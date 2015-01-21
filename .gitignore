@@ -1,0 +1,30 @@
+# my
+ignore/
+notes
+goals
+TODO
+
+# Haskell
+dist
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+.virtualenv
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+cabal.config
+report.html
+
+# Emacs
+\#*
+*~
+.#*
+\#*\#
+*.log
+
+# OS X
+.DS_Store
+

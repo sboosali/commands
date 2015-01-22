@@ -1,0 +1,133 @@
+name:    commands-core
+version: 0.0.0
+--       | | +----- no API change
+--       | +------- non-breaking API change (i.e. additions)
+--       +--------- breaking API change (i.e. deletions/modifications)
+-- http://semver.org/
+
+-- a short description, shows up in the search result from hackage
+synopsis: control your computer by voice, with "grammar combinators"
+category: Voice Control, Speech Recognition, Parsing, Natural Language Processing
+
+description:
+ Define @Grammar@s declaratively/modularly with combinators, which simultaneously induce @Parser@s and (for serialization) @Recognizer@s.
+ .
+ @parse@ natural language commands with a @Grammar@, @compile@ the @data@ into @Action@s, and @execute@ those @Action@s on your computer.
+ .
+ The <http://hackage.haskell.org/package/commands commands> package comes with "batteries included".
+
+author:     Spiros Boosalis
+maintainer: samboosalis@gmail.com
+
+homepage:    https://github.com/sboosali/commands-core#readme
+bug-reports: https://github.com/sboosali/commands-core/issues
+
+copyright:    Copyright (C) 2015 Spiros M. Boosalis
+license:      GPL-3
+license-file: LICENSE
+
+build-type:  Simple
+stability:   experimental
+tested-with: GHC == 7.8.3
+
+-- extra files to be distributed with the package
+extra-source-files:
+ README.md
+
+-- extra files to be distributed with the package
+-- access with:
+--  getDataFileName :: FilePath -> IO FilePath
+--  file <- getDataFileName "data/file.txt"
+--  data <- readFile file
+data-files:
+
+-- constraint on the version of Cabal needed to build this package
+cabal-version:       >=1.10
+
+
+source-repository head
+ type:     git
+ location: https://github.com/sboosali/commands-core
+
+
+library
+
+ -- directories with source files
+ hs-source-dirs: sources
+
+ -- modules exported by the library
+ exposed-modules:
+  Commands.Etc
+  Commands.Plugins.Example
+
+ -- modules included in this library, but not exported
+ other-modules:
+
+ -- other library packages from which modules are imported
+ build-depends:
+  exceptions    ==0.6.*,
+
+  base          ==4.7.*
+
+ -- base language which the package is written in
+ default-language: Haskell2010
+
+ ghc-options:
+  -Wall
+  -fno-warn-name-shadowing
+
+
+test-suite tests
+ main-is:        Tests.hs
+ hs-source-dirs: tests
+
+ -- cabal will say the tests pass only if `main-is` exits with zero
+ type: exitcode-stdio-1.0
+
+ default-language: Haskell2010
+ ghc-options:
+  -threaded
+
+ build-depends:
+  commands-core,
+
+  QuickCheck ==2.7.*,
+  doctest    ==0.9.*,
+
+  base       ==4.7.*
+
+
+executable example
+ main-is:        Example.hs
+ hs-source-dirs: executables
+
+ default-language: Haskell2010
+ ghc-options:
+  -Wall
+  -fno-warn-name-shadowing
+
+ build-depends:
+  commands-core,
+  base ==4.7.*
+
+
+-- http://haskell.org/cabal/users-guide/
+
+-- $ cabal sandbox init
+-- $ time cabal install --only-dependencies
+-- $ cabal build
+
+-- $ cabal repl
+-- # loads modules in `exposed-modules` under `library` (into ghci)
+-- Commands>
+
+-- $ cabal install --enable-tests
+-- $ cabal configure --enable-tests
+-- $ cabal build && cabal test
+-- # runs tests in the `main` function in the file in `main-is` under `test-suite`
+
+-- $ cabal haddock && open dist/doc/html/commands-core/index.html
+-- # .cabal-sandbox/share/doc/$COMPILER/$PACKAGE-VERSION/html/$MODULE
+
+-- # find dist/build/
+-- # rm -fr dist/

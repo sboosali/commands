@@ -93,8 +93,8 @@ module Commands.Plugins.Example where
 
 
 
--- main = do
---  putStrLn ""
+main = do
+ putStrLn ""
 --  -- handleParse (command `parses` "unknown-command")
 --  -- putStrLn ""
 --  -- handleParse (command `parses` "replace this no-with")

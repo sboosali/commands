@@ -22,9 +22,8 @@ run:
 	cabal run
 
 test:
-	cabal test
-	@echo
-	cat dist/test/*-tests.log
+	cabal test && echo && cat dist/test/*-tests.log
+
 
 document:
 	cabal haddock

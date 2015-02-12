@@ -8,11 +8,9 @@ module Commands.Parsec
 ) where
 import           Commands.Etc
 
-import           Control.Monad.Catch   (throwM)
-import           Data.Functor.Identity
-import           Text.Parsec           hiding (Parsec, many, parse, space,
-                                        (<|>))
-import qualified Text.Parsec           as Parsec
+import           Control.Monad.Catch (throwM)
+import           Text.Parsec         hiding (Parsec, many, parse, space, (<|>))
+import qualified Text.Parsec         as Parsec
 
 import           Control.Applicative
 
@@ -23,7 +21,10 @@ import           Control.Applicative
 -- parent to child as argument. i.e. we would want @Reader@ with
 -- @local@ if anything (I think), not "non-local" @State@. hence the
 -- unit @State@ @()@.
-type Parsec = ParsecT String () Identity
+type Parsec = Parsec.Parsec String ()
+
+-- type Parsec = ParsecT String () Identity
+-- commented out, because doctest loads module with different Transformers versions
 
 type Word = String
 

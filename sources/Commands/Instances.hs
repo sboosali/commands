@@ -2,11 +2,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Commands.Instances where
 
-import Control.Monad.Catch
+import Control.Monad.Catch (Exception)
+import Data.Typeable       (Typeable)
 import Text.Parsec         (ParseError)
-
-import Data.Typeable
 
 
 deriving instance Typeable  ParseError
 instance          Exception ParseError
+

@@ -1,6 +1,12 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables                            #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Commands.Plugins.Example where
+import           Commands.Etc                      ()
+import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Text
+import           Commands.Frontends.Dragon13.Types
+import qualified Data.Text.Lazy                    as T
 -- import Commands.Parse
 -- import Commands.Parse.Types
 -- import Commands.Parsec
@@ -91,35 +97,31 @@ module Commands.Plugins.Example where
 --  , DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
 --  ]
 
+grammar = DNSGrammar command [subcommand, flag] :: DNSGrammar Text Text
+
+command = DNSProduction (DNSRule "command")
+ [ DNSSequence
+   [ DNSTerminal (DNSToken "git")
+   , DNSNonTerminal (DNSRule "subcommand")
+   , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
+   ]
+ , DNSTerminal (DNSToken "ls")
+ ]
+
+subcommand = DNSProduction (DNSRule "subcommand")
+ [ DNSTerminal (DNSToken "status")
+ , DNSNonTerminal (DNSBuiltin DGNDictation)
+ ]
+
+flag = DNSVocabulary (DNSList "flag")
+ [ DNSPronounced "-f" "force"
+ , DNSPronounced "-r" "recursive"
+ , DNSPronounced "-a" "all"
+ , DNSPronounced "-i" "interactive"
+ ]
 
 
 main = do
  putStrLn ""
---  -- handleParse (command `parses` "unknown-command")
---  -- putStrLn ""
---  -- handleParse (command `parses` "replace this no-with")
---  -- putStrLn ""
---  -- handleParse (command `parses` "replace with dictation-can't-have-zero-words")
-
---  putStrLn ""
---  print . all (== Just (goodDirectionsF)) . map (directions' `parses`) $ exampleDirections
---  print $ outputDirectionsF == ((directions' `parses`) =<< inputDirectionsF)
---  putStrLn ""
---  print . all (== (Just goodDirections))  . map (directions `parses`)  $ exampleDirections
---  print =<< directions `parses` "directions to San Francisco from Redwood City by the bike"
-
---  putStrLn ""
---  print $ "directions =" <> render directions
---  putStrLn ""
---  print $ "directions' =" <> render directions'
---  putStrLn ""
---  -- print $ "command =" ++ render command
-
---  putStrLn ""
---  -- handleParse ( command `parses` "undo")
---  -- handleParse ( command `parses` "replace this and that with that and this")
---  -- handleParse ( command `parses` "3 undo")
---  -- handleParse ( test `parses` "test test 3 undo")
---  -- handleParse ( test' `parses` "test' test' 3 undo")
---  -- handleParse ( test `parses` "test test replace this and that with that and this")
---  -- handleParse ( test' `parses` "test' test' replace this and that with that and this")
+ escaped <- escapeDNSGrammar grammar
+ putStrLn . T.unpack . serialize' 50 $ escaped

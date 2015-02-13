@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE DataKinds, GADTs, OverloadedStrings, PatternSynonyms #-}
+{-# LANGUAGE RankNTypes                                           #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- | pretty printer combinators for format readability.
 --
@@ -6,26 +7,27 @@ module Commands.Frontends.Dragon13 where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
+import           Data.Bifoldable
+import           Data.Bitraversable
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 
 
-serialize :: DragonGrammar DragonText -> Text
+-- |
+--
+serialize :: DNSGrammar DNSName DNSText -> Text
 serialize = serialize' 80
 
 -- | unlimited width, as it will be embedded in a Python file. or limited 80 character went for easier reading, as the format is whitespace insensitive, I think.
-serialize' :: Int -> DragonGrammar DragonText -> Text
+serialize' :: Int -> DNSGrammar DNSName DNSText -> Text
 serialize' width = displayT . renderPretty 1.0 width . serializeGrammar
 
 -- |
 --
 -- >>> :set -XOverloadedStrings
--- >>> let command = DragonExport (DragonRule "command") (DragonAlternatives [DragonTerminal (DragonToken "git"), DragonNonTerminal (DragonLHSRule (DragonRule "subcommand")), DragonOptional (DragonMultiple (DragonNonTerminal (DragonLHSList (DragonList "flag"))))])
--- >>> let subcommand = DragonProduction (DragonRule "subcommand") (DragonAlternatives [DragonTerminal (DragonToken "status"), DragonNonTerminal (DragonLHSRule (DragonBuiltin DGNDictation))])
--- >>> let flag = DragonVocabulary (DragonList "flag") [DragonPronounced "f" "force", DragonPronounced "r" "recursive"]
--- >>> let grammar = DragonGrammar command [subcommand, flag] :: DragonGrammar Text
--- >>> escaped <- escapeDragonGrammar grammar
+-- >>> import Commands.Plugins.Example (grammar, command, subcommand, flag)
+-- >>> escaped <- escapeDNSGrammar grammar
 -- >>> putStrLn . T.unpack . serialize' 50 $ escaped
 -- <dgndictation> imported;
 -- <BLANKLINE>
@@ -33,74 +35,105 @@ serialize' width = displayT . renderPretty 1.0 width . serializeGrammar
 -- <BLANKLINE>
 -- <dgnletters> imported;
 -- <BLANKLINE>
--- <command> exported  = "git"
---                     | <subcommand>
---                     | [({flag})+];
+-- <command> exported  = "git" <subcommand>
+--                       [({flag})+]
+--                     | "ls";
 -- <BLANKLINE>
 -- <subcommand>  = "status" | <dgndictation>;
 -- <BLANKLINE>
--- {flag}  = "f"\"force" | "r"\"recursive";
+-- {flag}  = "force"
+--         | "recursive"
+--         | "all"
+--         | "interactive";
 --
--- the "hung" line exceeded the width of 50 characters:
+-- the "hung" lines exceeded the width of 30 characters:
 --
 -- @
--- \<command> exported  = "git" | \<subcommand> | [({flag})+];
--- ---------10--------20--------30----------40------50======
+-- {flag}  = "force" | "recursive" | "all";
+-- ---------10--------20--------30==========40
 -- @
 --
 -- this improves readability of long rules.
 --
 --
 --
-serializeGrammar :: DragonGrammar DragonText -> Doc
-serializeGrammar (DragonGrammar export productions) = cat . punctuate "\n" . (map serializeProduction header <>) . (serializeExport export :) . map serializeProduction $ productions
-
-header :: [DragonProduction s]
-header = map (DragonImport . DragonLHSRule . DragonBuiltin) constructors
+serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
+serializeGrammar (DNSGrammar export productions)
+ = cat
+ . punctuate "\n"
+ . (map serializeProduction dnsHeader <>)
+ . (serializeExport export :)
+ . map serializeProduction
+ $ productions
 
 -- |
-serializeExport :: DragonExport DragonText -> Doc
-serializeExport (DragonExport rule (DragonAlternatives rs)) =
- serializeRule rule <+> "exported" <+> encloseSep " = " ";" " | " (map serializeRHS rs)
-serializeExport (DragonExport rule r) =
-  serializeRule rule <+> "exported" <+> " =" <+> serializeRHS r <> ";"
+serializeExport :: DNSProduction True DNSName DNSText -> Doc
+serializeExport (DNSProduction l rs) =
+ serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeRHS rs)
+serializeExport (DNSVocabulary l ts) =
+ serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeToken ts)
 
 -- |
 --
-serializeProduction :: DragonProduction DragonText -> Doc
-serializeProduction (DragonProduction rule (DragonAlternatives rs)) =
-  serializeRule rule <+> encloseSep " = " ";" " | " (map serializeRHS rs)
-serializeProduction (DragonProduction rule r) =
-  serializeRule rule <+> " =" <+> serializeRHS r <> ";"
-serializeProduction (DragonVocabulary list ts) =
-  serializeList list <+> encloseSep " = " ";" " | " (map serializeToken ts)
-serializeProduction (DragonImport l) =
-  serializeLHS l <+> "imported" <> ";"
+serializeProduction :: DNSProduction False DNSName DNSText -> Doc
+serializeProduction (DNSProduction l rs) =
+ serializeLHS l <+> encloseSep " = " ";" " | " (map serializeRHS rs)
+serializeProduction (DNSVocabulary l ts) =
+ serializeLHS l <+> encloseSep " = " ";" " | " (map serializeToken ts)
+serializeProduction (DNSImport l) = serializeLHS l <+> "imported" <> ";"
 
--- serializeEquation :: Bool -> DragonLHS DragonText -> Either [DragonToken DragonText] (DragonRHS DragonText) -> Doc
-
---  |  align, for readability
--- consolidate DragonAlternatives with concat, as a rewrite, an
+--  |  align, fo r readability
+-- consolidate DNSAlternatives with concat, as a rewrite, an
 -- optimization for readability
-serializeRHS :: DragonRHS DragonText -> Doc
-serializeRHS (DragonTerminal t) = serializeToken t
-serializeRHS (DragonNonTerminal l) = serializeLHS l
-serializeRHS (DragonOptional r) = "[" <> serializeRHS r <> "]"
-serializeRHS (DragonMultiple r) = "(" <> serializeRHS r <> ")+"
-serializeRHS (DragonAlternatives rs) = "(" <> (cat . punctuate " | " . map serializeRHS $ rs) <> ")"
+serializeRHS :: DNSRHS DNSName DNSText -> Doc
+serializeRHS (DNSTerminal t)      = serializeToken t
+serializeRHS (DNSNonTerminal l)   = serializeLHS l
+serializeRHS (DNSSequence rs)     = align . fillSep . map serializeRHS $ rs
+serializeRHS (DNSAlternatives rs) = "(" <> (cat . punctuate " | " . map serializeRHS $ rs) <> ")"
+serializeRHS (DNSOptional r)      = "[" <> serializeRHS r <> "]"
+serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
 
-serializeLHS :: DragonLHS DragonText -> Doc
-serializeLHS (DragonLHSList list) = serializeList list
-serializeLHS (DragonLHSRule rule) = serializeRule rule
+serializeLHS :: DNSLHS lhs DNSName -> Doc
+serializeLHS (DNSRule (DNSName s)) = "<" <> text s <> ">"
+serializeLHS (DNSBuiltin b)        = "<" <> (text . T.toLower . T.pack . show $ b) <> ">"
+serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
 
-serializeRule :: DragonLHSRule DragonText -> Doc
-serializeRule (DragonRule (DragonText s)) = "<" <> text s <> ">"
-serializeRule (DragonBuiltin b) = "<" <> (text . T.toLower . T.pack . show $ b) <> ">"
+-- |
+--
+-- ignores the "written" field of 'DNSPronounced', only serializing
+-- the "pronounced" field.
+serializeToken :: DNSToken DNSText -> Doc
+serializeToken (DNSToken (DNSText s)) = dquotes (text s)
+serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
-serializeList :: DragonLHSList DragonText -> Doc
-serializeList (DragonList (DragonText s)) = "{" <> text s <> "}"
+-- | import all 'DNSBuiltins', whether used or not.
+dnsHeader :: [DNSProduction False name token]
+dnsHeader = map (DNSImport . DNSBuiltin) constructors
 
-serializeToken :: DragonToken DragonText -> Doc
-serializeToken (DragonToken (DragonText s)) = dquotes (text s)
-serializeToken (DragonPronounced (DragonText s1) (DragonText s2)) = dquotes (text s1) <> "\\" <> dquotes (text s2)
+-- |
+--
+-- just a 'bitraverse'.
+--
+escapeDNSGrammar :: DNSGrammar Text Text -> Possibly (DNSGrammar DNSName DNSText)
+escapeDNSGrammar grammar = biforM grammar escapeDNSName escapeDNSText
 
+-- |
+--
+-- just a ''.
+--
+getTokens :: DNSGrammar n t -> [t]
+getTokens = undefined
+
+-- |
+--
+-- just a ''.
+--
+getNames :: DNSGrammar n t -> [n]
+getNames = undefined
+
+-- |
+--
+-- just a 'bifoldMap'.
+--
+getTokensAndNames :: DNSGrammar n t -> ([t],[n])
+getTokensAndNames = undefined

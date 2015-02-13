@@ -67,6 +67,7 @@ data Some f = forall x. Some (f x)
 -- >>> constructors :: [Bool]
 -- [False,True]
 --
+
 constructors :: (Enum a) => [a]
 constructors = enumFrom (toEnum 0)
 
@@ -76,4 +77,5 @@ newtype Identifier = Identifier String deriving (Show, Eq, Ord)
 
 -- | should have four field: @Version@.
 data GUI = GUI !Package !Module !Identifier
+
 

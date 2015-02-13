@@ -12,4 +12,5 @@ main = doctest
  , "sources/Commands/Frontends/Dragon13"
  , "sources/Commands/Frontends/Dragon13/Types"
  , "sources/Commands/Frontends/Dragon13/Text"
+ , "sources/Commands/Plugins/Example"
  ]

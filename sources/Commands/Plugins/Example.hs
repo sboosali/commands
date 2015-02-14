@@ -6,7 +6,18 @@ import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
-import qualified Data.Text.Lazy                    as T
+-- import qualified Data.Text.Lazy                    as T
+import qualified Data.Text.Lazy.IO                 as T
+import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
+-- import Control.Lens (alongside,Prism',Traversal',Lens)
+-- import Control.Exception.Lens (handling, _IOException, AsIOException)
+-- import System.IO.Error.Lens (description, location)
+-- -- import System.IO.Error.Lens (errorType,_UserError,description)
+-- import Control.Monad.Catch (SomeException)
+-- import           Data.Monoid                       ((<>))
+import           Data.Either.Validation            (Validation (..))
+
+
 -- import Commands.Parse
 -- import Commands.Parse.Types
 -- import Commands.Parsec
@@ -97,15 +108,20 @@ import qualified Data.Text.Lazy                    as T
 --  , DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
 --  ]
 
-grammar = DNSGrammar command [subcommand, flag] :: DNSGrammar Text Text
+grammar = DNSGrammar root [command, subcommand, flag] :: DNSGrammar Text Text
 
-command = DNSProduction (DNSRule "command")
+root = DNSProduction (DNSRule "root")
  [ DNSSequence
-   [ DNSTerminal (DNSToken "git")
+   [ DNSNonTerminal (DNSList "command")
    , DNSNonTerminal (DNSRule "subcommand")
    , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
    ]
  , DNSTerminal (DNSToken "ls")
+ ]
+
+command = DNSVocabulary (DNSList "command")
+ [ DNSToken "git"
+ , DNSToken "rm"
  ]
 
 subcommand = DNSProduction (DNSRule "subcommand")
@@ -121,7 +137,59 @@ flag = DNSVocabulary (DNSList "flag")
  ]
 
 
+-- | traverse with monoidal error collecting
+badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
+
+
+w = 10
 main = do
+ let Success escaped = escapeDNSGrammar grammar
  putStrLn ""
- escaped <- escapeDNSGrammar grammar
- putStrLn . T.unpack . serialize' 50 $ escaped
+ T.putStrLn . displaySerialization w $ "gramSpec =" <+> serializeGrammar escaped
+ putStrLn ""
+ T.putStrLn . displaySerialization w $ "_commands_lists =" <+> serializeVocabularies (dnsProductions escaped)
+
+ putStrLn ""
+ putStr "words: "
+ print $ getWords grammar
+ putStr "names: "
+ print $ getNames grammar
+
+ -- handling ERROR with HANDLER run ACTION
+ let Failure errors = escapeDNSGrammar badGrammar
+ print errors
+
+ -- handling
+ --  (_IOException . description)
+ --  (\(dl) -> putStrLn $ "caught+thrown: {" <> dl <> "}")
+ --  (escapeDNSGrammar badGrammar >> putStrLn "uncaught/unthrown")
+
+--
+-- _IOException :: Prism' IOException   IOException
+-- _IOException :: Prism' SomeException IOException
+-- description  :: Lens'  IOException   String
+-- location     :: Lens'  IOException   String
+-- errorType    :: Lens'  IOException   IOErrorType
+-- _UserError   :: Prism' IOErrorType   ()
+--
+-- alongside :: LensLike (Context a b) s t a b -> LensLike (Context a' b') s' t' a' b' -> Lens (s, s') (t, t') (a, a') (b, b')
+-- alongside :: Lens' s a -> Lens' s' a' -> Lens' (s, s') (a,a')
+-- alongside :: Lens' IOException String -> Lens' IOException String -> Lens' (IOException,IOException) (String,String)
+--
+--  :: Lens' s a -> Lens' s a' -> Lens' s (a,a')
+--  :: Lens' IOException String -> Lens' IOException String -> Lens' IOException (String,String)
+--
+--  :: Lens' s a -> Lens' (s,s) a
+--   just clone the whole. for exception handling, maybe there is a more efficient alternative
+--  :: Lens s (s,s) a a
+--   think composing lenses, not applying functions!
+--
+-- infixr . 9
+-- a . (b . c)
+--
+
+-- forked :: Lens (s,s) s a a
+-- forked = undefined
+
+  -- (_IOException . forked . alongside description location)
+  -- (\(d,l) -> putStrLn $ "caught+thrown: {" <> d <> "} at " <> l)

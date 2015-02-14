@@ -15,14 +15,15 @@ module Commands.Frontends.Dragon13.Text
 import           Commands.Etc
 import           Control.Applicative
 import           Data.Char
+import           Data.Monoid         ((<>))
 import           Data.Text.Lazy      (Text)
 import qualified Data.Text.Lazy      as T
 
 
-newtype DNSName = DNSName Text deriving (Show, Eq, Ord)
+newtype DNSName = DNSName { unDNSName :: Text } deriving (Show, Eq, Ord)
 -- pattern DNSName s <- DNSName_ s
 
-newtype DNSText = DNSText Text deriving (Show, Eq, Ord)
+newtype DNSText = DNSText { unDNSText :: Text } deriving (Show, Eq, Ord)
 -- pattern DNSText s <- DNSText_ s
 
 
@@ -34,15 +35,15 @@ newtype DNSText = DNSText Text deriving (Show, Eq, Ord)
 --
 -- >>> :set -XOverloadedStrings
 -- >>> escapeDNSName "a_1"
--- DNSName "a_1"
+-- DNSName {unDNSName = "a_1"}
 -- >>> escapeDNSName "1_a"
--- *** Exception: user error (escapeDNSName)
+-- *** Exception: user error (escapeDNSName "1_a")
 -- >>> escapeDNSName "α"
--- *** Exception: user error (escapeDNSName)
+-- *** Exception: user error (escapeDNSName "\945")
 -- >>> escapeDNSName "'''"
--- *** Exception: user error (escapeDNSName)
+-- *** Exception: user error (escapeDNSName "'''")
 -- >>> escapeDNSName ""
--- *** Exception: user error (escapeDNSName)
+-- *** Exception: user error (escapeDNSName "")
 --
 -- TODO fails on DNSPronounced "-f" "force"
 --
@@ -54,7 +55,7 @@ newtype DNSText = DNSText Text deriving (Show, Eq, Ord)
 escapeDNSName :: Text -> Possibly DNSName
 escapeDNSName s
  | isPythonIdentifier s = return . DNSName $ s
- | otherwise = failed "escapeDNSName"
+ | otherwise = failed $ "escapeDNSName " <> show s
  where
  isPythonIdentifier s = T.all isAscii s && case T.uncons s of
     Nothing    -> False
@@ -62,20 +63,36 @@ escapeDNSName s
 
 -- | Its output should be:
 --
--- * safe to interpolate into any Python docstring (double-quoted or
--- single-quoted)
---
+-- * safe to interpolate into any Python string (double-quoted or
+-- single-quoted, docstring or not)
+-- * the only whitespace are spaces
 -- * nonempty
+--
+-- >>> :set -XOverloadedStrings
+-- >>> escapeDNSText "some words"
+-- DNSText {unDNSText = "some words"}
+-- >>> escapeDNSText "1_a"
+-- DNSText {unDNSText = "1_a"}
+-- >>> escapeDNSText "some\nwords"
+-- *** Exception: user error (escapeDNSText "some\nwords")
+-- >>> escapeDNSText "α"
+-- *** Exception: user error (escapeDNSText "\945")
+-- >>> escapeDNSText "'"
+-- *** Exception: user error (escapeDNSText "'")
+-- >>> escapeDNSText "\""
+-- *** Exception: user error (escapeDNSText "\"")
+-- >>> escapeDNSText ""
+-- *** Exception: user error (escapeDNSText "")
 --
 --
 escapeDNSText :: Text -> Possibly DNSText
 escapeDNSText s
  | isValid s = return . DNSText $ s
- | otherwise = failed "escapeDNSText"
+ | otherwise = failed $ "escapeDNSText " <> show s
  where
  isValid s
   =  not (T.null s)
   && T.all isAscii s
-  && T.all (not . (=='\n')) s
-  && not ("'''" `T.isInfixOf` s)
-  && not ("\"\"\"" `T.isInfixOf` s)
+  && T.all ((||) <$> (not . isSpace) <*> (==' ')) s
+  && not ("'" `T.isInfixOf` s)
+  && not ("\"" `T.isInfixOf` s)

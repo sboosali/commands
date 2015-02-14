@@ -26,8 +26,10 @@ import Prelude             hiding (mapM)
 -- extra constraint that only one production is exported. I hope this
 -- constraint isn't too restrictive for future uses.
 --
-data DNSGrammar name token
- = DNSGrammar (DNSProduction True name token) [DNSProduction False name token]
+data DNSGrammar name token = DNSGrammar
+ { dnsExport      :: DNSProduction True name token
+ , dnsProductions :: [DNSProduction False name token] -- TODO NonEmpty
+ }
 
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
 instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
@@ -36,8 +38,8 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
   DNSGrammar <$> bitraverse f g production
              <*> traverse (bitraverse f g) productions
 
--- | you can both import and export 'DNSList's, just like 'DNSRule's.
--- 'DNSImport's can't be exported.
+-- | you can import and export only 'DNSRule's, not 'DNSList's.
+-- and obviously, 'DNSImport's can't be exported.
 --
 -- (does {exported} need distinct constructors, or a proxy like a Singleton)
 -- I guess, to construct a DNSProduction with some desired {exported},
@@ -46,16 +48,16 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
 -- e.g. @<rule> = ...;@
 -- e.g. @<rule> exported = ...;@
 --
--- e.g. @{list} = ...;@
--- e.g. @{list} exported = ...;@
+-- e.g. @self.setList('list', [...])@
 --
 -- e.g. @<rule> imported;@
--- e.g. @{list} imported;@
 --
 data DNSProduction exported name token where
  DNSProduction :: DNSLHS LHSRule name -> [DNSRHS name token] -> DNSProduction exported name token
- DNSVocabulary :: DNSLHS LHSList name -> [DNSToken token] -> DNSProduction exported name token
- DNSImport     :: forall lhs name x. DNSLHS lhs name -> DNSProduction False name x
+ DNSVocabulary :: DNSLHS LHSList name -> [DNSToken token]    -> DNSProduction False name token
+ DNSImport     :: DNSLHS LHSRule name     -> DNSProduction False name x
+ -- TODO NonEmpty
+ -- TODO NonEmpty
 
 instance Bifunctor     (DNSProduction exported) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction exported) where bifoldMap = bifoldMapDefault
@@ -68,8 +70,8 @@ instance Bitraversable (DNSProduction exported) where -- valid Bitraversable?
 data DNSRHS name token
  = DNSTerminal (DNSToken token) -- ^ e.g. @"terminal"@
  | forall lhs. DNSNonTerminal (DNSLHS lhs name) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
- | DNSSequence [DNSRHS name token] -- ^ e.g. @first second ...@
- | DNSAlternatives [DNSRHS name token] -- ^ e.g. @(alternative | ...)@
+ | DNSSequence [DNSRHS name token] -- ^ e.g. @first second ...@ -- TODO NonEmpty
+ | DNSAlternatives [DNSRHS name token] -- ^ e.g. @(alternative | ...)@ -- TODO NonEmpty
  | DNSOptional (DNSRHS name token) -- ^ e.g. @[optional]@
  | DNSMultiple (DNSRHS name token) -- ^ e.g. @(multiple)+@
 

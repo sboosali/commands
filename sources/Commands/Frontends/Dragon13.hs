@@ -7,8 +7,13 @@ module Commands.Frontends.Dragon13 where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
+import           Control.Monad.Catch               (SomeException)
 import           Data.Bifoldable
+import           Data.Bifunctor                    (first)
 import           Data.Bitraversable
+import           Data.Either.Validation            (Validation,
+                                                    eitherToValidation)
+import           Data.List                         (nub)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
@@ -21,18 +26,16 @@ serialize = serialize' 80
 
 -- | unlimited width, as it will be embedded in a Python file. or limited 80 character went for easier reading, as the format is whitespace insensitive, I think.
 serialize' :: Int -> DNSGrammar DNSName DNSText -> Text
-serialize' width = displayT . renderPretty 1.0 width . serializeGrammar
+serialize' width = displaySerialization width . serializeGrammar
+
+displaySerialization :: Int -> Doc -> Text
+displaySerialization width = displayT . renderPretty 1.0 width
 
 -- |
 --
--- >>> :set -XOverloadedStrings
--- >>> import Commands.Plugins.Example (grammar, command, subcommand, flag)
--- >>> escaped <- escapeDNSGrammar grammar
--- >>> putStrLn . T.unpack . serialize' 50 $ escaped
+-- @
 -- <dgndictation> imported;
--- <BLANKLINE>
 -- <dgnwords> imported;
--- <BLANKLINE>
 -- <dgnletters> imported;
 -- <BLANKLINE>
 -- <command> exported  = "git" <subcommand>
@@ -45,12 +48,13 @@ serialize' width = displayT . renderPretty 1.0 width . serializeGrammar
 --         | "recursive"
 --         | "all"
 --         | "interactive";
+-- @
 --
--- the "hung" lines exceeded the width of 30 characters:
+-- any "hung" lines exceeded the width of 50 characters:
 --
 -- @
--- {flag}  = "force" | "recursive" | "all";
--- ---------10--------20--------30==========40
+-- {flag}  = "force" | "recursive" | "all" | "interactive";
+-- ---------10--------20--------30--------40--------50=====
 -- @
 --
 -- this improves readability of long rules.
@@ -58,29 +62,38 @@ serialize' width = displayT . renderPretty 1.0 width . serializeGrammar
 --
 --
 serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
-serializeGrammar (DNSGrammar export productions)
- = cat
+serializeGrammar (DNSGrammar export productions) = serializeImports dnsHeader <> line
+ <$$>
+ ( cat
  . punctuate "\n"
- . (map serializeProduction dnsHeader <>)
  . (serializeExport export :)
- . map serializeProduction
- $ productions
+ . concatMap serializeProduction
+ $ productions)
 
--- |
+-- | only insert one newline, between imports. not two, as between productions.
+serializeImports :: [DNSProduction False DNSName DNSText] -> Doc
+serializeImports = vsep . concatMap serializeProduction
+
+-- | just like @'serializeProduction' ('DNSProduction' ...)@, only
+-- with an @"exported"@ inserted.
 serializeExport :: DNSProduction True DNSName DNSText -> Doc
 serializeExport (DNSProduction l rs) =
  serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeRHS rs)
-serializeExport (DNSVocabulary l ts) =
- serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeToken ts)
 
 -- |
 --
-serializeProduction :: DNSProduction False DNSName DNSText -> Doc
-serializeProduction (DNSProduction l rs) =
+-- we have:
+--
+-- @'serializeProduction' 'DNSVocabulary'{} = 'empty'@
+--
+-- see 'serializeVocabulary' for the 'DNSVocabulary' case.
+--
+serializeProduction :: DNSProduction False DNSName DNSText -> [Doc]
+serializeProduction (DNSProduction l rs) = (:[]) $
  serializeLHS l <+> encloseSep " = " ";" " | " (map serializeRHS rs)
-serializeProduction (DNSVocabulary l ts) =
- serializeLHS l <+> encloseSep " = " ";" " | " (map serializeToken ts)
-serializeProduction (DNSImport l) = serializeLHS l <+> "imported" <> ";"
+serializeProduction (DNSImport l) = (:[]) $
+ serializeLHS l <+> "imported" <> ";"
+serializeProduction DNSVocabulary{} = [] -- mempty isn't identity to vertical alignment
 
 --  |  align, fo r readability
 -- consolidate DNSAlternatives with concat, as a rewrite, an
@@ -111,29 +124,86 @@ dnsHeader :: [DNSProduction False name token]
 dnsHeader = map (DNSImport . DNSBuiltin) constructors
 
 -- |
+-- 'serializeVocabulary' is separate (and very different) from
+-- 'serializeProduction'.
+-- this is because a 'DNSList' must be mutated in Python,
+-- not (as the 'DNSRules' are) defined in the @gramSpec@ string.
+serializeVocabularies :: [DNSProduction False DNSName DNSText] -> Doc
+serializeVocabularies
+ = enclosePythonic "{" "}" ","
+ . concatMap serializeVocabulary
+
+serializeVocabulary :: DNSProduction False DNSName DNSText -> [Doc]
+serializeVocabulary (DNSVocabulary (DNSList (DNSName n)) ts) = (:[]) $
+ (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (map serializeToken ts)
+serializeVocabulary _ = []
+-- serializeVocabulary _ = mempty -- not identity to all operations on documents
+
+-- | splits a multi-line collection-literal with the separator at the
+-- end of each line, not at the start.
 --
--- just a 'bitraverse'.
+-- compare Python-layout, via 'enclosePythonic':
 --
-escapeDNSGrammar :: DNSGrammar Text Text -> Possibly (DNSGrammar DNSName DNSText)
-escapeDNSGrammar grammar = biforM grammar escapeDNSName escapeDNSText
+-- @
+-- {"command": ["git",
+--              "rm"],
+--  "flag": ["force",
+--           "recursive",
+--           "all",
+--           "interactive"]}
+-- @
+--
+-- against Haskell-layout, via 'encloseSep':
+--
+-- @
+-- {"command": ["git"
+--             ,"rm"]
+-- ,"flag": ["force"
+--          ,"recursive"
+--          ,"all"
+--          ,"interactive"]}
+-- @
+--
+-- which doesn't parse as Python.
+--
+enclosePythonic :: Doc -> Doc -> Doc -> [Doc] -> Doc
+enclosePythonic left right sep ds
+  = left
+ <> (align . cat $ punctuate sep ds)
+ <> right
 
 -- |
 --
--- just a ''.
 --
-getTokens :: DNSGrammar n t -> [t]
-getTokens = undefined
-
--- |
---
--- just a ''.
---
-getNames :: DNSGrammar n t -> [n]
-getNames = undefined
+-- data DNSFormat = DNSFormat
+--  { dnsRules :: Text
+--  , dnsLists :: Text             --  ^ json?
+--  }
 
 -- |
 --
 -- just a 'bifoldMap'.
 --
-getTokensAndNames :: DNSGrammar n t -> ([t],[n])
-getTokensAndNames = undefined
+getWords :: (Eq t) => DNSGrammar n t -> [t]
+getWords = nub . bifoldMap (const []) (:[])
+
+-- |
+--
+-- just a 'bifoldMap'.
+--
+getNames :: (Eq n) => DNSGrammar n t -> [n]
+getNames = nub . bifoldMap (:[]) (const [])
+
+-- |
+--
+-- just a 'bitraverse'.
+--
+-- 'Validation' is just an Applicative (not Monad) because it doesn't short-circuit, running every computation to monoidally append all errors together
+escapeDNSGrammar :: DNSGrammar Text Text -> Validation [SomeException] (DNSGrammar DNSName DNSText)
+escapeDNSGrammar = bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
+
+
+-- |
+eitherToValidations :: Either e a -> Validation [e] a
+eitherToValidations = eitherToValidation . first (:[])
+

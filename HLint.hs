@@ -5,3 +5,4 @@ import "hint" HLint.Generalise
 ignore "Use unwords"
 ignore "Use fmap"
 ignore "Use map once"
+ignore "Use =<<"

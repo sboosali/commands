@@ -9,26 +9,27 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Foldable
+import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
 import Prelude             hiding (mapM)
 
 
--- | a nonempty list of productions, with at least one export.
--- the evolution of the type (I like to know the provenance of
--- designs, it motivates the inevitable complexity, so I thought
--- I would try to do that too):
--- type DNSGrammar = [DNSProduction]
--- type DNSGrammar = (DNSLHS, [DNSProduction])
--- data DNSGrammar = DNSGrammar DNSLHS [DNSProduction]
--- data DNSGrammar (s :: Safety) = DNSGrammar DNSLHS [DNSProduction s]
--- = DNSGrammar (DNSProduction name token True) [forall exported. DNSProduction name token exported]
+-- | a Dragon NaturallySpeaking (\"DNS") grammar has
+-- one or more 'DNSProduction's, exactly one of which is an export.
+-- (the "exactly one" constraint is really "at least one", but
+-- this restriction shouldn't matter).
 --
--- extra constraint that only one production is exported. I hope this
--- constraint isn't too restrictive for future uses.
+-- in the type @DNSGrammar n t@, you can read:
 --
-data DNSGrammar name token = DNSGrammar
- { dnsExport      :: DNSProduction True name token
- , dnsProductions :: [DNSProduction False name token] -- TODO NonEmpty
+-- * @n@ as @name@ or @nonTerminal@
+-- * @t@ as @text@ or @terminal@
+--
+-- a 'Bitraversable', because the terminals and the non-terminals
+-- are distinct lexemes, with different criteria for being valid.
+--
+data DNSGrammar n t = DNSGrammar
+ { dnsExport      :: DNSProduction True n t
+ , dnsProductions :: [DNSProduction False n t]
  }
 
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
@@ -38,46 +39,50 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
   DNSGrammar <$> bitraverse f g production
              <*> traverse (bitraverse f g) productions
 
--- | you can import and export only 'DNSRule's, not 'DNSList's.
--- and obviously, 'DNSImport's can't be exported.
+-- | The top-level statements of a grammar.
 --
--- (does {exported} need distinct constructors, or a proxy like a Singleton)
--- I guess, to construct a DNSProduction with some desired {exported},
--- you just annotate the expression. And you can change a hidden production to of visible production with the specialized identity: when composing grammars.
+-- in the type @DNSProduction e n t@, you can read:
 --
--- e.g. @<rule> = ...;@
--- e.g. @<rule> exported = ...;@
+-- * @e@ as @isExported@
+-- * @n@ as @name@ or @nonTerminal@
+-- * @t@ as @text@ or @terminal@
 --
--- e.g. @self.setList('list', [...])@
+-- in relation to NatLink's concrete syntax:
 --
--- e.g. @<rule> imported;@
+-- * @"\<rule> = ...;"@ has type @'DNSProduction' 'False'@
+-- * @"\<rule> exported = ...;"@ has type @'DNSProduction' 'True'@
+-- * @"self.setList('list', [...])"@ is a 'DNSVocabulary'
+-- * @"\<rule> imported;"@ is a 'DNSImport'
 --
-data DNSProduction exported name token where
- DNSProduction :: DNSLHS LHSRule name -> [DNSRHS name token] -> DNSProduction exported name token
- DNSVocabulary :: DNSLHS LHSList name -> [DNSToken token]    -> DNSProduction False name token
- DNSImport     :: DNSLHS LHSRule name     -> DNSProduction False name x
- -- TODO NonEmpty
- -- TODO NonEmpty
+-- a @GADT@ to constrain the exportability and the right-hand sides of
+-- its constructors.
+-- you can import and export only 'DNSRule's (including 'DNSBuiltin's),
+-- not 'DNSList's. a 'DNSVocabulary' can be named only by 'LHSList's, as
+-- a 'DNSProduction' can be named only by 'LHSRule's.
+--
+data DNSProduction e n t where
+ DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
+ DNSVocabulary :: DNSLHS LHSList n -> NonEmpty (DNSToken t) -> DNSProduction False n t
+ DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
 
-instance Bifunctor     (DNSProduction exported) where bimap     = bimapDefault
-instance Bifoldable    (DNSProduction exported) where bifoldMap = bifoldMapDefault
-instance Bitraversable (DNSProduction exported) where -- valid Bitraversable?
+instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
+instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
+instance Bitraversable (DNSProduction e) where
  bitraverse f g (DNSProduction l rs) = DNSProduction <$> traverse f l <*> traverse (bitraverse f g) rs
  bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
  bitraverse f _ (DNSImport l)        = DNSImport     <$> traverse f l
 
--- | EBNF-like
-data DNSRHS name token
- = DNSTerminal (DNSToken token) -- ^ e.g. @"terminal"@
- | forall lhs. DNSNonTerminal (DNSLHS lhs name) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
- | DNSSequence [DNSRHS name token] -- ^ e.g. @first second ...@ -- TODO NonEmpty
- | DNSAlternatives [DNSRHS name token] -- ^ e.g. @(alternative | ...)@ -- TODO NonEmpty
- | DNSOptional (DNSRHS name token) -- ^ e.g. @[optional]@
- | DNSMultiple (DNSRHS name token) -- ^ e.g. @(multiple)+@
-
-
--- does ExistentialQuantification in DNSLHS allow exhaustive pattern matching?
- -- LHS is one of two, the GADT has only three constructors
+-- | the
+-- <https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form EBNF>-like
+-- grammar specification.
+--
+data DNSRHS n t
+ = DNSTerminal (DNSToken t) -- ^ e.g. @"terminal"@
+ | forall l. DNSNonTerminal (DNSLHS l n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
+ | DNSSequence (NonEmpty (DNSRHS n t)) -- ^ e.g. @first second ...@
+ | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
+ | DNSOptional (DNSRHS n t) -- ^ e.g. @[optional]@
+ | DNSMultiple (DNSRHS n t) -- ^ e.g. @(multiple)+@
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault
@@ -89,49 +94,54 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
  bitraverse f g (DNSOptional r)      = DNSOptional     <$> bitraverse f g r
  bitraverse f g (DNSMultiple r)      = DNSMultiple     <$> bitraverse f g r
 
-data DNSToken token
- = DNSToken token -- ^ e.g. @"word or phrase"@
- | DNSPronounced token token -- ^ e.g. @written\\spoken@
+-- | the "leaves" of the grammar.
+data DNSToken t
+ = DNSToken t -- ^ e.g. @"word or phrase"@
+ | DNSPronounced t t -- ^ e.g. @written\\spoken@
  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
--- | "isomorphic" to
--- @type DNSLHS s = Either (DNSLHSList s) (DNSLHSRule s)@.
--- But, to derive @Functor, Traversable@:
--- "Constructor ‘DNSLHS’ must use the type variable only as the
--- last argument of a data type"
+-- |
 --
+-- in the type @DNSLHS l n@, you can read:
 --
--- e.g. @<rule>@
--- e.g. @<dgndictation>@
--- e.g. @{list}@
+-- * @l@ as @leftHandSide@
+-- * @n@ as @name@ or @nonTerminal@
 --
+-- in relation to NatLink's concrete syntax:
 --
-data DNSLHS lhs name where
- DNSRule    :: name       -> DNSLHS LHSRule name
+-- * @"\<rule>"@ is a 'DNSRule'
+-- * @"\<dgndictation>"@ is a 'DNSBuiltin'
+-- * @"{list}@ is a 'DNSList
+--
+-- a @GADT@ to distinguish 'LHSRule's from 'LHSList's, which behave
+-- differently. without @GADT@s, we would need sacrifice
+-- either safety (by not distinguishing things that are distinct)
+-- or readability (by wrapping each distinction in its own type).
+--
+-- the instances are manual because of the error:
+--
+-- @
+-- Can't make a derived instance of ...:
+-- Constructor ... must not have existential arguments
+-- @
+--
+-- (see https://ghc.haskell.org/trac/ghc/ticket/8678)
+data DNSLHS l n where
+ DNSRule    :: n          -> DNSLHS LHSRule n
  DNSBuiltin :: DNSBuiltin -> DNSLHS LHSRule x
- DNSList    :: name       -> DNSLHS LHSList name
+ DNSList    :: n          -> DNSLHS LHSList n
 
--- | Can't make a derived instance of _: Constructor ‘_’ must not have existential arguments
--- https://ghc.haskell.org/trac/ghc/ticket/8678
--- deriving instance Functor     (DNSLHS lhs)
--- deriving instance Foldable    (DNSLHS lhs)
--- deriving instance Traversable (DNSLHS lhs)
 instance Functor     (DNSLHS lhs) where fmap     = fmapDefault
 instance Foldable    (DNSLHS lhs) where foldMap  = foldMapDefault
-instance Traversable (DNSLHS lhs) where -- valid Traversable?
+instance Traversable (DNSLHS lhs) where
  traverse f (DNSRule name) = DNSRule <$> f name
  traverse f (DNSList name) = DNSList <$> f name
  traverse _ (DNSBuiltin x) = pure $ DNSBuiltin x
-
--- oh no, deriving two instances of child GADT won't work, the parent ADT can use those methods when existentially quantified over the phantom type. must be derived polymorphic way over anything
 
 -- | Builtin 'DNSProduction's with 'DNSLHS's, but without
 -- 'DNSRHS's.
 data DNSBuiltin = DGNDictation | DGNWords | DGNLetters
  deriving (Show, Eq, Ord, Enum)
-
--- | don't use DataKinds in this module times because types share
--- names with constructors. Or can you?
 
 -- | for promotion by @DataKinds@.
 data LHSKind = LHSRule | LHSList

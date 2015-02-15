@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, OverloadedStrings, PatternSynonyms #-}
-{-# LANGUAGE RankNTypes                                           #-}
+{-# LANGUAGE RankNTypes, ViewPatterns                             #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- | pretty printer combinators for format readability.
 --
@@ -7,23 +7,43 @@ module Commands.Frontends.Dragon13 where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
-import           Control.Monad.Catch               (SomeException)
+import           Commands.Instances                ()
+import           Control.Monad                     ((<=<))
+import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bifoldable
 import           Data.Bifunctor                    (first, second)
 import           Data.Bitraversable
 import           Data.Either.Validation            (Validation,
-                                                    eitherToValidation)
+                                                    eitherToValidation,
+                                                    validationToEither)
+import           Data.Foldable                     (toList)
 import           Data.List                         (nub)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
+import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 
 
--- |
-serialize :: DNSGrammar Text Text -> Validation [SomeException] Text
-serialize = second (displayT . renderPretty 1.0 80 . serializeGrammar) . escapeDNSGrammar
+-- | serialize a grammar into a Python file, unless:
+--
+-- * the grammars terminals/non-terminals don't lex
+-- * the Python file doesn't parse
+--
+serialize :: DNSGrammar Text Text -> Either [SomeException] Text
+serialize = isPythonFile
+ <=< (second (displayT . renderPretty 1.0 80 . serializeGrammar) . escapeDNSGrammar)
 
--- | unlimited width, as it will be embedded in a Python file. or limited 80 character went for easier reading, as the format is whitespace insensitive, I think.
+-- | preserves the input when a valid Python file,
+-- reports the syntax error otherwise.
+--
+-- a "Kleisli arrow" (?).
+--
+isPythonFile :: Text -> Either [SomeException] Text
+isPythonFile s = case parseModule (T.unpack s) "" of
+ Right {} -> Right s
+ Left  e  -> Left [SomeException e]
+
+-- |
 --
 serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
 serializeGrammar grammar = grammar_
@@ -76,14 +96,15 @@ serializeRules (DNSGrammar export productions) = serializeImports dnsHeader <> l
  . concatMap serializeProduction
  $ productions)
 
--- | only insert one newline, between imports. not two, as between productions.
+-- | for readability, only insert one newline, between imports. not
+-- two, as between productions.
 serializeImports :: [DNSProduction False DNSName DNSText] -> Doc
 serializeImports = vsep . concatMap serializeProduction
 
 -- | just like @'serializeProduction' ('DNSProduction' ...)@, only
 -- with an @"exported"@ inserted.
 serializeExport :: DNSProduction True DNSName DNSText -> Doc
-serializeExport (DNSProduction l rs) =
+serializeExport (DNSProduction l (toList -> rs)) =
  serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeRHS rs)
 
 -- |
@@ -95,7 +116,7 @@ serializeExport (DNSProduction l rs) =
 -- see 'serializeVocabulary' for the 'DNSVocabulary' case.
 --
 serializeProduction :: DNSProduction False DNSName DNSText -> [Doc]
-serializeProduction (DNSProduction l rs) = (:[]) $
+serializeProduction (DNSProduction l (toList -> rs)) = (:[]) $
  serializeLHS l <+> encloseSep " = " ";" " | " (map serializeRHS rs)
 serializeProduction (DNSImport l) = (:[]) $
  serializeLHS l <+> "imported" <> ";"
@@ -107,8 +128,8 @@ serializeProduction DNSVocabulary{} = [] -- mempty isn't identity to vertical al
 serializeRHS :: DNSRHS DNSName DNSText -> Doc
 serializeRHS (DNSTerminal t)      = serializeToken t
 serializeRHS (DNSNonTerminal l)   = serializeLHS l
-serializeRHS (DNSSequence rs)     = align . fillSep . map serializeRHS $ rs
-serializeRHS (DNSAlternatives rs) = "(" <> (cat . punctuate " | " . map serializeRHS $ rs) <> ")"
+serializeRHS (DNSSequence (toList -> rs))     = align . fillSep . map serializeRHS $ rs
+serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . map serializeRHS $ rs) <> ")"
 serializeRHS (DNSOptional r)      = "[" <> serializeRHS r <> "]"
 serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
 
@@ -143,7 +164,7 @@ serializeVocabularies
  . concatMap serializeVocabulary
 
 serializeVocabulary :: DNSProduction False DNSName DNSText -> [Doc]
-serializeVocabulary (DNSVocabulary (DNSList (DNSName n)) ts) = (:[]) $
+serializeVocabulary (DNSVocabulary (DNSList (DNSName n)) (toList -> ts)) = (:[]) $
  (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (map serializeToken ts)
 serializeVocabulary _ = []
 -- serializeVocabulary _ = mempty -- not identity to all operations on documents
@@ -205,11 +226,14 @@ getNames = nub . bifoldMap (:[]) (const [])
 
 -- |
 --
+-- converts the Either to a 'Validation' as an intermediary
+-- structure, to report all errors, not just the first.
+--
 -- a 'bitraverse'.
 --
---
-escapeDNSGrammar :: DNSGrammar Text Text -> Validation [SomeException] (DNSGrammar DNSName DNSText)
-escapeDNSGrammar = bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
+-- a "Kleisli arrow" (?)
+escapeDNSGrammar :: DNSGrammar Text Text -> Either [SomeException] (DNSGrammar DNSName DNSText)
+escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
 
 -- | 'Validation' is just an Applicative (not Monad) because it doesn't short-circuit, running every computation to monoidally append all errors together
 eitherToValidations :: Either e a -> Validation [e] a

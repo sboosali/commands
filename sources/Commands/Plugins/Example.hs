@@ -16,7 +16,8 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 -- import Control.Monad.Catch (SomeException)
 -- import           Data.Monoid                       ((<>))
 import           Data.Bitraversable
-import           Data.Either.Validation            (Validation (..))
+-- import           Data.Either.Validation            (Validation (..))
+import           Data.List.NonEmpty                (fromList)
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 
@@ -113,8 +114,8 @@ import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 
 grammar = DNSGrammar root [command, subcommand, flag] :: DNSGrammar Text Text
 
-root = DNSProduction (DNSRule "root")
- [ DNSSequence
+root = DNSProduction (DNSRule "root") $ fromList
+ [ DNSSequence $ fromList
    [ DNSNonTerminal (DNSList "command")
    , DNSNonTerminal (DNSRule "subcommand")
    , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
@@ -122,17 +123,17 @@ root = DNSProduction (DNSRule "root")
  , DNSTerminal (DNSToken "ls")
  ]
 
-command = DNSVocabulary (DNSList "command")
+command = DNSVocabulary (DNSList "command") $ fromList
  [ DNSToken "git"
  , DNSToken "rm"
  ]
 
-subcommand = DNSProduction (DNSRule "subcommand")
+subcommand = DNSProduction (DNSRule "subcommand") $ fromList
  [ DNSTerminal (DNSToken "status")
  , DNSNonTerminal (DNSBuiltin DGNDictation)
  ]
 
-flag = DNSVocabulary (DNSList "flag")
+flag = DNSVocabulary (DNSList "flag") $ fromList
  [ DNSPronounced "-f" "force"
  , DNSPronounced "-r" "recursive"
  , DNSPronounced "-a" "all"
@@ -140,7 +141,7 @@ flag = DNSVocabulary (DNSList "flag")
  ]
 
 -- | traverse with monoidal error collecting
-badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
+badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") $ fromList [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
 
 
 isPythonDict :: String -> Bool
@@ -153,14 +154,14 @@ isPythonString s = case parseExpr s "" of
  Right (Strings {}, _) -> True
  _ -> False
 
-isPythonFile :: String -> Bool
-isPythonFile s = case parseModule s "" of
+isPythonModule :: String -> Bool
+isPythonModule s = case parseModule s "" of
  Right {} -> True
  _ -> False
 
 
 main = do
- let Success escaped = escapeDNSGrammar grammar
+ let Right escaped = escapeDNSGrammar grammar
  let serializedRules = vsep ["'''", serializeRules escaped, "'''"]
  let serializedLists = serializeVocabularies (dnsProductions escaped)
  let serializedGrammar = vsep $ punctuate "\n" [ "_commands_rules_ =" <+> serializedRules, "_commands_lists_ =" <+> serializedLists]
@@ -182,7 +183,7 @@ main = do
  putStrLn ""
  print $ (isPythonString . show) serializedRules
  print $ (isPythonDict . show) serializedLists
- print $ (isPythonFile . show) serializedGrammar
+ print $ (isPythonModule . show) serializedGrammar
 
  putStrLn ""
  _ <- bitraverse print T.putStrLn $ serialize grammar

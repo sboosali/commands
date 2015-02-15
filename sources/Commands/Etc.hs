@@ -66,6 +66,7 @@ data Some f = forall x. Some (f x)
 --
 -- >>> constructors :: [Bool]
 -- [False,True]
+
 --
 
 constructors :: (Enum a) => [a]

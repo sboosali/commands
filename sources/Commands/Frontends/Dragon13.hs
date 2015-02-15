@@ -9,7 +9,7 @@ import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Control.Monad.Catch               (SomeException)
 import           Data.Bifoldable
-import           Data.Bifunctor                    (first)
+import           Data.Bifunctor                    (first, second)
 import           Data.Bitraversable
 import           Data.Either.Validation            (Validation,
                                                     eitherToValidation)
@@ -20,16 +20,22 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 
 
 -- |
---
-serialize :: DNSGrammar DNSName DNSText -> Text
-serialize = serialize' 80
+serialize :: DNSGrammar Text Text -> Validation [SomeException] Text
+serialize = second (displayT . renderPretty 1.0 80 . serializeGrammar) . escapeDNSGrammar
 
 -- | unlimited width, as it will be embedded in a Python file. or limited 80 character went for easier reading, as the format is whitespace insensitive, I think.
-serialize' :: Int -> DNSGrammar DNSName DNSText -> Text
-serialize' width = displaySerialization width . serializeGrammar
-
-displaySerialization :: Int -> Doc -> Text
-displaySerialization width = displayT . renderPretty 1.0 width
+--
+serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
+serializeGrammar grammar = grammar_
+ where
+ grammar_ = vsep $ punctuate "\n"
+  [ "_commands_rules_ =" <+> "'''"
+  , rules_
+  , "'''"
+  , "_commands_lists_ =" <+> lists_
+  ]
+ rules_ = serializeRules grammar
+ lists_ = serializeLists grammar
 
 -- |
 --
@@ -61,8 +67,8 @@ displaySerialization width = displayT . renderPretty 1.0 width
 --
 --
 --
-serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
-serializeGrammar (DNSGrammar export productions) = serializeImports dnsHeader <> line
+serializeRules :: DNSGrammar DNSName DNSText -> Doc
+serializeRules (DNSGrammar export productions) = serializeImports dnsHeader <> line
  <$$>
  ( cat
  . punctuate "\n"
@@ -123,6 +129,9 @@ serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 dnsHeader :: [DNSProduction False name token]
 dnsHeader = map (DNSImport . DNSBuiltin) constructors
 
+serializeLists :: DNSGrammar DNSName DNSText -> Doc
+serializeLists = serializeVocabularies . dnsProductions
+
 -- |
 -- 'serializeVocabulary' is separate (and very different) from
 -- 'serializeProduction'.
@@ -182,28 +191,27 @@ enclosePythonic left right sep ds
 
 -- |
 --
--- just a 'bifoldMap'.
+-- a 'bifoldMap'.
 --
 getWords :: (Eq t) => DNSGrammar n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
 
 -- |
 --
--- just a 'bifoldMap'.
+-- a 'bifoldMap'.
 --
 getNames :: (Eq n) => DNSGrammar n t -> [n]
 getNames = nub . bifoldMap (:[]) (const [])
 
 -- |
 --
--- just a 'bitraverse'.
+-- a 'bitraverse'.
 --
--- 'Validation' is just an Applicative (not Monad) because it doesn't short-circuit, running every computation to monoidally append all errors together
+--
 escapeDNSGrammar :: DNSGrammar Text Text -> Validation [SomeException] (DNSGrammar DNSName DNSText)
 escapeDNSGrammar = bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
 
-
--- |
+-- | 'Validation' is just an Applicative (not Monad) because it doesn't short-circuit, running every computation to monoidally append all errors together
 eitherToValidations :: Either e a -> Validation [e] a
 eitherToValidations = eitherToValidation . first (:[])
 

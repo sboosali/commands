@@ -15,7 +15,10 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 -- -- import System.IO.Error.Lens (errorType,_UserError,description)
 -- import Control.Monad.Catch (SomeException)
 -- import           Data.Monoid                       ((<>))
+import           Data.Bitraversable
 import           Data.Either.Validation            (Validation (..))
+import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
+import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 
 
 -- import Commands.Parse
@@ -136,18 +139,32 @@ flag = DNSVocabulary (DNSList "flag")
  , DNSPronounced "-i" "interactive"
  ]
 
-
 -- | traverse with monoidal error collecting
 badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
 
 
-w = 10
+isPythonDict :: String -> Bool
+isPythonDict s = case parseExpr s "" of
+ Right (Dictionary {}, _) -> True
+ _ -> False
+
+isPythonString :: String -> Bool
+isPythonString s = case parseExpr s "" of
+ Right (Strings {}, _) -> True
+ _ -> False
+
+isPythonFile :: String -> Bool
+isPythonFile s = case parseModule s "" of
+ Right {} -> True
+ _ -> False
+
+
 main = do
  let Success escaped = escapeDNSGrammar grammar
- putStrLn ""
- T.putStrLn . displaySerialization w $ "gramSpec =" <+> serializeGrammar escaped
- putStrLn ""
- T.putStrLn . displaySerialization w $ "_commands_lists =" <+> serializeVocabularies (dnsProductions escaped)
+ let serializedRules = vsep ["'''", serializeRules escaped, "'''"]
+ let serializedLists = serializeVocabularies (dnsProductions escaped)
+ let serializedGrammar = vsep $ punctuate "\n" [ "_commands_rules_ =" <+> serializedRules, "_commands_lists_ =" <+> serializedLists]
+ -- print serializedGrammar
 
  putStrLn ""
  putStr "words: "
@@ -155,41 +172,23 @@ main = do
  putStr "names: "
  print $ getNames grammar
 
- -- handling ERROR with HANDLER run ACTION
- let Failure errors = escapeDNSGrammar badGrammar
- print errors
+ putStrLn ""
+ putStrLn . take 100 . show $ parseExpr (show serializedRules) ""
+ putStrLn ""
+ putStrLn . take 100 . show $ parseExpr (show serializedLists) ""
+ putStrLn ""
+ putStrLn . take 100 . show $ parseModule (show serializedGrammar) ""
 
- -- handling
- --  (_IOException . description)
- --  (\(dl) -> putStrLn $ "caught+thrown: {" <> dl <> "}")
- --  (escapeDNSGrammar badGrammar >> putStrLn "uncaught/unthrown")
+ putStrLn ""
+ print $ (isPythonString . show) serializedRules
+ print $ (isPythonDict . show) serializedLists
+ print $ (isPythonFile . show) serializedGrammar
 
---
--- _IOException :: Prism' IOException   IOException
--- _IOException :: Prism' SomeException IOException
--- description  :: Lens'  IOException   String
--- location     :: Lens'  IOException   String
--- errorType    :: Lens'  IOException   IOErrorType
--- _UserError   :: Prism' IOErrorType   ()
---
--- alongside :: LensLike (Context a b) s t a b -> LensLike (Context a' b') s' t' a' b' -> Lens (s, s') (t, t') (a, a') (b, b')
--- alongside :: Lens' s a -> Lens' s' a' -> Lens' (s, s') (a,a')
--- alongside :: Lens' IOException String -> Lens' IOException String -> Lens' (IOException,IOException) (String,String)
---
---  :: Lens' s a -> Lens' s a' -> Lens' s (a,a')
---  :: Lens' IOException String -> Lens' IOException String -> Lens' IOException (String,String)
---
---  :: Lens' s a -> Lens' (s,s) a
---   just clone the whole. for exception handling, maybe there is a more efficient alternative
---  :: Lens s (s,s) a a
---   think composing lenses, not applying functions!
---
--- infixr . 9
--- a . (b . c)
---
+ putStrLn ""
+ _ <- bitraverse print T.putStrLn $ serialize grammar
+ putStrLn ""
+ _ <- bitraverse print T.putStrLn $ serialize badGrammar
+ putStrLn ""
 
--- forked :: Lens (s,s) s a a
--- forked = undefined
-
-  -- (_IOException . forked . alongside description location)
-  -- (\(d,l) -> putStrLn $ "caught+thrown: {" <> d <> "} at " <> l)
+-- | True == isPythonFile . display 80 . serializeGrammar $ (x :: DNSGrammar DNSName DNSText)
+-- instance Arbitrary DNSGrammar n t

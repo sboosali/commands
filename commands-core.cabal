@@ -92,6 +92,7 @@ library
                , semigroups ==0.16.*
                , text ==1.2.*
                , wl-pprint-text  ==1.1.*
+               , language-python  ==0.4.*
                , template-haskell ==2.9.*
 
 --               , aeson-pretty  ==0.7.*,

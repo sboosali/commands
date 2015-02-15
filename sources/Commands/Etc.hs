@@ -75,6 +75,7 @@ newtype Package    = Package    String deriving (Show, Eq, Ord)
 newtype Module     = Module     String deriving (Show, Eq, Ord)
 newtype Identifier = Identifier String deriving (Show, Eq, Ord)
 
+
 -- | should have four field: @Version@.
 data GUI = GUI !Package !Module !Identifier
 

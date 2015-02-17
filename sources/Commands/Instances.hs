@@ -12,4 +12,3 @@ instance          Exception Parsec.ParseError
 
 deriving instance Typeable  Python.ParseError
 instance          Exception Python.ParseError
-

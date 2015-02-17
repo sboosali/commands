@@ -16,7 +16,7 @@ import Prelude             hiding (mapM)
 
 -- | a Dragon NaturallySpeaking (\"DNS") grammar has
 -- one or more 'DNSProduction's, exactly one of which is an export.
--- (the "exactly one" constraint is really "at least one", but
+-- (the "exactly one" constraint should really be "at least one", but
 -- this restriction shouldn't matter).
 --
 -- in the type @DNSGrammar n t@, you can read:
@@ -60,9 +60,10 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
 -- not 'DNSList's. a 'DNSVocabulary' can be named only by 'LHSList's, as
 -- a 'DNSProduction' can be named only by 'LHSRule's.
 --
+-- a 'LHSRule'\'s 'DNSRHS' must be 'NonEmpty', but a 'LHSList'\'s 'DNSToken's may be empty.
 data DNSProduction e n t where
  DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
- DNSVocabulary :: DNSLHS LHSList n -> NonEmpty (DNSToken t) -> DNSProduction False n t
+ DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
  DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
 
 instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
@@ -125,7 +126,7 @@ data DNSToken t
 -- Constructor ... must not have existential arguments
 -- @
 --
--- (see https://ghc.haskell.org/trac/ghc/ticket/8678)
+-- (see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
 data DNSLHS l n where
  DNSRule    :: n          -> DNSLHS LHSRule n
  DNSBuiltin :: DNSBuiltin -> DNSLHS LHSRule x
@@ -138,8 +139,8 @@ instance Traversable (DNSLHS lhs) where
  traverse f (DNSList name) = DNSList <$> f name
  traverse _ (DNSBuiltin x) = pure $ DNSBuiltin x
 
--- | Builtin 'DNSProduction's with 'DNSLHS's, but without
--- 'DNSRHS's.
+-- | Builtin 'DNSProduction's: they have left-hand sides,
+-- but they don't have right-hand sides.
 data DNSBuiltin = DGNDictation | DGNWords | DGNLetters
  deriving (Show, Eq, Ord, Enum)
 

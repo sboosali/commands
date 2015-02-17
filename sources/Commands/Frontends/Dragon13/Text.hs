@@ -1,14 +1,17 @@
 {-# LANGUAGE DeriveFunctor, GeneralizedNewtypeDeriving, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes                                  #-}
 module Commands.Frontends.Dragon13.Text
- ( DNSText (..)
- , DNSName (..)
+ ( DNSName (..)
+ , DNSText (..)
  -- * smart constructors
- , escapeDNSText
  , escapeDNSName
+ , escapeDNSText
+ -- * dumb constructors
+ , unsafeDNSName
+ , unsafeDNSText
  -- * only destructors
- -- , pattern DNSText
  -- , pattern DNSName
+ -- , pattern DNSText
  -- * re-export
  , Text
  ) where
@@ -25,6 +28,12 @@ newtype DNSName = DNSName { unDNSName :: Text } deriving (Show, Eq, Ord)
 
 newtype DNSText = DNSText { unDNSText :: Text } deriving (Show, Eq, Ord)
 -- pattern DNSText s <- DNSText_ s
+
+unsafeDNSName :: Text -> DNSName
+unsafeDNSName = DNSName
+
+unsafeDNSText :: Text -> DNSText
+unsafeDNSText = DNSText
 
 
 -- | Its output should be:

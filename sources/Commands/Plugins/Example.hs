@@ -123,7 +123,7 @@ root = DNSProduction (DNSRule "root") $ fromList
  , DNSTerminal (DNSToken "ls")
  ]
 
-command = DNSVocabulary (DNSList "command") $ fromList
+command = DNSVocabulary (DNSList "command")
  [ DNSToken "git"
  , DNSToken "rm"
  ]
@@ -133,7 +133,7 @@ subcommand = DNSProduction (DNSRule "subcommand") $ fromList
  , DNSNonTerminal (DNSBuiltin DGNDictation)
  ]
 
-flag = DNSVocabulary (DNSList "flag") $ fromList
+flag = DNSVocabulary (DNSList "flag")
  [ DNSPronounced "-f" "force"
  , DNSPronounced "-r" "recursive"
  , DNSPronounced "-a" "all"

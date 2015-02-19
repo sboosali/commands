@@ -15,6 +15,6 @@ data LHS = LHS !Package !Module !Identifier deriving (Show, Eq, Ord)
 
 -- |
 --
--- (see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors>)
+-- (see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors> for background).
 type RHS = Alt Grammar
 

@@ -1,13 +1,15 @@
 {-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 module Commands.Etc where
-import Commands.Instances         ()
-import Control.Monad.Catch        (MonadThrow, throwM)
-import Data.Monoid                ((<>))
-import Language.Haskell.TH.Syntax (ModName (ModName), Name (..),
-                                   NameFlavour (NameG), OccName (OccName),
-                                   PkgName (PkgName))
-import           Data.Text.Lazy      (Text)
-import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+import Commands.Instances           ()
+import Control.Applicative
+import Control.Monad.Catch          (MonadThrow, throwM)
+import Data.Monoid                  ((<>))
+import Data.Text.Lazy               (Text)
+import Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
+                                     NameFlavour (NameG), OccName (OccName),
+                                     PkgName (PkgName))
+import Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+
 
 -- | generalized 'Maybe':
 --
@@ -86,3 +88,6 @@ data GUI = GUI !Package !Module !Identifier
 display :: Doc -> Text
 display = displayT . renderPretty 1.0 80
 
+-- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
+(-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
+p --> q = ((||) <$> (not . p) <*> q)

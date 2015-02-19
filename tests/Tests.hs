@@ -1,8 +1,8 @@
 module Main where
+import Commands.Test.Properties
 import Test.DocTest
 import Test.Tasty
 import Test.Tasty.QuickCheck
-import Commands.Test.Properties
 
 
 tastytest = defaultMain $ testGroup "QuickCheck"

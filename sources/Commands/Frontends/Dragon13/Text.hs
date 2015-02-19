@@ -108,7 +108,7 @@ isDNSText s
   =  not (T.null s)
   && T.all isAscii s
   && T.all isPrint s
-  && T.all ((||) <$> (not . isSpace) <*> (==' ')) s -- ie "whitespace implies space"
+  && T.all (isSpace --> (==' ')) s
   && not ("'" `T.isInfixOf` s)
   && not ("\"" `T.isInfixOf` s)
   && not ("\\" `T.isInfixOf` s)

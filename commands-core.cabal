@@ -75,6 +75,7 @@ library
   Commands.Plugins.Example
 
 
+
  -- modules included in this library, but not exported
  other-modules:
 

@@ -1,18 +1,19 @@
-{-# LANGUAGE DataKinds, GADTs, FlexibleInstances, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables                                   #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Commands.Test.Arbitrary where
-import Commands.Etc
-import Commands.Test.Types
-import Commands.Test.Etc
-import Test.QuickCheck
-import Commands.Frontends.Dragon13.Types
+import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
-import           Data.Text.Lazy      (Text)
-import qualified           Data.Text.Lazy as T
-import Control.Applicative
-import Data.List.NonEmpty (NonEmpty (..))
-import GHC.Exts (IsList (..))
-import Debug.Trace (traceShowId)
+import           Commands.Frontends.Dragon13.Types
+import           Commands.Test.Etc
+import           Commands.Test.Types
+import           Control.Applicative
+import           Data.List.NonEmpty                (NonEmpty (..))
+import           Data.Text.Lazy                    (Text)
+import qualified Data.Text.Lazy                    as T
+import           Debug.Trace                       (traceShowId)
+import           GHC.Exts                          (IsList (..))
+import           Test.QuickCheck
 
 
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSGrammar n t) where

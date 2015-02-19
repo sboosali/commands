@@ -1,14 +1,14 @@
 {-# LANGUAGE ViewPatterns #-}
 module Commands.Test.Properties where
-import Commands.Etc hiding  (failed)
+import Commands.Etc                      hiding (failed)
+import Commands.Frontends.Dragon13
+import Commands.Frontends.Dragon13.Text
+import Commands.Frontends.Dragon13.Types
 import Commands.Test.Arbitrary
 import Commands.Test.Types
-import           Commands.Frontends.Dragon13
-import           Commands.Frontends.Dragon13.Text
-import Commands.Frontends.Dragon13.Types
-import Test.QuickCheck.Property
+import Data.Bifunctor                    (bimap)
 import Test.QuickCheck.Modifiers
-import Data.Bifunctor (bimap)
+import Test.QuickCheck.Property
 
 
 -- | if the grammar can be escaped, its serialization must be valid Python.

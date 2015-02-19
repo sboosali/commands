@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveFoldable, DeriveFunctor, DeriveTraversable  #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DataKinds, EmptyDataDecls, ExistentialQuantification, GADTs, KindSignatures, FlexibleInstances, RankNTypes #-}
+{-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable  #-}
+{-# LANGUAGE EmptyDataDecls, ExistentialQuantification, FlexibleInstances #-}
+{-# LANGUAGE GADTs, KindSignatures, RankNTypes, StandaloneDeriving        #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc        ()
 import Commands.Instances  ()
@@ -24,7 +24,9 @@ import Prelude             hiding (mapM)
 -- * @n@ as @name@ or @nonTerminal@
 -- * @t@ as @text@ or @terminal@
 --
--- a 'Bitraversable', because the terminals and the non-terminals
+-- a 'Bitraversable', for easy validation
+-- (e.g. "Commands.Frontends.Dragon13.escapeDNSGrammar")
+-- not a @Traversable@, because the terminals and the non-terminals
 -- are distinct lexemes, with different criteria for being valid.
 --
 data DNSGrammar n t = DNSGrammar

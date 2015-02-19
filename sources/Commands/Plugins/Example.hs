@@ -191,5 +191,5 @@ main = do
  _ <- bitraverse print T.putStrLn $ serialize badGrammar
  putStrLn ""
 
--- | True == isPythonFile . display 80 . serializeGrammar $ (x :: DNSGrammar DNSName DNSText)
--- instance Arbitrary DNSGrammar n t
+ print escaped
+

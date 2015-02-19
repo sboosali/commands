@@ -51,37 +51,39 @@ import qualified Data.Text.Lazy                    as T
 import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 
--- $setup
--- >>> :set -XOverloadedLists
--- >>> :set -XOverloadedStrings
--- >>> :{
--- let root = DNSProduction (DNSRule "root")
---             [ DNSSequence
---               [ DNSNonTerminal (DNSList "command")
---               , DNSNonTerminal (DNSRule "subcommand")
---               , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
---               ]
---             , DNSTerminal (DNSToken "ls")
---             ]
---     flag = DNSVocabulary (DNSList "flag")
---             [ DNSPronounced "-f" "force"
---             , DNSPronounced "-r" "recursive"
---             , DNSPronounced "-a" "all"
---             , DNSPronounced "-i" "interactive"
---             ]
---     command = DNSVocabulary (DNSList "command")
---                       [ DNSToken "git"
---                       , DNSToken "rm"
---                       ]
---     subcommand = DNSProduction (DNSRule "subcommand")
---                        [ DNSTerminal (DNSToken "status")
---                        , DNSNonTerminal (DNSBuiltin DGNDictation)
---                        ]
---     Right grammar = escapeDNSGrammar (DNSGrammar root [command, subcommand, flag])
--- :}
---
--- (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
 
+{- $setup
+
+>>> :set -XOverloadedLists
+>>> :set -XOverloadedStrings
+>>> :{
+let root = DNSProduction (DNSRule "root")
+            [ DNSSequence
+              [ DNSNonTerminal (DNSList "command")
+              , DNSNonTerminal (DNSRule "subcommand")
+              , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
+              ]
+            , DNSTerminal (DNSToken "ls")
+            ]
+    flag = DNSVocabulary (DNSList "flag")
+            [ DNSPronounced "-f" "force"
+            , DNSPronounced "-r" "recursive"
+            , DNSPronounced "-a" "all"
+            , DNSPronounced "-i" "interactive"
+            ]
+    command = DNSVocabulary (DNSList "command")
+                      [ DNSToken "git"
+                      , DNSToken "rm"
+                      ]
+    subcommand = DNSProduction (DNSRule "subcommand")
+                       [ DNSTerminal (DNSToken "status")
+                       , DNSNonTerminal (DNSBuiltin DGNDictation)
+                       ]
+    Right grammar = escapeDNSGrammar (DNSGrammar root [command, subcommand, flag])
+:}
+
+(this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
+-}
 
 -- | serialize a grammar into a Python file, unless:
 --
@@ -93,7 +95,7 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 --
 serialize :: DNSGrammar Text Text -> Either [SomeException] Text
 serialize = isPythonFile
- <=< (second (displayT . renderPretty 1.0 80 . serializeGrammar) . escapeDNSGrammar)
+ <=< (second (display . serializeGrammar) . escapeDNSGrammar)
 
 -- | serializes a grammar into two Python assignments.
 --
@@ -122,7 +124,7 @@ serialize = isPythonFile
 --                              "interactive"]}
 --
 --
--- as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long rules. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
+-- as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long grammars. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
 --
 serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
 serializeGrammar grammar = grammar_
@@ -216,10 +218,10 @@ serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
 -- {list}
 --
 --
-serializeLHS :: DNSLHS lhs DNSName -> Doc
+serializeLHS :: DNSLHS l DNSName -> Doc
+serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
 serializeLHS (DNSRule (DNSName s)) = "<" <> text s <> ">"
 serializeLHS (DNSBuiltin b)        = "<" <> (text . T.toLower . T.pack . show $ b) <> ">"
-serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
 
 -- | wraps tokens containing whitespace with 'dquotes'.
 --
@@ -327,6 +329,8 @@ eitherToValidations = eitherToValidation . first (:[])
 -- reports the syntax error otherwise.
 --
 -- a Kleisli arrow (?)
+--
+-- TODO change to check that with two expressions are a Dictionary and a String
 --
 isPythonFile :: Text -> Either [SomeException] Text
 isPythonFile s = case parseModule (T.unpack s) "" of

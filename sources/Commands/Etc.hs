@@ -6,6 +6,8 @@ import Data.Monoid                ((<>))
 import Language.Haskell.TH.Syntax (ModName (ModName), Name (..),
                                    NameFlavour (NameG), OccName (OccName),
                                    PkgName (PkgName))
+import           Data.Text.Lazy      (Text)
+import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 -- | generalized 'Maybe':
 --
@@ -24,6 +26,7 @@ type Possibly a = (MonadThrow m) => m a
 
 failed :: String -> Possibly a
 failed = throwM . userError
+
 
 -- | easily define smart constructors, whose error message has a
 -- fully-qualified name for debugging. if you rename the module, the
@@ -80,5 +83,6 @@ newtype Identifier = Identifier String deriving (Show, Eq, Ord)
 -- | should have four field: @Version@.
 data GUI = GUI !Package !Module !Identifier
 
-
+display :: Doc -> Text
+display = displayT . renderPretty 1.0 80
 

@@ -74,26 +74,27 @@ library
   Commands.Munging
   Commands.Plugins.Example
 
+
  -- modules included in this library, but not exported
  other-modules:
 
  -- other library packages from which modules are imported
  build-depends:
 
-                 base          ==4.7.*
-               , containers    ==0.5.*
-               , exceptions    ==0.6.*
-               , free          ==4.10.*
-               , lens          ==4.7.*
-               , bifunctors    ==4.2.*
-               , parsec        ==3.1.*
-               , split         ==0.2.*
-               , either ==4.3.*
-               , semigroups ==0.16.*
-               , text ==1.2.*
-               , wl-pprint-text  ==1.1.*
-               , language-python  ==0.4.*
-               , template-haskell ==2.9.*
+    base          ==4.7.*
+  , containers    ==0.5.*
+  , exceptions    ==0.6.*
+  , free          ==4.10.*
+  , lens          ==4.7.*
+  , bifunctors    ==4.2.*
+  , parsec        ==3.1.*
+  , split         ==0.2.*
+  , either ==4.3.*
+  , semigroups ==0.16.*
+  , text ==1.2.*
+  , wl-pprint-text  ==1.1.*
+  , language-python  ==0.4.*
+  , template-haskell ==2.9.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly
@@ -111,6 +112,11 @@ library
 test-suite tests
  main-is:        Tests.hs
  hs-source-dirs: tests
+ other-modules:
+  Commands.Test.Etc
+  Commands.Test.Types
+  Commands.Test.Arbitrary
+  Commands.Test.Properties
 
  -- cabal will say the tests pass only if `main-is` exits with zero
  type: exitcode-stdio-1.0
@@ -120,12 +126,17 @@ test-suite tests
   -threaded
 
  build-depends:
-  commands-core,
-    base       ==4.7.*
+    commands-core
+
+  , base       ==4.7.*
+  , text ==1.2.*
+  , semigroups ==0.16.*
+  , bifunctors    ==4.2.*
+
   , QuickCheck ==2.7.*
   , doctest    ==0.9.*
-  , transformers  ==0.3.*
-
+  , tasty   ==0.10.*
+  , tasty-quickcheck ==0.8.*
 
 
 

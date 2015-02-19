@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable  #-}
-{-# LANGUAGE EmptyDataDecls, ExistentialQuantification, GADTs, RankNTypes #-}
-{-# LANGUAGE StandaloneDeriving                                           #-}
+{-# LANGUAGE DeriveFoldable, DeriveFunctor, DeriveTraversable  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DataKinds, EmptyDataDecls, ExistentialQuantification, GADTs, KindSignatures, FlexibleInstances, RankNTypes #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc        ()
 import Commands.Instances  ()
@@ -31,6 +31,7 @@ data DNSGrammar n t = DNSGrammar
  { dnsExport      :: DNSProduction True n t
  , dnsProductions :: [DNSProduction False n t]
  }
+ deriving Show
 
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
 instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
@@ -61,10 +62,12 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
 -- a 'DNSProduction' can be named only by 'LHSRule's.
 --
 -- a 'LHSRule'\'s 'DNSRHS' must be 'NonEmpty', but a 'LHSList'\'s 'DNSToken's may be empty.
-data DNSProduction e n t where
+data DNSProduction (e :: Bool) n t where
  DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
  DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
+
+deriving instance (Show n, Show t) => Show (DNSProduction e n t)
 
 instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
@@ -84,6 +87,8 @@ data DNSRHS n t
  | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
  | DNSOptional (DNSRHS n t) -- ^ e.g. @[optional]@
  | DNSMultiple (DNSRHS n t) -- ^ e.g. @(multiple)+@
+
+deriving instance (Show n, Show t) => Show (DNSRHS n t)
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault
@@ -127,10 +132,12 @@ data DNSToken t
 -- @
 --
 -- (see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
-data DNSLHS l n where
+data DNSLHS (l :: LHSKind) n where
  DNSRule    :: n          -> DNSLHS LHSRule n
  DNSBuiltin :: DNSBuiltin -> DNSLHS LHSRule x
  DNSList    :: n          -> DNSLHS LHSList n
+
+deriving instance (Show n) => Show (DNSLHS l n)
 
 instance Functor     (DNSLHS lhs) where fmap     = fmapDefault
 instance Foldable    (DNSLHS lhs) where foldMap  = foldMapDefault

@@ -9,6 +9,9 @@ module Commands.Frontends.Dragon13.Text
  -- * dumb constructors
  , unsafeDNSName
  , unsafeDNSText
+ -- * predicates
+ , isDNSName
+ , isDNSText
  -- * only destructors
  -- , pattern DNSName
  -- , pattern DNSText
@@ -63,12 +66,13 @@ unsafeDNSText = DNSText
 -- construction is a partial function
 escapeDNSName :: Text -> Possibly DNSName
 escapeDNSName s
- | isPythonIdentifier s = return . DNSName $ s
+ | isDNSName s = return . DNSName $ s
  | otherwise = failed $ "escapeDNSName " <> show s
- where
- isPythonIdentifier s = T.all isAscii s && case T.uncons s of
-    Nothing    -> False
-    Just (c,s) -> isAlpha c && T.all ((||) <$> isAlphaNum <*> (=='_')) s
+
+isDNSName :: Text -> Bool
+isDNSName s = T.all isAscii s && case T.uncons s of
+ Nothing    -> False
+ Just (c,s) -> isAlpha c && T.all ((||) <$> isAlphaNum <*> (=='_')) s
 
 -- | Its output should be:
 --
@@ -96,12 +100,15 @@ escapeDNSName s
 --
 escapeDNSText :: Text -> Possibly DNSText
 escapeDNSText s
- | isValid s = return . DNSText $ s
+ | isDNSText s = return . DNSText $ s
  | otherwise = failed $ "escapeDNSText " <> show s
- where
- isValid s
+
+isDNSText :: Text -> Bool
+isDNSText s
   =  not (T.null s)
   && T.all isAscii s
-  && T.all ((||) <$> (not . isSpace) <*> (==' ')) s
+  && T.all isPrint s
+  && T.all ((||) <$> (not . isSpace) <*> (==' ')) s -- ie "whitespace implies space"
   && not ("'" `T.isInfixOf` s)
   && not ("\"" `T.isInfixOf` s)
+  && not ("\\" `T.isInfixOf` s)

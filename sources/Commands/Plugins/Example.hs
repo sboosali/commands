@@ -6,28 +6,29 @@ import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
--- import qualified Data.Text.Lazy                    as T
+-- import Commands.Parse
+-- import Commands.Parse.Types
+-- import Commands.Grammar.Types
+
+-- import Control.Applicative
+import           Data.Bitraversable
+import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
+import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
+import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
+-- import Data.Foldable                   (asum)
+
+-- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
 -- import Control.Exception.Lens (handling, _IOException, AsIOException)
 -- import System.IO.Error.Lens (description, location)
 -- -- import System.IO.Error.Lens (errorType,_UserError,description)
 -- import Control.Monad.Catch (SomeException)
 -- import           Data.Monoid                       ((<>))
-import           Data.Bitraversable
 -- import           Data.Either.Validation            (Validation (..))
-import           Data.List.NonEmpty                (fromList)
-import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
-import           Language.Python.Version2.Parser   (parseExpr, parseModule)
-
-
--- import Commands.Parse
--- import Commands.Parse.Types
 -- import Commands.Parsec
--- import Control.Applicative
 -- import Control.Applicative.Permutation
--- import Data.Foldable                   (asum)
 -- import Data.List                       (intercalate)
 -- import Data.Monoid                     ((<>))
 -- import Data.Traversable (traverse)
@@ -38,22 +39,25 @@ import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 --  | Undo
 --  | Repeat Positive Command
 --  deriving (Show,Eq)
+
 -- command :: Grammar Command
--- command
---  = ReplaceWith  <$> (terminal "replace" *> dictation) <*> (terminal "with" *> dictation)
+-- command = 'command
+--  <=> ReplaceWith  <$> (terminal "replace" *> dictation) <*> (terminal "with" *> dictation)
 --  <|> Undo         <$  terminal "undo"
 --  <|> Repeat       <$> positive <*> command
 
--- data Test = Test Dictation Command deriving (Show,Eq)
--- test = Test <$> dictation <*> command
--- test' = Test <$> contextualize (string "replace") dictation <*> command
-
 -- newtype Positive = Positive Int deriving (Show,Eq)
 -- positive :: Grammar Positive
--- positive = Positive <$> (asum . map int) [1..9]
+-- positive = 'positive
+--  <=> Positive <$> (asum . map int) [1..9]
 
--- newtype Dictation = Dictation [String] deriving (Show,Eq)
+-- newtype Dictation = Dictation String deriving (Show,Eq)
 -- dictation :: Grammar Dictation
+-- dictation = 'dictation
+--  <=> Dictation <$ "this"
+--  <|> Dictation <$ "that"
+
+
 -- dictation = grammar "<dgndictation>" $ \context ->
 --  Dictation <$> anyWord `manyUntil` context
 

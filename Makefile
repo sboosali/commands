@@ -22,6 +22,9 @@ run:
 	cabal run
 
 test:
+# cabal install ../commands-core --force-reinstall --enable-tests
+# cabal exec -- ghc-pkg unregister commands-core-0.0.0
+	cabal configure --enable-tests
 	cabal test && echo && cat dist/test/*-tests.log
 
 

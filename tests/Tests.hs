@@ -13,13 +13,22 @@ main = do
  doctest
   [ "sources/Commands/Etc"
   , "sources/Commands/Instances"
+
+  , "sources/Commands/Grammar/Types"
+  , "sources/Commands/Grammar"
+
   , "sources/Commands/Parse/Types"
   , "sources/Commands/Parse"
   , "sources/Commands/Parsec"
-  , "sources/Commands/Munging"
+
   , "sources/Commands/Frontends/Dragon13"
   , "sources/Commands/Frontends/Dragon13/Types"
   , "sources/Commands/Frontends/Dragon13/Text"
+
+  , "sources/Commands/Munging"
+
   , "sources/Commands/Plugins/Example"
+
+  , "sources/Control/Alternative/Free/Johansen"
   ]
  tastytest

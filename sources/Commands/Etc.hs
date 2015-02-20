@@ -50,12 +50,12 @@ failure :: Name -> Possibly a
 failure = throwM . userError . showName
 
 showName :: Name -> String
-showName = either id showGUI . fromName
+showName = either show showGUI . fromName
 
 -- | only 'NameG' is global.
-fromName :: Name -> Either String GUI
+fromName :: Name -> Possibly GUI
 fromName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
-fromName (Name (OccName occ) _) = fail occ
+fromName (Name (OccName occ) _) = failed occ
 
 -- | >>> showGUI (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
 -- "package-Module.SubModule.identifier"
@@ -83,7 +83,7 @@ newtype Identifier = Identifier String deriving (Show, Eq, Ord)
 
 
 -- | should have four field: @Version@.
-data GUI = GUI !Package !Module !Identifier
+data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord)
 
 display :: Doc -> Text
 display = displayT . renderPretty 1.0 80

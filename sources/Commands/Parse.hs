@@ -1,10 +1,15 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 module Commands.Parse where
--- import Commands.Etc
+import Commands.Etc
+import Commands.Grammar.Types
+import Commands.Parse.Types
+import Commands.Parsec
+import Control.Alternative.Free.Johansen
+import Control.Applicative
+import Control.Monad.Reader
+import Data.List                         (foldl')
+import Data.Traversable
 -- import Commands.Munging       (unCamelCase)
--- import Commands.Parse.Types
--- import Commands.Parsec
--- import Control.Applicative
 -- import Control.Exception.Lens (handler)
 -- import Control.Lens           hiding (Context)
 -- import Control.Monad.Catch    (Handler, SomeException (..), catches)
@@ -15,15 +20,48 @@ module Commands.Parse where
 -- import Data.Typeable          (cast)
 
 
+gparser :: Grammar a -> SensitiveParser a
+gparser (Terminal s) = return $ string s *> undefined
+gparser (NonTerminal l (Alt rs)) = do
+ ps <- traverse rparser rs
+ let p = foldl' (<|>) empty ps
+ return (p <?> show l)
 
--- gparser :: Grammar a -> SensitiveParser a
--- gparser = _
 
--- rparser :: RHS a -> SensitiveParser a
--- rparser = _
+rparser :: RHS a -> SensitiveParser a
+rparser (Pure a) = return . pure $ a
+rparser (Alt rs `App` g) = do
+ q <- gparser g
+ ps <- with (Some q) $ traverse rparser rs  -- recur on the left, with the parser from the right
+ let p = foldl' (<|>) empty ps
+ return $ p <*> q               -- run the parser from the left, before the parser from the right
 
--- parses :: Grammar a -> String -> Possibly a
--- parses (SensitiveParser sp) = parse $ sp (Some eof)
+with :: Monad m => r -> ReaderT r m a -> ReaderT r m a
+with = local . const
+
+{- |
+
+grammar :: Grammar x
+rs :: Alt Grammar (x -> a)
+
+traverse :: (RHS a -> Reader Context (Parsec a)) -> [RHS a] -> Reader Context [Parsec a]
+
+q :: Parsec x
+fs :: [Parsec (x -> a)]
+
+
+(<*>) :: [Parsec x -> Parsec a] -> [Parsec x] -> [Parsec a]
+(<*>) _ :: f a -> f b
+
+ps :: [Parsec a]
+p :: Parsec a
+
+
+-}
+
+parses :: Grammar a -> String -> Possibly a
+parses g s = parse p s
+ where p = runReader (gparser g) (Some eof)
 
 -- _ParseError :: Prism' SomeException ParseError
 -- _ParseError = prism SomeException $ \(SomeException e) ->

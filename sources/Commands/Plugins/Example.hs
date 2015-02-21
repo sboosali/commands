@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell           #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
@@ -17,6 +17,7 @@ import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
+import           System.Timeout                    (timeout)
 import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
 
 -- import qualified Data.Text.Lazy                    as T
@@ -24,7 +25,6 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
 -- import Control.Exception.Lens (handling, _IOException, AsIOException)
 -- import System.IO.Error.Lens (description, location)
 -- -- import System.IO.Error.Lens (errorType,_UserError,description)
--- import Control.Monad.Catch (SomeException)
 -- import           Data.Monoid                       ((<>))
 -- import           Data.Either.Validation            (Validation (..))
 -- import Commands.Parsec
@@ -43,7 +43,7 @@ data Root
 root :: Grammar Root
 root = 'root
  <=> ReplaceWith  # (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
- <|> Undo        <$ str "undo"
+ <|> Undo        <$ terminal "undo"
  <|> Repeat       # inject positive <*> inject root
 
 newtype Positive = Positive Int deriving (Show,Eq)
@@ -198,6 +198,8 @@ main = do
  print escaped
 
  putStrLn ""
- -- print =<< root `parses` "replace this with that"
- print =<< dictation `parses` "this"
- print =<< positive `parses` "9"
+ handleParse positive "9"
+ handleParse dictation "this"
+ timeout (round (1e6 :: Double)) (handleParse root "undo")
+ timeout (round (1e6 :: Double)) (handleParse root "replace this with that")
+ timeout (round (1e6 :: Double)) (handleParse root "9 1 undo")

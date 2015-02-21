@@ -55,7 +55,7 @@ instance Functor f => Applicative (App f) where
 --
 --
 lift :: f a -> Alt f a
-lift = undefined
+lift x = Alt [Alt [Pure id] `App` x]
 
 -- |
 --

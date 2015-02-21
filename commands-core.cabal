@@ -175,7 +175,7 @@ executable example
 -- http://haskell.org/cabal/users-guide/
 
 -- $ cabal sandbox init
--- $ time cabal install --only-dependencies
+-- $ time cabal install --only-dependencies --enable-tests
 -- $ cabal build
 
 -- $ cabal repl

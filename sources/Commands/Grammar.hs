@@ -7,40 +7,65 @@
 module Commands.Grammar where
 import Commands.Etc
 import Commands.Grammar.Types
-import Language.Haskell.TH.Syntax (Name)
+import Commands.Munging
+import Control.Alternative.Free.Johansen
 
+import Control.Applicative
+import Data.List                         (intercalate)
+import Language.Haskell.TH.Syntax        (Name)
 
 infix  2 <=>
 -- infixl 3 <|>
+-- infixl 4 <$>
+infixl 4 #
 -- infixl 4 <*>
--- infixr 9 &
+infixl 9 &
 
 (<=>) :: Name -> RHSs a -> Grammar a
 name <=> rs = NonTerminal l rs
  where Just l = fromName name
 
--- (&) :: (Grammatical a x) => a -> Grammar (a -> b) -> Grammar b
--- x & y = toGrammar x <*> y
+-- (&) :: (Grammatical a) => RHSs (a -> b) -> a -> RHSs b
+-- f & x = f <*> toR x
+(&) :: Applicative f => f (a -> b) -> f a -> f b
+f & x = f <*> x
 
--- class    Grammatical a x | a -> x  where  toGrammar :: a -> RHSs x
--- instance Grammatical String      x where  toGrammar = Terminal
--- instance Grammatical (Grammar x) x where  toGrammar =
--- instance Grammatical (RHSs x)    x where  toGrammar = id
+-- (#) :: (Grammatical a) => (a -> b) -> a -> RHSs b
+-- f # x = f <$> toR x
+(#) :: Functor f => (a -> b) -> f a -> f b
+f # x = f <$> x
 
--- terminal :: String -> Grammar a
--- terminal s = Terminal s
+-- class Grammatical a where
+--  type R a :: *
+--  toR :: a -> RHSs (R a)
 
--- terminals = map terminal
+-- instance Grammatical (RHSs b)    where  type R (RHSs b)    = b;  toR = id
+-- instance Grammatical String      where  type R String      = b;  toR = lift . Terminal
+-- -- instance Grammatical (Grammar b) where  type R (Grammar b) = b;  toR = lift
+-- instance Grammatical (Grammar b) where
+--  type R (Grammar b) = b
+--  toR (Terminal s)      = toR s
+--  toR (NonTerminal _ r) = r
 
--- con :: (Show a) => a -> Grammar a
--- con c = c <$ (terminal . intercalate " " . unCamelCase . show) c
+inject :: Grammar a -> RHSs a
+inject (Terminal s)      = terminal s
+inject (NonTerminal _ r) = r
 
--- int :: Int -> Grammar Int
--- int = con
+terminal :: String -> RHSs a
+terminal = lift . Terminal
 
--- str :: String -> Grammar String
--- str s = s <$ terminal s
+terminals :: [String] -> RHSs a
+terminals = foldr (<|>) empty . map terminal
 
--- twig :: (Enum a, Show a) => Grammar a
--- twig = foldr (<|>) empty . map con $ constructors
+con :: (Show a) => a -> RHSs a
+con c = c <$ (terminal . intercalate " " . unCamelCase . show) c
+
+int :: Int -> RHSs Int
+int = con
+
+str :: String -> RHSs String
+str s = s <$ terminal s
+
+twig :: (Enum a, Show a) => RHSs a
+twig = foldr (<|>) empty . map con $ constructors
 

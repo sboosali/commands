@@ -1,23 +1,23 @@
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables                            #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell           #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
--- import Commands.Parse
+import           Commands.Parse
 -- import Commands.Parse.Types
--- import Commands.Grammar.Types
+import           Commands.Grammar
+import           Commands.Grammar.Types
 
--- import Control.Applicative
+import           Control.Applicative
 import           Data.Bitraversable
 import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
-import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
--- import Data.Foldable                   (asum)
+import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -34,28 +34,28 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 -- import Data.Traversable (traverse)
 
 
--- data Command
---  = ReplaceWith Dictation Dictation
---  | Undo
---  | Repeat Positive Command
---  deriving (Show,Eq)
+data Root
+ = ReplaceWith Dictation Dictation
+ | Undo
+ | Repeat Positive Root
+ deriving (Show,Eq)
 
--- command :: Grammar Command
--- command = 'command
---  <=> ReplaceWith  <$> (terminal "replace" *> dictation) <*> (terminal "with" *> dictation)
---  <|> Undo         <$  terminal "undo"
---  <|> Repeat       <$> positive <*> command
+root :: Grammar Root
+root = 'root
+ <=> ReplaceWith  # (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
+ <|> Undo        <$ str "undo"
+ <|> Repeat       # inject positive <*> inject root
 
--- newtype Positive = Positive Int deriving (Show,Eq)
--- positive :: Grammar Positive
--- positive = 'positive
---  <=> Positive <$> (asum . map int) [1..9]
+newtype Positive = Positive Int deriving (Show,Eq)
+positive :: Grammar Positive
+positive = 'positive
+ <=> Positive # (foldr (<|>) empty . map int) [1..9]
 
--- newtype Dictation = Dictation String deriving (Show,Eq)
--- dictation :: Grammar Dictation
--- dictation = 'dictation
---  <=> Dictation <$ "this"
---  <|> Dictation <$ "that"
+newtype Dictation = Dictation String deriving (Show,Eq)
+dictation :: Grammar Dictation
+dictation = 'dictation
+ <=> Dictation # str "this"
+ <|> Dictation # str "that"
 
 
 -- dictation = grammar "<dgndictation>" $ \context ->
@@ -116,9 +116,9 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 --  , DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
 --  ]
 
-grammar = DNSGrammar root [command, subcommand, flag] :: DNSGrammar Text Text
+grammar = DNSGrammar export [command, subcommand, flag] :: DNSGrammar Text Text
 
-root = DNSProduction (DNSRule "root") $ fromList
+export = DNSProduction (DNSRule "export") $ fromList
  [ DNSSequence $ fromList
    [ DNSNonTerminal (DNSList "command")
    , DNSNonTerminal (DNSRule "subcommand")
@@ -197,3 +197,7 @@ main = do
 
  print escaped
 
+ putStrLn ""
+ -- print =<< root `parses` "replace this with that"
+ print =<< dictation `parses` "this"
+ print =<< positive `parses` "9"

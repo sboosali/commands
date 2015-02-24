@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell           #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
@@ -19,6 +19,7 @@ import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 import           System.Timeout                    (timeout)
 import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
+-- import Commands.Render
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -34,6 +35,11 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
 -- import Data.Traversable (traverse)
 
 
+instance Show (Grammar a) where
+ show (Terminal s) = "Terminal " ++ s
+ show (NonTerminal l rs) = "NonTerminal (" ++ show l ++ ") (" ++ show rs ++ ") "
+
+
 data Root
  = ReplaceWith Dictation Dictation
  | Undo
@@ -44,6 +50,7 @@ root :: Grammar Root
 root = 'root
  <=> ReplaceWith  # (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
  <|> Undo        <$ terminal "undo"
+ <|> Undo        <$ terminal "undo it"
  <|> Repeat       # inject positive <*> inject root
 
 newtype Positive = Positive Int deriving (Show,Eq)
@@ -163,6 +170,8 @@ isPythonModule s = case parseModule s "" of
  Right {} -> True
  _ -> False
 
+attempt =  timeout (round (1e6 :: Double))
+
 
 main = do
  let Right escaped = escapeDNSGrammar grammar
@@ -199,7 +208,12 @@ main = do
 
  putStrLn ""
  handleParse positive "9"
- handleParse dictation "this"
- timeout (round (1e6 :: Double)) (handleParse root "undo")
- timeout (round (1e6 :: Double)) (handleParse root "replace this with that")
- timeout (round (1e6 :: Double)) (handleParse root "9 1 undo")
+ handleParse dictation "that"
+ attempt  (handleParse root "undo")
+ attempt  (handleParse root "undo it")
+ attempt  (handleParse root "replace this with that")
+ attempt (handleParse root "1 undo")
+
+ putStrLn ""
+ -- attempt (print $ counts root)
+ -- attempt $ print dictation

@@ -14,6 +14,7 @@ import Control.Applicative
 import Data.List                         (intercalate)
 import Language.Haskell.TH.Syntax        (Name)
 
+
 infix  2 <=>
 -- infixl 3 <|>
 -- infixl 4 <$>

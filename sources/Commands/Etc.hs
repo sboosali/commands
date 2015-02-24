@@ -9,6 +9,8 @@ import Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                      NameFlavour (NameG), OccName (OccName),
                                      PkgName (PkgName))
 import Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+import qualified Debug.Trace
+import Control.Monad.Reader (ReaderT, local)
 
 
 -- | generalized 'Maybe':
@@ -71,9 +73,7 @@ data Some f = forall x. Some (f x)
 --
 -- >>> constructors :: [Bool]
 -- [False,True]
-
 --
-
 constructors :: (Enum a) => [a]
 constructors = enumFrom (toEnum 0)
 
@@ -91,3 +91,16 @@ display = displayT . renderPretty 1.0 80
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
 (-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
 p --> q = ((||) <$> (not . p) <*> q)
+
+trace :: String -> a -> a
+trace = Debug.Trace.trace
+
+traced :: (Show a) => a -> a
+traced = Debug.Trace.traceShowId
+
+tracing :: (Show a, Monad m) => a -> m ()
+tracing = Debug.Trace.traceShowM
+
+with :: Monad m => r -> ReaderT r m a -> ReaderT r m a
+with = local . const
+

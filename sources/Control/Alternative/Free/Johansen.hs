@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, FlexibleContexts, UndecidableInstances #-}
 -- | (see <https://hackage.haskell.org/package/free-4.10.0.1/docs/Control-Alternative-Free.html Control.Alternative.Free> for inspiration)
 
 module Control.Alternative.Free.Johansen where
@@ -24,8 +24,16 @@ instance Functor f => Applicative (Alt f) where
  -- Alt []  <*> _          = empty                                  -- empty is left annihilator for <*>
  -- _       <*> Alt []     = empty                                  -- empty is right annihilator for <*>
  -- Alt [f] <*> Alt [x,y]  = Alt (f <*> x) <|> Alt (f <*> y)        -- <*> left-distributes over <|>
- Alt fs  <*> Alt xs     = Alt (fmap (<*>) fs <*> xs)
+ Alt fs  <*> Alt xs     = Alt (fmap (<*>) fs <*> xs) -- TODO the right order?
  -- (<*>) f :: App f a -> App f b
+
+ -- Alt []  <*> _          = empty
+ -- Alt [f]  <*> Alt xs     = Alt ([(f <*>)] <*> xs)
+ -- Alt (f:fs)  <*> Alt xs     = (Alt [f] <*> Alt xs) <|> (Alt fs <*> Alt xs)
+
+
+-- >>> [(+1), (*10)] <*> [1,2,3]
+-- [2,3,4,2,4,6]
 
 instance Functor f => Alternative (Alt f) where
  empty = Alt []
@@ -62,3 +70,12 @@ lift x = Alt [Alt [Pure id] `App` x]
 --
 fell :: Alternative f => Alt f a -> f a
 fell = undefined
+
+
+instance Show (App f a) => Show (Alt f a) where
+ show (Alt xs) = "Alt " ++ show xs
+
+instance Show (App f a) where
+ show (Pure _) = "Pure _"
+ show (xs `App` _) = "(" ++ show xs ++ ") `App` _"
+

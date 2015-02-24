@@ -2,10 +2,11 @@
 module Commands.Parse.Types where
 import Commands.Etc
 import Commands.Parsec      (Parsec)
-import Control.Monad.Reader
+-- import Control.Monad.Reader
 
 
-type SensitiveParser a = Reader Context (Parsec a)
+-- type SensitiveParser a = Reader Context (Parsec a)
+type SensitiveParser a = Context -> (Parsec a)
 
 type Context = Some Parsec
 

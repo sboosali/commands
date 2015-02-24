@@ -6,9 +6,9 @@ import Commands.Parse.Types
 import Commands.Parsec
 import Control.Alternative.Free.Johansen
 import Control.Applicative
-import Control.Monad.Reader
--- import Data.List                         (foldl')
-import Data.Traversable
+-- import Control.Monad.Reader
+-- import Data.Foldable                         (foldr')
+-- import Data.Traversable
 -- import Commands.Munging       (unCamelCase)
 import Control.Exception.Lens            (handler, _ErrorCall)
 import Control.Lens
@@ -20,25 +20,63 @@ import Control.Monad.Catch               (Handler, SomeException (..), catches)
 import Data.Typeable                     (cast)
 
 
+-- | build a parser from a grammar.
+--
+-- Implementation Detail: we use 'foldr' (not @foldl@, nor @foldr'@) to support infinitely many alternatives.
+--
+--
+--
+-- like most Haskell functions, the method '<|>' (instantiated to the Parsec Applicative) is non-strict:
+--
+-- >>> parse (word "hello" <|> undefined) "hello"
+-- "hello"
+--
+-- "right-associated" means that the topmost "thing" is the leftmost. e.g. the expression:
+--
+-- @
+-- 1:2:[]
+-- @
+--
+-- associates as:
+-- 
+-- @
+--  (:)
+--  / \\
+-- 1  (:)
+--    / \\
+--   2  []
+-- @
+--
+-- so when our "constructor" is non-strict (like @:@, unlike @+@) and "generative" (or "sufficiently non-strict", I don't know the right jargon for what I mean), a consumer can consume one "thing" at a time.
+--
+-- e.g. 'parse' lazily consumes @p '<|>' (q '<|>' ...)@: if @p@ fails it tries @q@; if @q@ succeeds it doesn't try @...@; so even if @...@ is bottom (e.g. doesn't terminate), that's okay.
+--
+-- that's why we right-associate '<|>' (whose @infixl@ doesn't matter, as I think (?) the '<|>' method satisfies associativity anyway) with 'foldr'.
+--
+--
+--
 gparser :: Grammar a -> SensitiveParser a
-gparser (Terminal s) = return $ try (word s) *> pure undefined -- TODO make safe
-gparser (NonTerminal l (Alt rs)) = do
- ps <- traverse rparser rs
- let p = foldr (<|>) empty ps
- return $ try (p <?> show l)
+gparser (Terminal s) _ = try (word s) *> pure undefined -- TODO make safe
+gparser (NonTerminal l (Alt rs)) context = try (p <?> show l)
+ where
+ ps = map (flip rparser $ context) rs
+ p = foldr (<|>) empty ps
 
+-- | build a parser from a right-hand side.
+--
 rparser :: RHS a -> SensitiveParser a
-rparser (Pure a) = return . pure $ a
-rparser (Alt rs `App` g) = do
- q <- gparser g
- ps <- with (Some q) $ traverse rparser rs  -- recur on the left, with the parser from the right
- let p = foldr (<|>) empty ps
- return $ try (p <*> q)              -- run the parser from the left, before the parser from the right
+rparser (Pure a) _ = pure $ a
+rparser (Alt rs `App` g) context = try $ p <*> q
+ where
+ q = (flip gparser) context g
+ ps = map (flip rparser $ Some q) rs
+ p = foldr (<|>) empty ps
 
-with :: Monad m => r -> ReaderT r m a -> ReaderT r m a
-with = local . const
+parses :: Grammar a -> String -> Possibly a
+parses g s = parse (p <* eof) s
+ where p = (gparser g) (Some eof)
 
-{- |
+{-
 
 grammar :: Grammar x
 rs :: Alt Grammar (x -> a)
@@ -58,11 +96,7 @@ p :: Parsec a
 
 -}
 
-parses :: Grammar a -> String -> Possibly a
-parses g s = parse p s
- where p = runReader (gparser g) (Some eof)
-
-
+-- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
 _ParseError :: Prism' SomeException ParseError
 _ParseError = prism SomeException $ \(SomeException e) -> case cast e of
  Nothing -> Left (SomeException e)

@@ -4,32 +4,7 @@
 -- | Uses pretty printer combinators for readability of serialization.
 --
 --
-module Commands.Frontends.Dragon13
- ( -- * serializers
-   -- | the @doctest@ed examples depend on the following ghci session:
-   --
-   -- $setup
-
-   serialize
- , serializeGrammar
- , serializeRules
- , serializeImports
- , serializeExport
- , serializeProduction
- , serializeRHS
- , serializeLHS
- , serializeToken
- , dnsHeader
- , serializeLists
- , serializeVocabularies
- , serializeVocabulary
- , enclosePythonic
- , escapeDNSGrammar
- , eitherToValidations
- , isPythonFile
- , getNames
- , getWords
- ) where
+module Commands.Frontends.Dragon13 where
 
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text

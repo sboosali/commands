@@ -10,6 +10,9 @@ import           Data.Monoid
 import           Data.Traversable    (Traversable)
 import           GHC.Exts            (IsList (..))
 
+-- $setup
+-- >>> import Test.QuickCheck.Modifiers (Blind(..))
+
 
 -- | Applicatives and Alternatives
 data Tree a = Leaf a | Branch [Tree a]
@@ -26,6 +29,9 @@ data Tree a = Leaf a | Branch [Tree a]
 --
 -- >>> fromList [(+1), (*10)] <*> fromList [1,2,3] :: Tree Int
 -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 10,Leaf 20,Leaf 30]]
+--
+--
+-- prop> \(Blind fs) xs -> (fs <*> xs) == toList (fromList fs <*> fromList xs :: Tree Int)
 --
 --
 instance Applicative Tree where

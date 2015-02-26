@@ -1,6 +1,6 @@
 {-# LANGUAGE ExtendedDefaultRules, LambdaCase, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes, ScopedTypeVariables    #-}
-{-# LANGUAGE TemplateHaskell                                     #-}
+{-# LANGUAGE TemplateHaskell, TupleSections                      #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
@@ -296,4 +296,20 @@ main = do
  -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 10,Leaf 20,Leaf 30]]
  print $ (+) <$> fromLeaves [1, 10] <*> fromLeaves [1,2,3]
  -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 11,Leaf 12,Leaf 13]]
-
+ print $ (,,) <$> fromLeaves [0] <*> fromLeaves [False, True] <*> fromLeaves ['a', 'b', 'c']
+ -- Branch
+ --  [Branch                                                             -- the 0 branch
+ --   [Branch [Leaf (0,False,'a'),Leaf (0,False,'b'),Leaf (0,False,'c')] -- the False branch
+ --   ,Branch [Leaf (0,True,'a'),Leaf (0,True,'b'),Leaf (0,True,'c')]]]  -- the True branch
+ print $ (,,) <$> fromLeaves [False, True] <*> fromLeaves ['a', 'b', 'c'] <*> fromLeaves [1,2,3]
+{- |
+Branch
+ [Branch                                                               -- the False branch
+  [ Branch [Leaf (False,'a',1),Leaf (False,'a',2),Leaf (False,'a',3)]  -- the False 'a' branch
+  , Branch [Leaf (False,'b',1),Leaf (False,'b',2),Leaf (False,'b',3)]  -- the False 'b' branch
+  , Branch [Leaf (False,'c',1),Leaf (False,'c',2),Leaf (False,'c',3)]] -- the False 'c' branch
+ , Branch                                                            -- the True branch
+  [ Branch [Leaf (True,'a',1),Leaf (True,'a',2),Leaf (True,'a',3)]   -- the True 'a'  branch
+  , Branch [Leaf (True,'b',1),Leaf (True,'b',2),Leaf (True,'b',3)]   -- the True 'b' branch
+  , Branch [Leaf (True,'c',1),Leaf (True,'c',2),Leaf (True,'c',3)]]] -- the True 'c' branch
+-}

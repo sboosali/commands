@@ -1,18 +1,24 @@
 {-# LANGUAGE ConstraintKinds, DataKinds, DeriveDataTypeable                 #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving      #-}
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving            #-}
-{-# LANGUAGE TypeFamilies, TypeOperators                                    #-}
+{-# LANGUAGE LambdaCase, RankNTypes, ScopedTypeVariables                    #-}
+{-# LANGUAGE StandaloneDeriving, TypeFamilies, TypeOperators                #-}
 -- |
 module Commands.Grammar where
-import Commands.Etc
-import Commands.Grammar.Types
-import Commands.Munging
-import Control.Alternative.Free.Johansen
+import           Commands.Etc
+import           Commands.Grammar.Types
+import           Commands.Munging
+import           Control.Alternative.Free.Johansen
 
-import Control.Applicative
-import Data.List                         (intercalate)
-import Language.Haskell.TH.Syntax        (Name)
+import           Control.Applicative
+import           Control.Monad.Trans.State.Strict
+import           Data.Foldable                     (traverse_)
+import           Data.List                         (intercalate)
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
+import           Language.Haskell.TH.Syntax        (Name)
+-- import Control.Monad.State hiding  (lift)
+import           Control.Monad                     (when)
 
 
 infix  2 <=>
@@ -70,3 +76,23 @@ str s = s <$ terminal s
 twig :: (Enum a, Show a) => RHSs a
 twig = foldr (<|>) empty . map con $ constructors
 
+reifyGrammar :: Grammar x -> Map LHS (Some RHSs)
+reifyGrammar grammar = execState (reifyGrammar_ grammar) Map.empty
+
+reifyGrammar_ :: Grammar x -> State (Map LHS (Some RHSs)) ()
+reifyGrammar_ (Terminal _)       = return ()
+reifyGrammar_ (NonTerminal l rs) = do
+ traverse_ (\case  (_ `App` g) -> tracing g; _ -> return ()) (alternatives rs)
+ visited <- gets $ Map.member l
+ when (not visited) $ do
+  modify $ Map.insert l (Some rs)
+  reifyRHSs_ rs
+
+reifyRHSs_ :: RHSs x -> State (Map LHS (Some RHSs)) ()
+reifyRHSs_ (Alt rs) = traverse_ reifyRHS_ rs
+
+reifyRHS_ :: RHS x -> State (Map LHS (Some RHSs)) ()
+reifyRHS_ (Pure _) = return ()
+reifyRHS_ (rs `App` g) = do
+ reifyGrammar_ g
+ reifyRHSs_ rs

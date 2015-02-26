@@ -38,7 +38,7 @@ import Data.Typeable                     (cast)
 -- @
 --
 -- associates as:
--- 
+--
 -- @
 --  (:)
 --  / \\
@@ -112,3 +112,4 @@ handleParse :: Show a => Grammar a -> String -> IO ()
 handleParse p s = do
  (print =<< (p `parses` s)) `catches` parseHandlers
  putStrLn ""
+

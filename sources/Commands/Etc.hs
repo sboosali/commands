@@ -1,16 +1,17 @@
 {-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 module Commands.Etc where
-import Commands.Instances           ()
-import Control.Applicative
-import Control.Monad.Catch          (MonadThrow, throwM)
-import Data.Monoid                  ((<>))
-import Data.Text.Lazy               (Text)
-import Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
-                                     NameFlavour (NameG), OccName (OccName),
-                                     PkgName (PkgName))
-import Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+import           Commands.Instances           ()
+import           Control.Applicative
+import           Control.Monad.Catch          (MonadThrow, throwM)
+import           Control.Monad.Reader         (ReaderT, local)
+import           Data.Monoid                  ((<>))
+import           Data.Text.Lazy               (Text)
 import qualified Debug.Trace
-import Control.Monad.Reader (ReaderT, local)
+import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
+                                               NameFlavour (NameG),
+                                               OccName (OccName),
+                                               PkgName (PkgName))
+import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 
 -- | generalized 'Maybe':

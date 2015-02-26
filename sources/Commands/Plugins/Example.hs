@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell           #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell                       #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
@@ -10,15 +10,24 @@ import           Commands.Parse
 -- import Commands.Parse.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Control.Alternative.Free.Johansen
 
+-- import Data.Maybe (maybe)
+-- import qualified Data.Map as Map
 import           Control.Applicative
+import           Control.Concurrent
+import           Control.Concurrent.Async
+import           Control.Monad                     (void, (<=<), (>=>))
+import           Control.Parallel
 import           Data.Bitraversable
 import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 import           System.Timeout                    (timeout)
-import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
+import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
+                                                    (<>))
+
 -- import Commands.Render
 
 -- import qualified Data.Text.Lazy                    as T
@@ -35,10 +44,6 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<>))
 -- import Data.Traversable (traverse)
 
 
-instance Show (Grammar a) where
- show (Terminal s) = "Terminal " ++ s
- show (NonTerminal l rs) = "NonTerminal (" ++ show l ++ ") (" ++ show rs ++ ") "
-
 
 data Root
  = ReplaceWith Dictation Dictation
@@ -47,11 +52,12 @@ data Root
  deriving (Show,Eq)
 
 root :: Grammar Root
-root = 'root
- <=> ReplaceWith  # (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
- <|> Undo        <$ terminal "undo"
+root = 'root <=> empty
+ -- <|> Repeat      <$> (Positive <$> int 1) <*> inject root
+ <|> ReplaceWith <$> (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
  <|> Undo        <$ terminal "undo it"
- <|> Repeat       # inject positive <*> inject root
+ <|> Undo        <$ terminal "undo"
+ <|> Repeat      <$> inject positive <*> inject root
 
 newtype Positive = Positive Int deriving (Show,Eq)
 positive :: Grammar Positive
@@ -63,7 +69,6 @@ dictation :: Grammar Dictation
 dictation = 'dictation
  <=> Dictation # str "this"
  <|> Dictation # str "that"
-
 
 -- dictation = grammar "<dgndictation>" $ \context ->
 --  Dictation <$> anyWord `manyUntil` context
@@ -170,7 +175,57 @@ isPythonModule s = case parseModule s "" of
  Right {} -> True
  _ -> False
 
-attempt =  timeout (round (1e6 :: Double))
+oneSecond :: Int
+oneSecond = round (1e6 :: Double)
+
+-- attempt :: IO () -> IO ()
+-- attempt = maybe (putStrLn ".") (const (return ())) <=< timeout (round (1e6 :: Double))
+-- attempt action = do
+--  handle <- async $ timeout oneSecond action
+--  waitCatch handle >>= \case
+--   Left error     -> print error
+--   Right Nothing  -> putStrLn "."
+--   Right (Just _) -> return ()
+-- attempt action = do
+--  timeout oneSecond action `withAsync` \handle -> do
+--   waitCatch handle >>= \case
+--    Left error     -> print error
+--    Right Nothing  -> putStrLn "."
+--    Right (Just _) -> return ()
+-- attempt action = do
+--  forkIO $ timeout oneSecond action >>= \case
+--   Nothing  -> putStrLn "."
+--   (Just _) -> return ()
+
+
+-- attemptForking action = do
+--  forkFinally (timeout oneSecond action) $ \case
+--    Left error     -> print error
+--    Right Nothing  -> putStrLn "."
+--    Right (Just _) -> print ()
+attemptForking action = do
+ forkFinally (timeout oneSecond action) $ \case
+   Left error     -> print error
+   Right Nothing  -> putStrLn "."
+   Right (Just _) -> print ()
+
+attemptAsynchronously action = do
+ (timeout oneSecond action) `withAsync` (waitCatch >=> \case
+   Left error     -> print error
+   Right Nothing  -> putStrLn "."
+   Right (Just _) -> return ()
+  )
+
+attempt = attemptAsynchronously
+
+-- attempting :: [IO ()] -> IO ()
+-- attempting actions = do
+--  sequence_ actions
+attempting :: [IO ()] -> IO ()
+attempting actions = do
+ sequence_ actions
+
+attemptParse p s = attempt (print =<< (p `parses` s))
 
 
 main = do
@@ -209,11 +264,28 @@ main = do
  putStrLn ""
  handleParse positive "9"
  handleParse dictation "that"
- attempt  (handleParse root "undo")
- attempt  (handleParse root "undo it")
- attempt  (handleParse root "replace this with that")
- attempt (handleParse root "1 undo")
+
+ -- attempting
+ --  [ handleParse root "undo"
+ --  , handleParse root "undo it"
+ --  , handleParse root "replace this with that"
+ --  , handleParse root "1 undo"
+ --  , handleParse root "1 1 undo"
+ --  ]
+
+ attemptParse root "undo"
+ attemptParse root "undo it"
+ attemptParse root "replace this with that"
+ attemptParse root "1 undo"
+ attemptParse root "1 1 undo"
 
  putStrLn ""
  -- attempt (print $ counts root)
  -- attempt $ print dictation
+ -- attempt $ print $ Map.keys $ reifyGrammar positive
+ -- attempt $ print $ Map.keys $ reifyGrammar dictation
+ -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
+
+ attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
+ attempt $ print $ length $ alternatives $ inject dictation -- is two
+ attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity

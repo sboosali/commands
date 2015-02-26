@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts, GADTs, UndecidableInstances #-}
 -- | (see <https://hackage.haskell.org/package/free-4.10.0.1/docs/Control-Alternative-Free.html Control.Alternative.Free> for inspiration)
 
 module Control.Alternative.Free.Johansen where
@@ -23,17 +23,32 @@ instance Functor f => Applicative (Alt f) where
  pure x = Alt [pure x]
  -- Alt []  <*> _          = empty                                  -- empty is left annihilator for <*>
  -- _       <*> Alt []     = empty                                  -- empty is right annihilator for <*>
- -- Alt [f] <*> Alt [x,y]  = Alt (f <*> x) <|> Alt (f <*> y)        -- <*> left-distributes over <|>
- Alt fs  <*> Alt xs     = Alt (fmap (<*>) fs <*> xs) -- TODO the right order?
- -- (<*>) f :: App f a -> App f b
+ -- Alt [f] <*> Alt [x,y]  = Alt [f <*> x] <|> Alt [f <*> y]        -- <*> left-distributes over <|>
+ Alt fs  <*> Alt xs     = Alt (fmap (<*>) fs <*> xs) -- TODO the right order? nope!
 
- -- Alt []  <*> _          = empty
- -- Alt [f]  <*> Alt xs     = Alt ([(f <*>)] <*> xs)
- -- Alt (f:fs)  <*> Alt xs     = (Alt [f] <*> Alt xs) <|> (Alt fs <*> Alt xs)
+ -- Alt fs <*> Alt xs = Alt $ (`apply` xs) `map` fs
+ --  where
+ --  apply :: App f (x -> a) -> [App f x] -> App f a
+ --  apply f xs = (f <*>) `map` xs
 
+ -- Alt fs <*> Alt xs = Alt $ (inject . (`apply` xs)) `map` fs
+ --  where
+ --  apply :: App f (x -> a) -> [App f x] -> Alt f a
+ --  apply f xs = (f <*>) `map` xs
+ --  inject :: Alt f a -> App f a
+ --  inject f = _ f `App` _
+
+ -- (length.alternatives) (Alt fs <*> Alt xs) = (length.alternatives) (Alt fs)
+
+-- (<*>) f :: App f a -> App f b
 
 -- >>> [(+1), (*10)] <*> [1,2,3]
--- [2,3,4,2,4,6]
+-- [2,3,4,10,20,30]
+
+-- >>> let each fs xs = fmap (`fmap` xs) fs
+-- >>> [(+1), (*10)] `each` [1,2,3]
+-- [[2,3,4],[10,20,30]]
+
 
 instance Functor f => Alternative (Alt f) where
  empty = Alt []
@@ -55,9 +70,15 @@ instance Functor f => Functor     (App f) where
 
 instance Functor f => Applicative (App f) where
  pure = Pure
- Pure ab <*> fa           = fmap ab fa      -- fmap
- fab     <*> Pure a       = fmap ($ a) fab  -- interchange
- fab     <*> gxa `App` hx  = ((.) <$> Alt [fab] <*> gxa) `App` hx
+ Pure ab <*> fa             = fmap ab fa      -- Functor
+ fab     <*> Pure a         = fmap ($ a) fab  -- Interchange
+ fab     <*> (gxa `App` hx) = ((.) <$> Alt [fab] <*> gxa) `App` hx -- Composition
+
+-- Homomorphism?
+
+-- Identity:
+-- pure id <*> x = Pure id <*> x = fmap id x = x
+
 
 -- |
 --

@@ -21,3 +21,9 @@ type LHS = GUI
 type RHS = App Grammar
 
 type RHSs = Alt Grammar
+
+-- TODO remove this abomination
+instance Show (Grammar a) where
+ show (Terminal s) = "Terminal " ++ s
+ show (NonTerminal l _) = "NonTerminal (" ++ show l ++ ") _"
+

@@ -99,7 +99,9 @@ library
   , language-python  ==0.4.*
   , template-haskell ==2.9.*
   , mtl   ==2.1.*
-
+  , transformers  ==0.3.*
+  , async  ==2.0.*
+  , parallel  ==3.2.*
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly
 --               , transformers  ==0.3.*
@@ -152,6 +154,9 @@ executable example
  ghc-options:
   -Wall
   -fno-warn-name-shadowing
+  -threaded
+  -O2
+  "-with-rtsopts=-N"
 
  build-depends:
   commands-core,

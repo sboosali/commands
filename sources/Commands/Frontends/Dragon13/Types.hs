@@ -102,12 +102,6 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
  bitraverse f g (DNSOptional r)      = DNSOptional     <$> bitraverse f g r
  bitraverse f g (DNSMultiple r)      = DNSMultiple     <$> bitraverse f g r
 
--- | the "leaves" of the grammar.
-data DNSToken t
- = DNSToken t -- ^ e.g. @"word or phrase"@
- | DNSPronounced t t -- ^ e.g. @written\\spoken@
- deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
-
 -- |
 --
 -- in the type @DNSLHS l n@, you can read:
@@ -141,17 +135,23 @@ data DNSLHS (l :: LHSKind) n where
 
 deriving instance (Show n) => Show (DNSLHS l n)
 
-instance Functor     (DNSLHS lhs) where fmap     = fmapDefault
-instance Foldable    (DNSLHS lhs) where foldMap  = foldMapDefault
-instance Traversable (DNSLHS lhs) where
- traverse f (DNSRule name) = DNSRule <$> f name
- traverse f (DNSList name) = DNSList <$> f name
+instance Functor     (DNSLHS l) where fmap     = fmapDefault
+instance Foldable    (DNSLHS l) where foldMap  = foldMapDefault
+instance Traversable (DNSLHS l) where
+ traverse f (DNSRule n) = DNSRule <$> f n
+ traverse f (DNSList n) = DNSList <$> f n
  traverse _ (DNSBuiltin x) = pure $ DNSBuiltin x
 
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
 data DNSBuiltin = DGNDictation | DGNWords | DGNLetters
  deriving (Show, Eq, Ord, Enum)
+
+-- | the "leaves" of the grammar.
+data DNSToken t
+ = DNSToken t -- ^ e.g. @"word or phrase"@
+ | DNSPronounced t t -- ^ e.g. @written\\spoken@
+ deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 -- | for promotion by @DataKinds@.
 data LHSKind = LHSRule | LHSList

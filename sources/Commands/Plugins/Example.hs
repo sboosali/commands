@@ -1,5 +1,6 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, PatternSynonyms, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell                       #-}
+{-# LANGUAGE ExtendedDefaultRules, LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms, RankNTypes, ScopedTypeVariables    #-}
+{-# LANGUAGE TemplateHaskell                                     #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
@@ -225,67 +226,74 @@ attempting :: [IO ()] -> IO ()
 attempting actions = do
  sequence_ actions
 
-attemptParse p s = attempt (print =<< (p `parses` s))
+-- attemptParse p s = attempt (print =<< (p `parses` s))
 
 
 main = do
- let Right escaped = escapeDNSGrammar grammar
- let serializedRules = vsep ["'''", serializeRules escaped, "'''"]
- let serializedLists = serializeVocabularies (dnsProductions escaped)
- let serializedGrammar = vsep $ punctuate "\n" [ "_commands_rules_ =" <+> serializedRules, "_commands_lists_ =" <+> serializedLists]
+ -- let Right escaped = escapeDNSGrammar grammar
+ -- let serializedRules = vsep ["'''", serializeRules escaped, "'''"]
+ -- let serializedLists = serializeVocabularies (dnsProductions escaped)
+ -- let serializedGrammar = vsep $ punctuate "\n" [ "_commands_rules_ =" <+> serializedRules, "_commands_lists_ =" <+> serializedLists]
  -- print serializedGrammar
 
- putStrLn ""
- putStr "words: "
- print $ getWords grammar
- putStr "names: "
- print $ getNames grammar
+ -- putStrLn ""
+ -- putStr "words: "
+ -- print $ getWords grammar
+ -- putStr "names: "
+ -- print $ getNames grammar
+
+ -- putStrLn ""
+ -- putStrLn . take 100 . show $ parseExpr (show serializedRules) ""
+ -- putStrLn ""
+ -- putStrLn . take 100 . show $ parseExpr (show serializedLists) ""
+ -- putStrLn ""
+ -- putStrLn . take 100 . show $ parseModule (show serializedGrammar) ""
+
+ -- putStrLn ""
+ -- print $ (isPythonString . show) serializedRules
+ -- print $ (isPythonDict . show) serializedLists
+ -- print $ (isPythonModule . show) serializedGrammar
+
+ -- putStrLn ""
+ -- _ <- bitraverse print T.putStrLn $ serialize grammar
+ -- putStrLn ""
+ -- _ <- bitraverse print T.putStrLn $ serialize badGrammar
+ -- putStrLn ""
+
+ -- print escaped
+
+ -- putStrLn ""
+ -- handleParse positive "9"
+ -- handleParse dictation "that"
+
+ -- -- attempting
+ -- --  [ handleParse root "undo"
+ -- --  , handleParse root "undo it"
+ -- --  , handleParse root "replace this with that"
+ -- --  , handleParse root "1 undo"
+ -- --  , handleParse root "1 1 undo"
+ -- --  ]
+
+ -- attemptParse root "undo"
+ -- attemptParse root "undo it"
+ -- attemptParse root "replace this with that"
+ -- attemptParse root "1 undo"
+ -- attemptParse root "1 1 undo"
+
+ -- putStrLn ""
+ -- -- attempt (print $ counts root)
+ -- -- attempt $ print dictation
+ -- -- attempt $ print $ Map.keys $ reifyGrammar positive
+ -- -- attempt $ print $ Map.keys $ reifyGrammar dictation
+ -- -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
+
+ -- attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
+ -- attempt $ print $ length $ alternatives $ inject dictation -- is two
+ -- attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity
 
  putStrLn ""
- putStrLn . take 100 . show $ parseExpr (show serializedRules) ""
- putStrLn ""
- putStrLn . take 100 . show $ parseExpr (show serializedLists) ""
- putStrLn ""
- putStrLn . take 100 . show $ parseModule (show serializedGrammar) ""
+ print $ fromLeaves [(+1), (*10)] <*> fromLeaves [1,2,3]
+ -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 10,Leaf 20,Leaf 30]]
+ print $ (+) <$> fromLeaves [1, 10] <*> fromLeaves [1,2,3]
+ -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 11,Leaf 12,Leaf 13]]
 
- putStrLn ""
- print $ (isPythonString . show) serializedRules
- print $ (isPythonDict . show) serializedLists
- print $ (isPythonModule . show) serializedGrammar
-
- putStrLn ""
- _ <- bitraverse print T.putStrLn $ serialize grammar
- putStrLn ""
- _ <- bitraverse print T.putStrLn $ serialize badGrammar
- putStrLn ""
-
- print escaped
-
- putStrLn ""
- handleParse positive "9"
- handleParse dictation "that"
-
- -- attempting
- --  [ handleParse root "undo"
- --  , handleParse root "undo it"
- --  , handleParse root "replace this with that"
- --  , handleParse root "1 undo"
- --  , handleParse root "1 1 undo"
- --  ]
-
- attemptParse root "undo"
- attemptParse root "undo it"
- attemptParse root "replace this with that"
- attemptParse root "1 undo"
- attemptParse root "1 1 undo"
-
- putStrLn ""
- -- attempt (print $ counts root)
- -- attempt $ print dictation
- -- attempt $ print $ Map.keys $ reifyGrammar positive
- -- attempt $ print $ Map.keys $ reifyGrammar dictation
- -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
-
- attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
- attempt $ print $ length $ alternatives $ inject dictation -- is two
- attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity

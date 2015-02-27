@@ -30,6 +30,7 @@ data Tree a = Leaf a | Branch [Tree a]
 -- >>> fromList [(+1), (*10)] <*> fromList [1,2,3] :: Tree Int
 -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 10,Leaf 20,Leaf 30]]
 --
+-- you can recover the unassociated behavior by collapsing the associations with 'toList':
 --
 -- prop> \(Blind fs) xs -> (fs <*> xs) == toList (fromList fs <*> fromList xs :: Tree Int)
 --
@@ -38,7 +39,7 @@ instance Applicative Tree where
  pure = Leaf
  Leaf f     <*> xs        = f `fmap` xs     -- Identity. shape of xs
  fs         <*> Leaf x    = ($ x) `fmap` fs -- Interchange. shape of fs
- Branch fs  <*> xs = Branch $ (<*> xs) `fmap` fs       -- "breadth-first". shape of fs
+ Branch fs  <*> xs        = Branch $ (<*> xs) `fmap` fs       -- "breadth-first". shape of fs
 
 instance Monoid (Tree a) where
  mempty = Branch []
@@ -113,12 +114,7 @@ instance Functor f => Applicative (Alt f) where
  -- Alt []  <*> _          = empty                                  -- empty is left annihilator for <*>
  -- _       <*> Alt []     = empty                                  -- empty is right annihilator for <*>
  -- Alt [f] <*> Alt [x,y]  = Alt [f <*> x] <|> Alt [f <*> y]        -- <*> left-distributes over <|>
-
- Alt fs <*> Alt xs = undefined -- Alt $ (`apply` xs) `fmap` fs
-  -- where
-  -- apply :: App f (x -> a) -> Tree (App f x) -> [Tree (App f a)]
-  -- apply f (Leaf x)    = [Leaf (f <*> x)]
-  -- apply f (Branch xs) = (f <*>) `fmap` xs
+ Alt fs <*> Alt xs = Alt $ fmap (<*>) fs <*> xs
 
  -- Alt fs <*> Alt xs = Alt $ (inject . (`apply` xs)) `map` fs
  --  where
@@ -127,18 +123,17 @@ instance Functor f => Applicative (Alt f) where
  --  inject :: Alt f a -> App f a
  --  inject f = _ f `App` _
 
- -- prop> (length.alternatives) (Alt f <*> Alt x) = (length.alternatives) (Alt f)
-
+-- prop> (length.alternatives) (Alt f <*> Alt x) = (length.alternatives) (Alt f)
 -- (f <*>) :: App f a -> App f b
 
--- >>> [(+1), (*10)] <*> [1,2,3]
--- [2,3,4,10,20,30]
+-- _ :: Tree (App f (a -> b)) -> Tree (App f a -> App f b)
+-- (<*>) :: App f (a -> b) -> (App f a -> App f b)
+-- fmap (<*>) :: f (App f (a -> b)) -> f (App f a -> App f b)
 
--- >>> let each fs xs = fmap (`fmap` xs) fs
--- >>> [(+1), (*10)] `each` [1,2,3]
--- [[2,3,4],[10,20,30]]
-
--- | <|> still must be associative
+-- | The identity/associativity 'Alternative' laws for 'Alt' come from
+-- the 'Monoid' laws for 'Tree'.
+--
+-- the distributivity law is TODO
 instance Functor f => Alternative (Alt f) where
  empty = Alt mempty
  -- Alt [] <|> Alt ys = Alt ys  -- empty is left identity for <|>
@@ -168,12 +163,11 @@ instance Functor f => Applicative (App f) where
 -- Identity:
 -- pure id <*> x = Pure id <*> x = fmap id x = x
 
-
 -- |
 --
 --
 lift :: f a -> Alt f a
-lift x = undefined -- Alt [Alt [Pure id] `App` x]
+lift x = Alt $ Leaf (Alt (Leaf (Pure id)) `App` x) -- Alt [Alt [Pure id] `App` x]
 
 -- |
 --

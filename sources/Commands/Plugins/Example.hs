@@ -1,7 +1,7 @@
 {-# LANGUAGE ExtendedDefaultRules, LambdaCase, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes, ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell, TupleSections                      #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
@@ -226,7 +226,7 @@ attempting :: [IO ()] -> IO ()
 attempting actions = do
  sequence_ actions
 
--- attemptParse p s = attempt (print =<< (p `parses` s))
+attemptParse p s = attempt (print =<< (p `parses` s))
 
 
 main = do
@@ -262,23 +262,23 @@ main = do
 
  -- print escaped
 
- -- putStrLn ""
- -- handleParse positive "9"
- -- handleParse dictation "that"
+ putStrLn ""
+ handleParse positive "9"
+ handleParse dictation "that"
 
- -- -- attempting
- -- --  [ handleParse root "undo"
- -- --  , handleParse root "undo it"
- -- --  , handleParse root "replace this with that"
- -- --  , handleParse root "1 undo"
- -- --  , handleParse root "1 1 undo"
- -- --  ]
+ -- attempting
+ --  [ handleParse root "undo"
+ --  , handleParse root "undo it"
+ --  , handleParse root "replace this with that"
+ --  , handleParse root "1 undo"
+ --  , handleParse root "1 1 undo"
+ --  ]
 
- -- attemptParse root "undo"
- -- attemptParse root "undo it"
- -- attemptParse root "replace this with that"
- -- attemptParse root "1 undo"
- -- attemptParse root "1 1 undo"
+ attemptParse root "undo"
+ attemptParse root "undo it"
+ attemptParse root "replace this with that"
+ attemptParse root "1 undo"
+ attemptParse root "1 1 undo"
 
  -- putStrLn ""
  -- -- attempt (print $ counts root)

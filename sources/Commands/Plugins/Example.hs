@@ -21,10 +21,12 @@ import           Control.Concurrent.Async
 import           Control.Monad                     (void, (<=<), (>=>))
 import           Control.Parallel
 import           Data.Bitraversable
+import           Data.Foldable                     (Foldable (..))
 import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
+import           Prelude                           hiding (foldr)
 import           System.Timeout                    (timeout)
 import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
                                                     (<>))
@@ -54,10 +56,10 @@ data Root
 
 root :: Grammar Root
 root = 'root <=> empty
- -- <|> Repeat      <$> (Positive <$> int 1) <*> inject root
+
  <|> ReplaceWith <$> (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
- <|> Undo        <$ terminal "undo it"
- <|> Undo        <$ terminal "undo"
+ <|> Undo        <$ terminal "no way"
+ <|> Undo        <$ terminal "no"
  <|> Repeat      <$> inject positive <*> inject root
 
 newtype Positive = Positive Int deriving (Show,Eq)
@@ -262,34 +264,6 @@ main = do
 
  -- print escaped
 
- putStrLn ""
- handleParse positive "9"
- handleParse dictation "that"
-
- -- attempting
- --  [ handleParse root "undo"
- --  , handleParse root "undo it"
- --  , handleParse root "replace this with that"
- --  , handleParse root "1 undo"
- --  , handleParse root "1 1 undo"
- --  ]
-
- attemptParse root "undo"
- attemptParse root "undo it"
- attemptParse root "replace this with that"
- attemptParse root "1 undo"
- attemptParse root "1 1 undo"
-
- -- putStrLn ""
- -- -- attempt (print $ counts root)
- -- -- attempt $ print dictation
- -- -- attempt $ print $ Map.keys $ reifyGrammar positive
- -- -- attempt $ print $ Map.keys $ reifyGrammar dictation
- -- -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
-
- -- attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
- -- attempt $ print $ length $ alternatives $ inject dictation -- is two
- -- attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity
 
  putStrLn ""
  print $ fromLeaves [(+1), (*10)] <*> fromLeaves [1,2,3]
@@ -302,7 +276,7 @@ main = do
  --   [Branch [Leaf (0,False,'a'),Leaf (0,False,'b'),Leaf (0,False,'c')] -- the False branch
  --   ,Branch [Leaf (0,True,'a'),Leaf (0,True,'b'),Leaf (0,True,'c')]]]  -- the True branch
  print $ (,,) <$> fromLeaves [False, True] <*> fromLeaves ['a', 'b', 'c'] <*> fromLeaves [1,2,3]
-{- |
+{-
 Branch
  [Branch                                                               -- the False branch
   [ Branch [Leaf (False,'a',1),Leaf (False,'a',2),Leaf (False,'a',3)]  -- the False 'a' branch
@@ -313,3 +287,38 @@ Branch
   , Branch [Leaf (True,'b',1),Leaf (True,'b',2),Leaf (True,'b',3)]   -- the True 'b' branch
   , Branch [Leaf (True,'c',1),Leaf (True,'c',2),Leaf (True,'c',3)]]] -- the True 'c' branch
 -}
+ attempt $ print $ foldr (&&) True $ Branch [Leaf False, fromLeaves [False,False ..]]
+
+
+ putStrLn ""
+ handleParse positive "9"
+ handleParse dictation "that"
+
+ -- attempting
+ --  [ handleParse root "no"
+ --  , handleParse root "no way"
+ --  , handleParse root "replace this with that"
+ --  , handleParse root "1 no"
+ --  , handleParse root "1 1 no"
+ --  ]
+
+ attemptParse root "no"
+ -- attemptParse root "no way"
+ -- attemptParse root "replace this with that"
+ -- attemptParse root "1 no"
+ attemptParse root "1 1 no"
+
+ putStrLn ""
+ -- attempt (print $ counts root)
+ -- attempt $ print dictation
+ -- attempt $ print $ Map.keys $ reifyGrammar positive
+ -- attempt $ print $ Map.keys $ reifyGrammar dictation
+ -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
+
+ -- attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
+ -- attempt $ print $ length $ alternatives $ inject dictation -- is two
+ -- attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity
+
+ print $ fmap (const ()) $ alternatives $ inject positive -- it's flat??
+ print $ fmap (const ()) $ alternatives $ inject dictation
+ -- print $ fmap (const ()) $ alternatives $ inject root

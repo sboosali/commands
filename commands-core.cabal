@@ -78,6 +78,7 @@ library
   Commands.Plugins.Example
 
   Control.Alternative.Free.Johansen
+  Control.Alternative.Free.Menendez
 
  -- modules included in this library, but not exported
  other-modules:

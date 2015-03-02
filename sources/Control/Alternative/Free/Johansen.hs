@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveFoldable, DeriveFunctor, DeriveTraversable, GADTs #-}
-{-# LANGUAGE TypeFamilies                                            #-}
+{-# LANGUAGE DeriveFunctor, DeriveTraversable, GADTs, InstanceSigs #-}
+{-# LANGUAGE TypeFamilies                                          #-}
 -- | (see <https://hackage.haskell.org/package/free-4.10.0.1/docs/Control-Alternative-Free.html Control.Alternative.Free> for inspiration)
 
 module Control.Alternative.Free.Johansen where
 import           Control.Applicative
-import           Data.Foldable       (Foldable)
+import           Data.Foldable       (Foldable (..))
 import qualified Data.Foldable       as Foldable
 import           Data.Monoid
 import           Data.Traversable    (Traversable)
@@ -16,7 +16,21 @@ import           GHC.Exts            (IsList (..))
 
 -- | Applicatives and Alternatives
 data Tree a = Leaf a | Branch [Tree a]
- deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+ deriving (Show, Eq, Ord, Functor, Traversable)
+
+
+-- | a "breadth-first" foldr.
+--
+-- the default implementation of 'foldr' wrt 'foldMap' uses the 'Endo' 'Monoid'.
+--
+-- supports short-circuiting (e.g. in infinite trees of infinitely-many alternatives) by being "sufficiently lazy".
+instance Foldable Tree where
+ -- foldr :: (a -> b -> b) -> b -> Tree a -> b
+ -- foldr f b (Leaf a) = f a b
+ -- foldr f b as = foldr f b (map (foldr f b) as)  -- TODO multiple b necessary? neutral only with Monoids
+ foldMap :: Monoid m => (a -> m) -> Tree a -> m
+ foldMap f (Leaf a)    = f a <> mempty
+ foldMap f (Branch as) = fold $ fmap (foldMap f) as
 
 -- |
 --
@@ -37,17 +51,20 @@ data Tree a = Leaf a | Branch [Tree a]
 --
 instance Applicative Tree where
  pure = Leaf
- Leaf f     <*> xs        = f `fmap` xs     -- Identity. shape of xs
- fs         <*> Leaf x    = ($ x) `fmap` fs -- Interchange. shape of fs
- Branch fs  <*> xs        = Branch $ (<*> xs) `fmap` fs       -- "breadth-first". shape of fs
+ Leaf f     <*> xs        = f `fmap` xs                 -- Identity (shape of xs)
+ fs         <*> Leaf x    = ($ x) `fmap` fs             -- Interchange (shape of fs)
+ Branch fs  <*> xs        = Branch $ (<*> xs) `fmap` fs -- (shape of fs)
 
+-- | 'mappend' mostly preserves the depth of the inputs
 instance Monoid (Tree a) where
  mempty = Branch []
  Leaf x    `mappend` Leaf y    = Branch ([Leaf x] <> [Leaf y])
  Leaf x    `mappend` Branch ys = Branch ([Leaf x] <> ys)
  Branch xs `mappend` Leaf y    = Branch (xs       <> [Leaf y])
  Branch xs `mappend` Branch ys = Branch (xs       <> ys)
--- not associative the way you want to do it
+
+ -- xs `mappend` ys = Branch [xs, ys]
+-- not associative the way you want to do it. Maybe the associative version screws The foldable instance up?
 
 instance IsList (Tree a) where
  type Item (Tree a) = a
@@ -84,13 +101,13 @@ fromLeaves = Branch . map Leaf
 --          x && (y || z) = (x && y) || (x && z)
 --          @
 --
---          but infinitely:
+--          but infinitely, for example:
 --
 --          @
---          False && (_ || _ || ...) ≠ (False && _) || (False && _) || ...
+--          False && (False || False || ...) ≠ (False && False) || (False && False) || ...
 --          @
 --
---          because the first terminates (@== False@) while the second doesn't.
+--          because the left one terminates (@== False@) while the right one doesn't.
 --
 --          This example is for intuition; an equivalent situation shows up from recursively-defined parsers. e.g. (in pseudo-DSL):
 --

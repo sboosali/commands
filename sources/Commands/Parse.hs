@@ -61,7 +61,8 @@ gparser (Terminal s) _ = try (word s) *> pure undefined -- TODO make safe
 gparser (NonTerminal l (Alt rs)) context = try (p <?> show l)
  where
  ps = fmap (flip rparser $ context) rs
- p = foldr (<|>) empty ps -- TODO make breadth-first
+ p = foldr (<|>) empty ps
+-- TODO breadth-first foldr
 
 -- | build a parser from a right-hand side.
 --
@@ -99,8 +100,8 @@ p :: Parsec a
 -- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
 _ParseError :: Prism' SomeException ParseError
 _ParseError = prism SomeException $ \(SomeException e) -> case cast e of
- Nothing -> Left (SomeException e) -- wrong type (preserve input)
- Just a  -> Right a                -- right type
+ Nothing -> Left (SomeException e) -- wrong type (preserve)
+ Just a  -> Right a                -- Right type (project)
 
 parseHandlers :: [Handler IO ()]
 parseHandlers =

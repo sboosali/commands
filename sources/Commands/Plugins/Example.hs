@@ -11,17 +11,18 @@ import           Commands.Parse
 -- import Commands.Parse.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
-import           Control.Alternative.Free.Johansen
+import           Control.Alternative.Free.Tree
 
 -- import Data.Maybe (maybe)
 -- import qualified Data.Map as Map
 import           Control.Applicative
+import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Monad                     (void, (<=<), (>=>))
 import           Control.Parallel
 import           Data.Bitraversable
-import           Data.Foldable                     (Foldable (..))
+import           Data.Foldable                     (Foldable (..), traverse_)
 import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
@@ -46,6 +47,7 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
 -- import Data.Monoid                     ((<>))
 -- import Data.Traversable (traverse)
 
+type Grammar = Rule
 
 
 data Root
@@ -57,10 +59,10 @@ data Root
 root :: Grammar Root
 root = 'root <=> empty
 
- <|> ReplaceWith <$> (terminal "replace" *> inject dictation) <*> (terminal "with" *> inject dictation)
+ <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
  <|> Undo        <$ terminal "no way"
  <|> Undo        <$ terminal "no"
- <|> Repeat      <$> inject positive <*> inject root
+ <|> Repeat      <$> project positive <*> project root
 
 newtype Positive = Positive Int deriving (Show,Eq)
 positive :: Grammar Positive
@@ -70,8 +72,7 @@ positive = 'positive
 newtype Dictation = Dictation String deriving (Show,Eq)
 dictation :: Grammar Dictation
 dictation = 'dictation
- <=> Dictation # str "this"
- <|> Dictation # str "that"
+ <=> Dictation # terminals ["this","that","bike","here","there"]
 
 -- dictation = grammar "<dgndictation>" $ \context ->
 --  Dictation <$> anyWord `manyUntil` context
@@ -85,31 +86,30 @@ dictation = 'dictation
 --  <*> atom (terminal "by"   *> dictation))
 
 
--- data Place = Place String deriving (Show,Eq)
--- place :: Grammar Place
--- place = Place <$> freely "<Place>" anyWord
+type Place = Dictation
+place = dictation
 
--- data Transport = Foot | Bike | Bus | Car deriving (Show,Eq,Enum)
--- transport :: Grammar Transport
--- transport = twig
+data Transport = Foot | Bike | Bus | Car deriving (Show,Eq,Enum)
+transport :: Rule Transport
+transport = 'transport <=> twig
 
--- -- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
--- data DirectionsF = DirectionsF (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
--- directions' :: Grammar DirectionsF
--- directions' = terminal "directions" *> (runPerms $ DirectionsF
---  <$> maybeAtom (terminal "from" *> place)
---  <*> maybeAtom (terminal "to"   *> place)
---  <*> maybeAtom (terminal "by"   *> transport))
+-- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
+data DirectionsF = DirectionsF (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
+directions :: Rule DirectionsF
+directions = 'directions <=> terminal "directions" *> (runPerms $ DirectionsF
+ <$> maybeAtom (terminal "from" *> project place)
+ <*> maybeAtom (terminal "to"   *> project place)
+ <*> maybeAtom (terminal "by"   *> project transport))
 
 
--- exampleDirections =
---  [ "directions from here to there  by bike"
---  , "directions from here by bike   to there"
---  , "directions to there  from here by bike"
---  , "directions to there  by bike   from here"
---  , "directions by bike   from here to there"
---  , "directions by bike   to there  from here"
---  ]
+exampleDirections =
+ [ "directions from here to there  by bike"
+ , "directions from here by bike   to there"
+ , "directions to there  from here by bike"
+ , "directions to there  by bike   from here"
+ , "directions by bike   from here to there"
+ , "directions by bike   to there  from here"
+ ]
 
 -- goodDirections  = Directions  (Dictation ["here"])  (Dictation ["there"])  (Dictation ["bike"])
 -- goodDirectionsF = DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
@@ -266,31 +266,6 @@ main = do
 
 
  putStrLn ""
- print $ fromLeaves [(+1), (*10)] <*> fromLeaves [1,2,3]
- -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 10,Leaf 20,Leaf 30]]
- print $ (+) <$> fromLeaves [1, 10] <*> fromLeaves [1,2,3]
- -- Branch [Branch [Leaf 2,Leaf 3,Leaf 4],Branch [Leaf 11,Leaf 12,Leaf 13]]
- print $ (,,) <$> fromLeaves [0] <*> fromLeaves [False, True] <*> fromLeaves ['a', 'b', 'c']
- -- Branch
- --  [Branch                                                             -- the 0 branch
- --   [Branch [Leaf (0,False,'a'),Leaf (0,False,'b'),Leaf (0,False,'c')] -- the False branch
- --   ,Branch [Leaf (0,True,'a'),Leaf (0,True,'b'),Leaf (0,True,'c')]]]  -- the True branch
- print $ (,,) <$> fromLeaves [False, True] <*> fromLeaves ['a', 'b', 'c'] <*> fromLeaves [1,2,3]
-{-
-Branch
- [Branch                                                               -- the False branch
-  [ Branch [Leaf (False,'a',1),Leaf (False,'a',2),Leaf (False,'a',3)]  -- the False 'a' branch
-  , Branch [Leaf (False,'b',1),Leaf (False,'b',2),Leaf (False,'b',3)]  -- the False 'b' branch
-  , Branch [Leaf (False,'c',1),Leaf (False,'c',2),Leaf (False,'c',3)]] -- the False 'c' branch
- , Branch                                                            -- the True branch
-  [ Branch [Leaf (True,'a',1),Leaf (True,'a',2),Leaf (True,'a',3)]   -- the True 'a'  branch
-  , Branch [Leaf (True,'b',1),Leaf (True,'b',2),Leaf (True,'b',3)]   -- the True 'b' branch
-  , Branch [Leaf (True,'c',1),Leaf (True,'c',2),Leaf (True,'c',3)]]] -- the True 'c' branch
--}
- attempt $ print $ foldr (&&) True $ Branch [Leaf False, fromLeaves [False,False ..]]
-
-
- putStrLn ""
  handleParse positive "9"
  handleParse dictation "that"
 
@@ -303,10 +278,13 @@ Branch
  --  ]
 
  attemptParse root "no"
- -- attemptParse root "no way"
- -- attemptParse root "replace this with that"
- -- attemptParse root "1 no"
+ attemptParse root "no way"
+ attemptParse root "replace this with that"
+ attemptParse root "1 no"
  attemptParse root "1 1 no"
+
+ putStrLn ""
+ traverse_ (attemptParse directions) exampleDirections
 
  putStrLn ""
  -- attempt (print $ counts root)
@@ -315,10 +293,10 @@ Branch
  -- attempt $ print $ Map.keys $ reifyGrammar dictation
  -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
 
- -- attempt $ print $ length $ alternatives $ inject positive -- should be one "lexically", but is nine "semantically"
- -- attempt $ print $ length $ alternatives $ inject dictation -- is two
- -- attempt $ print $ length $ alternatives $ inject root -- should be three, but it's infinity
+ -- attempt $ print $ length $ alternatives $ project positive -- should be one "lexically", but is nine "semantically"
+ -- attempt $ print $ length $ alternatives $ project dictation -- is two
+ -- attempt $ print $ length $ alternatives $ project root -- should be three, but it's infinity
 
- print $ fmap (const ()) $ alternatives $ inject positive -- it's flat??
- print $ fmap (const ()) $ alternatives $ inject dictation
- -- print $ fmap (const ()) $ alternatives $ inject root
+ -- print $ fmap (const ()) $ alternatives $ project positive -- it's flat??
+ -- print $ fmap (const ()) $ alternatives $ project dictation
+ -- print $ fmap (const ()) $ alternatives $ project root

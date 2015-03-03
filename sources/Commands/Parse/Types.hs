@@ -5,11 +5,13 @@ import Commands.Parsec (Parsec)
 -- import Control.Monad.Reader
 
 
--- type SensitiveParser a = Reader Context (Parsec a)
-type SensitiveParser a = Context -> (Parsec a)
+-- type Parser a = Reader Context (Parsec a)
+type Parser a = Context -> (Parsec a)
 
 type Context = Some Parsec
 
+runParser :: Parser a -> Parsec a
+runParser = undefined
 
 -- -- | Parsers with restricted right-context-sensitivity.
 -- --

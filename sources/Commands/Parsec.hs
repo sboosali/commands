@@ -26,7 +26,7 @@ type Parsec = Parsec.Parsec String ()
 -- type Parsec = ParsecT String () Identity
 -- commented out, because doctest loads module with different Transformers versions
 
-type Word = String
+type Token = String
 
 -- | specialized helper function for easy parsing.
 --
@@ -64,7 +64,7 @@ manyUntil p (Some q) = (:) <$> p <*> p `manyTill` (try . lookAhead) q
 --
 -- uses @'noneOf' 'separators'@
 --
-anyWord :: Parsec Word
+anyWord :: Parsec Token
 anyWord = (spaced . Parsec.many1 $ noneOf separators) <?> "a word"
 
 -- | @separators = ",;:. \\t\\n\\r"@
@@ -88,7 +88,7 @@ separators = ",;:. \t\n\r"
 -- unexpected "d"
 -- expecting a space or "word"
 --
-word :: String -> Parsec Word
+word :: String -> Parsec Token
 word = spaced . string
 
 -- |

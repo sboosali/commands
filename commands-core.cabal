@@ -77,8 +77,7 @@ library
 
   Commands.Plugins.Example
 
-  Control.Alternative.Free.Johansen
-  Control.Alternative.Free.Menendez
+  Control.Alternative.Free.Tree
 
  -- modules included in this library, but not exported
  other-modules:
@@ -101,8 +100,11 @@ library
   , template-haskell ==2.9.*
   , mtl   ==2.1.*
   , transformers  ==0.3.*
+  , transformers-compat  ==0.4.*
   , async  ==2.0.*
   , parallel  ==3.2.*
+  , action-permutations ==0.0.*
+
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly
 --               , transformers  ==0.3.*

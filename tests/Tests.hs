@@ -29,6 +29,6 @@ main = do
 
   , "sources/Commands/Plugins/Example"
 
-  , "sources/Control/Alternative/Free/Johansen"
+  , "sources/Control/Alternative/Free/Tree"
   ]
  tastytest

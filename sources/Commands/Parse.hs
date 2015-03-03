@@ -1,25 +1,34 @@
-{-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE GADTs, PackageImports, RankNTypes #-}
 module Commands.Parse where
 import Commands.Etc
 import Commands.Grammar.Types
 import Commands.Parse.Types
 import Commands.Parsec
-import Control.Alternative.Free.Johansen
+import Control.Alternative.Free.Tree
 import Control.Applicative
 -- import Control.Monad.Reader
 -- import Data.Foldable                         (foldr')
 -- import Data.Traversable
 -- import Commands.Munging       (unCamelCase)
-import Control.Exception.Lens            (handler, _ErrorCall)
+import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
-import Control.Monad.Catch               (Handler, SomeException (..), catches)
-import Data.Foldable                     (foldr)
-import Prelude                           hiding (foldr)
+import Control.Monad.Catch           (Handler, SomeException (..), catches)
+import Data.Foldable                 (foldr)
+import Prelude                       hiding (foldr)
 -- import Data.Functor.Constant
 -- import Data.Functor.Product
 -- import Data.List              (intercalate)
-import Data.Typeable                     (cast)
+import Data.Functor.Constant
+import "transformers-compat" Data.Functor.Sum
+import Data.Typeable                 (cast)
 
+
+sparser :: Symb a -> Parser a
+sparser (InL (Constant w)) context = wparser w context
+sparser (InR r) context = gparser r context
+
+wparser :: Word -> Parser a
+wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 
 -- | build a parser from a grammar.
 --
@@ -56,25 +65,30 @@ import Data.Typeable                     (cast)
 --
 --
 --
-gparser :: Grammar a -> SensitiveParser a
-gparser (Terminal s) _ = try (word s) *> pure undefined -- TODO make safe
-gparser (NonTerminal l (Alt rs)) context = try (p <?> show l)
+gparser :: Rule a -> Parser a
+gparser (Rule l rs) context = try (p <?> show l)
  where
- ps = fmap (flip rparser $ context) rs
- p = foldr (<|>) empty ps
+ p = rparser rs context
 -- TODO breadth-first foldr
 
 -- | build a parser from a right-hand side.
 --
-rparser :: RHS a -> SensitiveParser a
+rparser :: RHS a -> Parser a
 rparser (Pure a) _ = pure a
-rparser (Alt rs `App` g) context = try (p <*> q)
+rparser (Many rs) context = try p
  where
- q = (flip gparser) context g
- ps = fmap (flip rparser $ Some q) rs
+ ps = fmap (flip rparser $ context) rs
  p = foldr (<|>) empty ps
+rparser (fs `App` x) context = try (p <*> q)
+ where
+ q = sparser x  context
+ p = rparser fs (Some q)
+rparser (fs :<*>  xs) context = try (p <*> q)
+ where
+ q = rparser xs context
+ p = rparser fs (Some q)
 
-parses :: Grammar a -> String -> Possibly a
+parses :: Rule a -> String -> Possibly a
 parses g s = parse (p <* eof) s
  where p = (gparser g) (Some eof)
 
@@ -109,7 +123,7 @@ parseHandlers =
  , handler _ErrorCall print
  ]
 
-handleParse :: Show a => Grammar a -> String -> IO ()
+handleParse :: Show a => Rule a -> String -> IO ()
 handleParse p s = do
  (print =<< (p `parses` s)) `catches` parseHandlers
  putStrLn ""

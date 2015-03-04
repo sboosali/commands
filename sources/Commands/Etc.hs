@@ -6,6 +6,9 @@ import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Monoid                  ((<>))
 import           Data.Text.Lazy               (Text)
+import           Data.Typeable                (Typeable, tyConModule, tyConName,
+                                               tyConPackage, typeRep,
+                                               typeRepTyCon)
 import qualified Debug.Trace
 import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                NameFlavour (NameG),
@@ -105,3 +108,10 @@ tracing = Debug.Trace.traceShowM
 with :: Monad m => r -> ReaderT r m a -> ReaderT r m a
 with = local . const
 
+-- | the globally unique identifier of a type: @(pkg,
+-- <https://www.haskell.org/onlinereport/lexemes.html modid>,
+-- <https://www.haskell.org/onlinereport/lexemes.html tycon>)@
+--
+--
+guiOf :: (Typeable a) => proxy a -> GUI
+guiOf = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t)) . typeRepTyCon . typeRep

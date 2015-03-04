@@ -98,12 +98,14 @@ library
   , wl-pprint-text  ==1.1.*
   , language-python  ==0.4.*
   , template-haskell ==2.9.*
-  , mtl   ==2.1.*
-  , transformers  ==0.3.*
-  , transformers-compat  ==0.4.*
   , async  ==2.0.*
   , parallel  ==3.2.*
   , action-permutations ==0.0.*
+  , hashable ==1.2.*
+
+  , transformers  ==0.3.*
+  , transformers-compat  ==0.4.*
+  , mtl   ==2.1.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

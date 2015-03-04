@@ -1,20 +1,19 @@
-{-# LANGUAGE ExtendedDefaultRules, LambdaCase, OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms, RankNTypes, ScopedTypeVariables    #-}
-{-# LANGUAGE TemplateHaskell, TupleSections                      #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes       #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Etc                      ()
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
-import           Commands.Parse
--- import Commands.Parse.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Parse
+import           Commands.Parse.Types
+import           Commands.Render
 import           Control.Alternative.Free.Tree
 
--- import Data.Maybe (maybe)
--- import qualified Data.Map as Map
 import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Concurrent
@@ -22,9 +21,12 @@ import           Control.Concurrent.Async
 import           Control.Monad                     (void, (<=<), (>=>))
 import           Control.Parallel
 import           Data.Bitraversable
-import           Data.Foldable                     (Foldable (..), traverse_)
+import           Data.Either                       (either)
+import           Data.Foldable                     (Foldable (..), asum,
+                                                    traverse_)
 import           Data.List.NonEmpty                (fromList)
 import qualified Data.Text.Lazy.IO                 as T
+import           Data.Typeable
 import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser   (parseExpr, parseModule)
 import           Prelude                           hiding (foldr)
@@ -32,7 +34,6 @@ import           System.Timeout                    (timeout)
 import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
                                                     (<>))
 
--- import Commands.Render
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -47,8 +48,6 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
 -- import Data.Monoid                     ((<>))
 -- import Data.Traversable (traverse)
 
-type Grammar = Rule
-
 
 data Root
  = ReplaceWith Dictation Dictation
@@ -56,30 +55,30 @@ data Root
  | Repeat Positive Root
  deriving (Show,Eq)
 
-root :: Grammar Root
+root :: Rule Root
 root = 'root <=> empty
-
  <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
  <|> Undo        <$ terminal "no way"
  <|> Undo        <$ terminal "no"
  <|> Repeat      <$> project positive <*> project root
 
 newtype Positive = Positive Int deriving (Show,Eq)
-positive :: Grammar Positive
+positive :: Rule Positive
 positive = 'positive
- <=> Positive # (foldr (<|>) empty . map int) [1..9]
+ <=> Positive # (asum . fmap int) [1..9]
 
 newtype Dictation = Dictation String deriving (Show,Eq)
-dictation :: Grammar Dictation
+dictation :: Rule Dictation
 dictation = 'dictation
  <=> Dictation # terminals ["this","that","bike","here","there"]
+
 
 -- dictation = grammar "<dgndictation>" $ \context ->
 --  Dictation <$> anyWord `manyUntil` context
 
 -- -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
 -- data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
--- directions :: Grammar Directions
+-- directions :: Rule Directions
 -- directions = terminal "directions" *> (runPerms $ Directions
 --  <$> atom (terminal "from" *> dictation)
 --  <*> atom (terminal "to"   *> dictation)
@@ -89,14 +88,13 @@ dictation = 'dictation
 type Place = Dictation
 place = dictation
 
-data Transport = Foot | Bike | Bus | Car deriving (Show,Eq,Enum)
-transport :: Rule Transport
-transport = 'transport <=> twig
+data Transport = Foot | Bike | Bus | Car deriving (Show,Ord,Eq,Enum,Typeable)
+transport = defaultRule
 
 -- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
-data DirectionsF = DirectionsF (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions :: Rule DirectionsF
-directions = 'directions <=> terminal "directions" *> (runPerms $ DirectionsF
+data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
+directions :: Rule Directions_
+directions = 'directions <=> terminal "directions" *> (runPerms $ Directions_
  <$> maybeAtom (terminal "from" *> project place)
  <*> maybeAtom (terminal "to"   *> project place)
  <*> maybeAtom (terminal "by"   *> project transport))
@@ -112,23 +110,23 @@ exampleDirections =
  ]
 
 -- goodDirections  = Directions  (Dictation ["here"])  (Dictation ["there"])  (Dictation ["bike"])
--- goodDirectionsF = DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
+-- goodDirections_ = Directions_ (Just (Place "here")) (Just (Place "there")) (Just Bike)
 
 -- powerset :: [a] -> [[a]]
 -- powerset [] = [[]]
--- powerset (x:xs) = xss <> map (x:) xss
+-- powerset (x:xs) = xss <> fmap (x:) xss
 --  where xss = powerset xs
 
--- inputDirectionsF  = map (intercalate " ") . map ("directions":) . powerset $ ["by bike","to there","from here"]
--- outputDirectionsF =
---  [ DirectionsF Nothing               Nothing                Nothing
---  , DirectionsF (Just (Place "here")) Nothing                Nothing
---  , DirectionsF Nothing               (Just (Place "there")) Nothing
---  , DirectionsF (Just (Place "here")) (Just (Place "there")) Nothing
---  , DirectionsF Nothing               Nothing                (Just Bike)
---  , DirectionsF (Just (Place "here")) Nothing                (Just Bike)
---  , DirectionsF Nothing               (Just (Place "there")) (Just Bike)
---  , DirectionsF (Just (Place "here")) (Just (Place "there")) (Just Bike)
+-- inputDirections_  = fmap (intercalate " ") . fmap ("directions":) . powerset $ ["by bike","to there","from here"]
+-- outputDirections_ =
+--  [ Directions_ Nothing               Nothing                Nothing
+--  , Directions_ (Just (Place "here")) Nothing                Nothing
+--  , Directions_ Nothing               (Just (Place "there")) Nothing
+--  , Directions_ (Just (Place "here")) (Just (Place "there")) Nothing
+--  , Directions_ Nothing               Nothing                (Just Bike)
+--  , Directions_ (Just (Place "here")) Nothing                (Just Bike)
+--  , Directions_ Nothing               (Just (Place "there")) (Just Bike)
+--  , Directions_ (Just (Place "here")) (Just (Place "there")) (Just Bike)
 --  ]
 
 grammar = DNSGrammar export [command, subcommand, flag] :: DNSGrammar Text Text
@@ -181,37 +179,6 @@ isPythonModule s = case parseModule s "" of
 oneSecond :: Int
 oneSecond = round (1e6 :: Double)
 
--- attempt :: IO () -> IO ()
--- attempt = maybe (putStrLn ".") (const (return ())) <=< timeout (round (1e6 :: Double))
--- attempt action = do
---  handle <- async $ timeout oneSecond action
---  waitCatch handle >>= \case
---   Left error     -> print error
---   Right Nothing  -> putStrLn "."
---   Right (Just _) -> return ()
--- attempt action = do
---  timeout oneSecond action `withAsync` \handle -> do
---   waitCatch handle >>= \case
---    Left error     -> print error
---    Right Nothing  -> putStrLn "."
---    Right (Just _) -> return ()
--- attempt action = do
---  forkIO $ timeout oneSecond action >>= \case
---   Nothing  -> putStrLn "."
---   (Just _) -> return ()
-
-
--- attemptForking action = do
---  forkFinally (timeout oneSecond action) $ \case
---    Left error     -> print error
---    Right Nothing  -> putStrLn "."
---    Right (Just _) -> print ()
-attemptForking action = do
- forkFinally (timeout oneSecond action) $ \case
-   Left error     -> print error
-   Right Nothing  -> putStrLn "."
-   Right (Just _) -> print ()
-
 attemptAsynchronously action = do
  (timeout oneSecond action) `withAsync` (waitCatch >=> \case
    Left error     -> print error
@@ -219,16 +186,12 @@ attemptAsynchronously action = do
    Right (Just _) -> return ()
   )
 
+
 attempt = attemptAsynchronously
 
--- attempting :: [IO ()] -> IO ()
--- attempting actions = do
---  sequence_ actions
-attempting :: [IO ()] -> IO ()
-attempting actions = do
- sequence_ actions
-
 attemptParse p s = attempt (print =<< (p `parses` s))
+
+attemptSerialize g = attempt $ either print T.putStrLn (serialize (render g))
 
 
 main = do
@@ -264,19 +227,14 @@ main = do
 
  -- print escaped
 
+ putStrLn ""
+ attempt . print . render $ root
+ putStrLn ""
+ attemptSerialize root
 
  putStrLn ""
  handleParse positive "9"
  handleParse dictation "that"
-
- -- attempting
- --  [ handleParse root "no"
- --  , handleParse root "no way"
- --  , handleParse root "replace this with that"
- --  , handleParse root "1 no"
- --  , handleParse root "1 1 no"
- --  ]
-
  attemptParse root "no"
  attemptParse root "no way"
  attemptParse root "replace this with that"
@@ -287,16 +245,3 @@ main = do
  traverse_ (attemptParse directions) exampleDirections
 
  putStrLn ""
- -- attempt (print $ counts root)
- -- attempt $ print dictation
- -- attempt $ print $ Map.keys $ reifyGrammar positive
- -- attempt $ print $ Map.keys $ reifyGrammar dictation
- -- timeout (round (1e2 :: Double)) $ print $ Map.keys $ reifyGrammar root
-
- -- attempt $ print $ length $ alternatives $ project positive -- should be one "lexically", but is nine "semantically"
- -- attempt $ print $ length $ alternatives $ project dictation -- is two
- -- attempt $ print $ length $ alternatives $ project root -- should be three, but it's infinity
-
- -- print $ fmap (const ()) $ alternatives $ project positive -- it's flat??
- -- print $ fmap (const ()) $ alternatives $ project dictation
- -- print $ fmap (const ()) $ alternatives $ project root

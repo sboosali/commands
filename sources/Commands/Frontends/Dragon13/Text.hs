@@ -19,6 +19,7 @@ module Commands.Frontends.Dragon13.Text
  , Text
  ) where
 import           Commands.Etc
+
 import           Control.Applicative
 import           Data.Char
 import           Data.Monoid         ((<>))
@@ -48,6 +49,8 @@ unsafeDNSText = DNSText
 -- >>> :set -XOverloadedStrings
 -- >>> escapeDNSName "a_1"
 -- DNSName {unDNSName = "a_1"}
+-- >>> escapeDNSName "commands-core-0.0.0__Commands.Plugins.Example__dictation"
+-- DNSName {unDNSName = "commands_core_0_0_0__Commands_Plugins_Example__dictation"}
 -- >>> escapeDNSName "1_a"
 -- *** Exception: user error (escapeDNSName "1_a")
 -- >>> escapeDNSName "α"
@@ -66,8 +69,9 @@ unsafeDNSText = DNSText
 -- construction is a partial function
 escapeDNSName :: Text -> Possibly DNSName
 escapeDNSName s
- | isDNSName s = return . DNSName $ s
+ | isDNSName n = return . DNSName $ n
  | otherwise = failed $ "escapeDNSName " <> show s
+ where n = T.replace "." "_" . T.replace "-" "_" $ s
 
 isDNSName :: Text -> Bool
 isDNSName s = T.all isAscii s && case T.uncons s of

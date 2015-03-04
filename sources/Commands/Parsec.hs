@@ -8,11 +8,10 @@ module Commands.Parsec
 ) where
 import           Commands.Etc
 
+import           Control.Applicative
 import           Control.Monad.Catch (throwM)
 import           Text.Parsec         hiding (Parsec, many, parse, space, (<|>))
 import qualified Text.Parsec         as Parsec
-
-import           Control.Applicative
 
 
 -- | a parser of strings, that keeps no state, and runs no effects.

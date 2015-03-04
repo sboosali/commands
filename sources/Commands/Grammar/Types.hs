@@ -2,6 +2,7 @@
 module Commands.Grammar.Types where
 import Commands.Etc
 import Control.Alternative.Free.Tree
+
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
 

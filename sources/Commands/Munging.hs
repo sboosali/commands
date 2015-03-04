@@ -1,8 +1,7 @@
 module Commands.Munging where
 
-import Data.List.Split
-
 import Data.Char
+import Data.List.Split
 
 
 -- |

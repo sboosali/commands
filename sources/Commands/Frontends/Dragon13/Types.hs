@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable  #-}
-{-# LANGUAGE EmptyDataDecls, ExistentialQuantification, FlexibleInstances #-}
-{-# LANGUAGE GADTs, KindSignatures, RankNTypes, StandaloneDeriving        #-}
+{-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
+{-# LANGUAGE KindSignatures, RankNTypes, StandaloneDeriving              #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc        ()
 import Commands.Instances  ()
+
 import Control.Applicative
 import Data.Bifoldable
 import Data.Bifunctor

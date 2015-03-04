@@ -25,6 +25,8 @@ main = do
   , "sources/Commands/Frontends/Dragon13/Types"
   , "sources/Commands/Frontends/Dragon13/Text"
 
+  , "sources/Commands/Render"
+
   , "sources/Commands/Munging"
 
   , "sources/Commands/Plugins/Example"

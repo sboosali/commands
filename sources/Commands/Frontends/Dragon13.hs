@@ -10,6 +10,7 @@ import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Instances                ()
+
 import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bifoldable
@@ -146,7 +147,7 @@ serializeImports = vsep . mapMaybe serializeProduction
 --
 serializeExport :: DNSProduction True DNSName DNSText -> Doc
 serializeExport (DNSProduction l (toList -> rs)) =
- serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (map serializeRHS rs)
+ serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 -- |
 --
@@ -163,7 +164,7 @@ serializeExport (DNSProduction l (toList -> rs)) =
 --
 serializeProduction :: DNSProduction False DNSName DNSText -> Possibly Doc
 serializeProduction (DNSProduction l (toList -> rs)) = return $
- serializeLHS l <+> encloseSep " = " ";" " | " (map serializeRHS rs)
+ serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 serializeProduction (DNSImport l) = return $
  serializeLHS l <+> "imported" <> ";"
 serializeProduction DNSVocabulary{} = failed "serializeProduction"
@@ -178,8 +179,8 @@ serializeProduction DNSVocabulary{} = failed "serializeProduction"
 serializeRHS :: DNSRHS DNSName DNSText -> Doc
 serializeRHS (DNSTerminal t)      = serializeToken t
 serializeRHS (DNSNonTerminal l)   = serializeLHS l
-serializeRHS (DNSSequence (toList -> rs))     = align . fillSep . map serializeRHS $ rs
-serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . map serializeRHS $ rs) <> ")"
+serializeRHS (DNSSequence (toList -> rs))     = align . fillSep . fmap serializeRHS $ rs
+serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . fmap serializeRHS $ rs) <> ")"
 serializeRHS (DNSOptional r)      = "[" <> serializeRHS r <> "]"
 serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
 
@@ -213,7 +214,7 @@ serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
 dnsHeader :: [DNSProduction False name token]
-dnsHeader = map (DNSImport . DNSBuiltin) constructors
+dnsHeader = fmap (DNSImport . DNSBuiltin) constructors
 
 -- | serialize the 'DNSList's that were ignored by 'serializeRules'.
 --
@@ -244,7 +245,7 @@ serializeVocabularies
 -- a safe partial-function (outputs a list).
 serializeVocabulary :: DNSProduction False DNSName DNSText -> Possibly Doc
 serializeVocabulary (DNSVocabulary (DNSList (DNSName n)) ts) = return $
- (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (map serializeToken ts)
+ (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
 serializeVocabulary _ = failed "serializeVocabulary"
 -- serializeVocabulary _ = mempty -- not identity to all operations on documents
 

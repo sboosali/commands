@@ -13,8 +13,7 @@ import Control.Applicative
 import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
 import Control.Monad.Catch           (Handler, SomeException (..), catches)
-import Data.Foldable                 (foldr)
-import Prelude                       hiding (foldr)
+import Data.Foldable                 (asum)
 -- import Data.Functor.Constant
 -- import Data.Functor.Product
 -- import Data.List              (intercalate)
@@ -25,7 +24,7 @@ import Data.Typeable                 (cast)
 
 sparser :: Symb a -> Parser a
 sparser (InL (Constant w)) context = wparser w context
-sparser (InR r) context = gparser r context
+sparser (InR r)            context = gparser r context
 
 wparser :: Word -> Parser a
 wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
@@ -66,10 +65,7 @@ wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 --
 --
 gparser :: Rule a -> Parser a
-gparser (Rule l rs) context = try (p <?> show l)
- where
- p = rparser rs context
--- TODO breadth-first foldr
+gparser (Rule l rs) context = rparser rs context <?> show l
 
 -- | build a parser from a right-hand side.
 --
@@ -78,12 +74,12 @@ rparser (Pure a) _ = pure a
 rparser (Many rs) context = try p
  where
  ps = fmap (flip rparser $ context) rs
- p = foldr (<|>) empty ps
+ p = asum ps
 rparser (fs `App` x) context = try (p <*> q)
  where
  q = sparser x  context
  p = rparser fs (Some q)
-rparser (fs :<*>  xs) context = try (p <*> q)
+rparser (fs :<*> xs) context = try (p <*> q)
  where
  q = rparser xs context
  p = rparser fs (Some q)

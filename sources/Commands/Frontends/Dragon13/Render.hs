@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, ExistentialQuantification #-}
-module Commands.Render where
+module Commands.Frontends.Dragon13.Render where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
@@ -7,18 +7,13 @@ import           Commands.Grammar.Types
 import           Control.Alternative.Free.Tree
 
 import           Control.Applicative
-import           Data.Bifunctor                    (bimap)
 import           Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe,
                                                     mapMaybe)
-import           Data.Text.Lazy                    (Text)
-import qualified Data.Text.Lazy                    as T
+-- import           Data.Text.Lazy                    (Text)
+-- import qualified Data.Text.Lazy                    as T
 
-
--- | renders a generic grammar to a Dragon NaturallySpeaking grammar.
-render :: Rule x -> DNSGrammar Text Text
-render = bimap T.pack T.pack . renderGrammar
 
 -- |
 --

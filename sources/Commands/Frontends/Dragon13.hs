@@ -9,7 +9,9 @@ module Commands.Frontends.Dragon13 where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
+-- import           Commands.Frontends.Dragon13.Render
 import           Commands.Instances                ()
+-- import           Commands.Grammar.Types
 
 import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))

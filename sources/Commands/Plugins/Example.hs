@@ -3,37 +3,40 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
-import           Commands.Etc                      ()
+import           Commands.Command
+import           Commands.Command.Types
+import           Commands.Etc                       ()
 import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Render
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parse
 import           Commands.Parse.Types
-import           Commands.Render
+import           Commands.Parsec
 import           Control.Alternative.Free.Tree
 
 import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
-import           Control.Monad                     (void, (<=<), (>=>))
+import           Control.Monad                      (void, (<=<), (>=>))
+import           Control.Monad.Catch                (catches)
 import           Control.Parallel
 import           Data.Bitraversable
-import           Data.Either                       (either)
-import           Data.Foldable                     (Foldable (..), asum,
-                                                    traverse_)
-import           Data.List.NonEmpty                (fromList)
-import qualified Data.Text.Lazy.IO                 as T
+import           Data.Either                        (either)
+import           Data.Foldable                      (Foldable (..), asum,
+                                                     traverse_)
+import           Data.List.NonEmpty                 (fromList)
+import qualified Data.Text.Lazy.IO                  as T
 import           Data.Typeable
-import           Language.Python.Common.AST        (Expr (Dictionary, Strings))
-import           Language.Python.Version2.Parser   (parseExpr, parseModule)
-import           Prelude                           hiding (foldr)
-import           System.Timeout                    (timeout)
-import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
-                                                    (<>))
-
+import           Language.Python.Common.AST         (Expr (Dictionary, Strings))
+import           Language.Python.Version2.Parser    (parseExpr, parseModule)
+import           Prelude                            hiding (foldr)
+import           System.Timeout                     (timeout)
+import           Text.PrettyPrint.Leijen.Text       hiding (empty, int, (<$>),
+                                                     (<>))
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -42,7 +45,6 @@ import           Text.PrettyPrint.Leijen.Text      hiding (empty, int, (<$>),
 -- -- import System.IO.Error.Lens (errorType,_UserError,description)
 -- import           Data.Monoid                       ((<>))
 -- import           Data.Either.Validation            (Validation (..))
--- import Commands.Parsec
 -- import Control.Applicative.Permutation
 -- import Data.List                       (intercalate)
 -- import Data.Monoid                     ((<>))
@@ -55,7 +57,7 @@ data Root
  | Repeat Positive Root
  deriving (Show,Eq)
 
-root :: Rule Root
+root :: Command Root
 root = 'root <=> empty
  <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
  <|> Undo        <$ terminal "no way"
@@ -63,37 +65,36 @@ root = 'root <=> empty
  <|> Repeat      <$> project positive <*> project root
 
 newtype Positive = Positive Int deriving (Show,Eq)
-positive :: Rule Positive
+positive :: Command Positive
 positive = 'positive
  <=> Positive # (asum . fmap int) [1..9]
 
-newtype Dictation = Dictation String deriving (Show,Eq)
-dictation :: Rule Dictation
-dictation = 'dictation
- <=> Dictation # terminals ["this","that","bike","here","there"]
+newtype Dictation = Dictation [String] deriving (Show,Eq)
+dictation :: Command Dictation
+dictation = specialCommand
+ 'dictation
+ (DNSProduction (DNSRule "dictation") $ fromList [ DNSNonTerminal (DNSBuiltin DGNDictation) ])
+ (\context -> Dictation <$> anyWord `manyUntil` context)
 
-
--- dictation = grammar "<dgndictation>" $ \context ->
---  Dictation <$> anyWord `manyUntil` context
 
 -- -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
 -- data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
--- directions :: Rule Directions
+-- directions :: Command Directions
 -- directions = terminal "directions" *> (runPerms $ Directions
 --  <$> atom (terminal "from" *> dictation)
 --  <*> atom (terminal "to"   *> dictation)
 --  <*> atom (terminal "by"   *> dictation))
 
 
-type Place = Dictation
-place = dictation
+newtype Place = Place String deriving (Show,Eq)
+place = 'place <=> Place # alias ["this","that","bike","here","there"]
 
 data Transport = Foot | Bike | Bus | Car deriving (Show,Ord,Eq,Enum,Typeable)
-transport = defaultRule
+transport = defaultCommand
 
 -- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
 data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions :: Rule Directions_
+directions :: Command Directions_
 directions = 'directions <=> terminal "directions" *> (runPerms $ Directions_
  <$> maybeAtom (terminal "from" *> project place)
  <*> maybeAtom (terminal "to"   *> project place)
@@ -189,9 +190,14 @@ attemptAsynchronously action = do
 
 attempt = attemptAsynchronously
 
-attemptParse p s = attempt (print =<< (p `parses` s))
+attemptParse (Command _ _ p) s = attempt (print =<< (p `parses` s))
 
-attemptSerialize g = attempt $ either print T.putStrLn (serialize (render g))
+-- attemptSerialize (Command _ g _) = attempt $ either print print $ (serializeProduction (renderProduction g))
+
+handleParse :: Show a => Command a -> String -> IO ()
+handleParse (Command _ _ p) s = do
+ (print =<< (p `parses` s)) `catches` parseHandlers
+ putStrLn ""
 
 
 main = do
@@ -227,10 +233,10 @@ main = do
 
  -- print escaped
 
- putStrLn ""
- attempt . print . render $ root
- putStrLn ""
- attemptSerialize root
+ -- putStrLn ""
+ -- attempt . print . renders $ root
+ -- putStrLn ""
+ -- attemptSerialize root
 
  putStrLn ""
  handleParse positive "9"

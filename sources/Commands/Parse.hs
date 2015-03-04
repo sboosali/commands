@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 module Commands.Parse where
 import Commands.Etc
+import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Parse.Types
 import Commands.Parsec
@@ -9,7 +10,7 @@ import Control.Alternative.Free.Tree
 import Control.Applicative
 import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
-import Control.Monad.Catch           (Handler, SomeException (..), catches)
+import Control.Monad.Catch           (Handler, SomeException (..))
 import Data.Foldable                 (asum)
 import Data.Typeable                 (cast)
 
@@ -56,10 +57,11 @@ wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 --
 --
 gparser :: Rule a -> Parser a
-gparser (Rule l rs) context = rparser rs context <?> show l
+gparser (Rule l rs) context = try (rparser rs context <?> showLHS l)
 
 -- | build a parser from a right-hand side.
 --
+-- always returns a 'Parsec' wrapped in 'try'
 rparser :: RHS a -> Parser a
 rparser (Pure a) _ = pure a
 rparser (Many rs) context = try p
@@ -75,9 +77,9 @@ rparser (fs :<*> xs) context = try (p <*> q)
  q = rparser xs context
  p = rparser fs (Some q)
 
-parses :: Rule a -> String -> Possibly a
-parses g s = parse (p <* eof) s
- where p = (gparser g) (Some eof)
+parses :: Parser a -> String -> Possibly a
+parses sp s = parse (fp <* eof) s
+ where fp = sp (Some eof)
 
 {-
 
@@ -109,9 +111,4 @@ parseHandlers =
  [ handler _ParseError print
  , handler _ErrorCall print
  ]
-
-handleParse :: Show a => Rule a -> String -> IO ()
-handleParse p s = do
- (print =<< (p `parses` s)) `catches` parseHandlers
- putStrLn ""
 

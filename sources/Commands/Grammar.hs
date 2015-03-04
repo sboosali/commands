@@ -20,53 +20,15 @@ import           Data.List                     (intercalate)
 import           Data.Map.Strict               (Map)
 import qualified Data.Map.Strict               as Map
 import           Data.Monoid                   ((<>))
-import           Data.Proxy
 import           Data.Typeable                 (Typeable)
-import           Language.Haskell.TH.Syntax    (Name)
 import           Numeric
 
-
-infix  2 <=>
--- infixl 3 <|>
--- infixl 4 <$>
-infixl 4 #
--- infixl 4 <*>
-infixl 9 &
-
-(<=>) :: Name -> RHS a -> Rule a
-name <=> rs = Rule l rs
- where Just l = fromName name
-
--- (&) :: (Grammatical a) => RHSs (a -> b) -> a -> RHSs b
--- f & x = f <*> toR x
-(&) :: Applicative f => f (a -> b) -> f a -> f b
-f & x = f <*> x
-
--- (#) :: (Grammatical a) => (a -> b) -> a -> RHSs b
--- f # x = f <$> toR x
-(#) :: Functor f => (a -> b) -> f a -> f b
-f # x = f <$> x
-
--- class Grammatical a where
---  type R a :: *
---  toR :: a -> RHSs (R a)
-
--- instance Grammatical (RHSs b)    where  type R (RHSs b)    = b;  toR = id
--- instance Grammatical String      where  type R String      = b;  toR = lift . Terminal
--- -- instance Grammatical (Rule b) where  type R (Rule b) = b;  toR = lift
--- instance Grammatical (Rule b) where
---  type R (Rule b) = b
---  toR (Terminal s)      = toR s
---  toR (NonTerminal _ r) = r
-
-project :: Rule a -> RHS a
-project = lift . fromRule
 
 terminal :: String -> RHS a
 terminal = lift . fromWord . Word
 
-terminals :: [String] -> RHS String
-terminals = asum . fmap str
+alias :: [String] -> RHS String
+alias = asum . fmap str
 
 con :: (Show a) => a -> RHS a
 con c = c <$ (terminal . intercalate " " . unCamelCase . show) c
@@ -76,18 +38,6 @@ int = con
 
 str :: String -> RHS String
 str s = s <$ terminal s
-
--- | a default 'Rule' for simple ADTs.
---
--- with 'Enum' ADTs, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parse'rs and 'Render'ers. without any TemplateHaskell.
---
--- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Rule's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
---
---
-defaultRule :: forall a. (Typeable a, Enum a, Show a) => Rule a
-defaultRule = Rule
- (lhsOfType (Proxy :: Proxy a))
- (asum . fmap con $ constructors)
 
 lhsOfType :: (Typeable a) => proxy a -> LHS
 lhsOfType = guiOf

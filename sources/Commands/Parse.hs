@@ -1,30 +1,21 @@
-{-# LANGUAGE GADTs, PackageImports, RankNTypes #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 module Commands.Parse where
 import Commands.Etc
 import Commands.Grammar.Types
 import Commands.Parse.Types
 import Commands.Parsec
+
 import Control.Alternative.Free.Tree
 import Control.Applicative
--- import Control.Monad.Reader
--- import Data.Foldable                         (foldr')
--- import Data.Traversable
--- import Commands.Munging       (unCamelCase)
 import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
 import Control.Monad.Catch           (Handler, SomeException (..), catches)
 import Data.Foldable                 (asum)
--- import Data.Functor.Constant
--- import Data.Functor.Product
--- import Data.List              (intercalate)
-import Data.Functor.Constant
-import "transformers-compat" Data.Functor.Sum
 import Data.Typeable                 (cast)
 
 
-sparser :: Symb a -> Parser a
-sparser (InL (Constant w)) context = wparser w context
-sparser (InR r)            context = gparser r context
+sparser :: Symbol a -> Parser a
+sparser s context = symbol (flip wparser $ context) (flip gparser $ context) s
 
 wparser :: Word -> Parser a
 wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe

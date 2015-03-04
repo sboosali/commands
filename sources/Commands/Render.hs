@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExistentialQuantification, PackageImports #-}
+{-# LANGUAGE DataKinds, ExistentialQuantification #-}
 module Commands.Render where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Types
@@ -8,8 +8,6 @@ import           Control.Alternative.Free.Tree
 
 import           Control.Applicative
 import           Data.Bifunctor                    (bimap)
-import           Data.Functor.Constant
-import           "transformers-compat" Data.Functor.Sum
 import           Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe                        (catMaybes, fromMaybe,
@@ -61,9 +59,10 @@ renderRHS_ (fs `App` x) = DNSSequence <$> (nonEmpty . catMaybes $ [renderRHS_ fs
 renderRHS_ (fs :<*> xs) = DNSSequence <$> (nonEmpty . catMaybes $ [renderRHS_ fs, renderRHS_ xs])
 
 -- |
-renderSymbol :: Symb x -> DNSRHS String String
-renderSymbol (InL (Constant (Word t))) = DNSTerminal $ DNSToken t
-renderSymbol (InR (Rule l _)) = DNSNonTerminal $ renderLHS l
+renderSymbol :: Symbol x -> DNSRHS String String
+renderSymbol = symbol
+ (\(Word t)   -> DNSTerminal $ DNSToken t)
+ (\(Rule l _) -> DNSNonTerminal $ renderLHS l)
 
 -- |
 emptyList :: DNSRHS String String

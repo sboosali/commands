@@ -1,7 +1,7 @@
 {-# LANGUAGE ConstraintKinds, DataKinds, DeriveDataTypeable                 #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving      #-}
-{-# LANGUAGE LambdaCase, PackageImports, RankNTypes, ScopedTypeVariables    #-}
+{-# LANGUAGE LambdaCase, RankNTypes, ScopedTypeVariables                    #-}
 {-# LANGUAGE StandaloneDeriving, TypeFamilies, TypeOperators                #-}
 -- |
 module Commands.Grammar where
@@ -15,8 +15,6 @@ import           Control.Monad                 (unless)
 import           Control.Monad.Trans.State
 import           Data.Foldable                 (asum)
 import           Data.Foldable                 (traverse_)
-import           Data.Functor.Constant
-import           "transformers-compat" Data.Functor.Sum
 import           Data.Hashable
 import           Data.List                     (intercalate)
 import           Data.Map.Strict               (Map)
@@ -62,10 +60,10 @@ f # x = f <$> x
 --  toR (NonTerminal _ r) = r
 
 project :: Rule a -> RHS a
-project = lift . InR
+project = lift . fromRule
 
 terminal :: String -> RHS a
-terminal = lift . InL . Constant . Word
+terminal = lift . fromWord . Word
 
 terminals :: [String] -> RHS String
 terminals = asum . fmap str
@@ -121,7 +119,8 @@ reifyRule_ (Rule l rs) = do
 reifyRHS_ :: RHS x -> State ReifiedRule ()
 reifyRHS_ (Pure _)     = return ()
 reifyRHS_ (Many rs)    = traverse_ reifyRHS_ rs
-reifyRHS_ (fs `App` x) = reifyRHS_ fs >> case x of (InL _) -> return (); (InR r ) -> reifyRule_  r
+reifyRHS_ (fs `App` x) = reifyRHS_ fs >> symbol (\_ -> return ()) reifyRule_ x
+
 reifyRHS_ (fs :<*> xs) = reifyRHS_ fs >> reifyRHS_ xs
 
 type ReifiedRule = Map LHS (Some RHS)

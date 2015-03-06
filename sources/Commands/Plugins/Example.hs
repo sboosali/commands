@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
-{-# LANGUAGE OverloadedStrings, PatternSynonyms, RankNTypes       #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase           #-}
+{-# LANGUAGE NamedFieldPuns, OverloadedStrings, PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections            #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Command
@@ -28,7 +28,7 @@ import           Data.Bitraversable
 import           Data.Either                        (either)
 import           Data.Foldable                      (Foldable (..), asum,
                                                      traverse_)
-import           Data.List.NonEmpty                 (fromList)
+import           Data.List.NonEmpty                 (NonEmpty (..), fromList)
 import qualified Data.Text.Lazy.IO                  as T
 import           Data.Typeable
 import           Language.Python.Common.AST         (Expr (Dictionary, Strings))
@@ -59,7 +59,8 @@ data Root
 
 root :: Command Root
 root = 'root <=> empty
- <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
+ -- <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
+ <|> (ReplaceWith <$ terminal "replace") <*> (project dictation <* terminal "with") <*> project dictation
  <|> Undo        <$ terminal "no way"
  <|> Undo        <$ terminal "no"
  <|> Repeat      <$> project positive <*> project root
@@ -71,35 +72,40 @@ positive = 'positive
 
 newtype Dictation = Dictation [String] deriving (Show,Eq)
 dictation :: Command Dictation
-dictation = specialCommand
- 'dictation
- (DNSProduction (DNSRule "dictation") $ fromList [ DNSNonTerminal (DNSBuiltin DGNDictation) ])
+dictation = specialCommand 'dictation
+ (DNSGrammar (DNSProduction (DNSRule "dictation") (DNSNonTerminal (DNSBuiltin DGNDictation) :| [])) [])
  (\context -> Dictation <$> anyWord `manyUntil` context)
 
 
--- -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
--- data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
--- directions :: Command Directions
--- directions = terminal "directions" *> (runPerms $ Directions
---  <$> atom (terminal "from" *> dictation)
---  <*> atom (terminal "to"   *> dictation)
---  <*> atom (terminal "by"   *> dictation))
+-- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
+data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
+directions :: Command Directions
+directions = 'directions <=> terminal "directions" *> (runPerms $ Directions
+ <$> atom (terminal "from" *> project dictation)
+ <*> atom (terminal "to"   *> project dictation)
+ <*> atom (terminal "by"   *> project dictation))
+
+-- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
+data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
+directions_ :: Command Directions_
+directions_ = 'directions_ <=> terminal "directions" *> (runPerms $ Directions_
+ <$> maybeAtom (terminal "from" *> project place)
+ <*> maybeAtom (terminal "to"   *> project place)
+ <*> maybeAtom (terminal "by"   *> project transport))
+
+data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
+directions__ :: Command Directions__
+directions__ = 'directions__ <=> terminal "directions" *> (runPerms $ Directions__
+ <$> maybeAtom (terminal "from" *> project dictation)
+ <*> maybeAtom (terminal "to"   *> project dictation)
+ <*> maybeAtom (terminal "by"   *> project dictation))
 
 
 newtype Place = Place String deriving (Show,Eq)
 place = 'place <=> Place # alias ["this","that","bike","here","there"]
 
-data Transport = Foot | Bike | Bus | Car deriving (Show,Ord,Eq,Enum,Typeable)
+data Transport = Foot | Bike | Bus | Car | PublicTransit deriving (Show,Ord,Eq,Enum,Typeable)
 transport = defaultCommand
-
--- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
-data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions :: Command Directions_
-directions = 'directions <=> terminal "directions" *> (runPerms $ Directions_
- <$> maybeAtom (terminal "from" *> project place)
- <*> maybeAtom (terminal "to"   *> project place)
- <*> maybeAtom (terminal "by"   *> project transport))
-
 
 exampleDirections =
  [ "directions from here to there  by bike"
@@ -190,14 +196,10 @@ attemptAsynchronously action = do
 
 attempt = attemptAsynchronously
 
-attemptParse (Command _ _ p) s = attempt (print =<< (p `parses` s))
+attemptParse command s = attempt (print =<< (command `parses` s))
 
 -- attemptSerialize (Command _ g _) = attempt $ either print print $ (serializeProduction (renderProduction g))
-
-handleParse :: Show a => Command a -> String -> IO ()
-handleParse (Command _ _ p) s = do
- (print =<< (p `parses` s)) `catches` parseHandlers
- putStrLn ""
+attemptSerialize command = attempt $ either print T.putStrLn $ serialized command
 
 
 main = do
@@ -239,15 +241,27 @@ main = do
  -- attemptSerialize root
 
  putStrLn ""
- handleParse positive "9"
- handleParse dictation "that"
+ attemptSerialize root
+ attemptSerialize directions
+
+ putStrLn ""
+ attemptParse positive "9"
+ attemptParse dictation "this and that"
  attemptParse root "no"
  attemptParse root "no way"
- attemptParse root "replace this with that"
- attemptParse root "1 no"
+ attemptParse root "replace this and that with that and this"
+ attemptParse root "1 replace this with that"
  attemptParse root "1 1 no"
 
  putStrLn ""
+ traverse_ (attemptParse directions_) exampleDirections
+
+ putStrLn ""
  traverse_ (attemptParse directions) exampleDirections
+ attemptParse directions "directions from Redwood City to San Francisco by public transit"
+
+ putStrLn ""
+ traverse_ (attemptParse directions__) exampleDirections
+ -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City "
 
  putStrLn ""

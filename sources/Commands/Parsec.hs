@@ -8,7 +8,7 @@ module Commands.Parsec
 ) where
 import           Commands.Etc
 
-import           Control.Applicative
+import           Control.Applicative hiding (optional)
 import           Control.Monad.Catch (throwM)
 import           Text.Parsec         hiding (Parsec, many, parse, space, (<|>))
 import qualified Text.Parsec         as Parsec

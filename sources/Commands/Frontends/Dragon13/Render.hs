@@ -1,32 +1,27 @@
 {-# LANGUAGE DataKinds, ExistentialQuantification #-}
 module Commands.Frontends.Dragon13.Render where
-import           Commands.Etc
-import           Commands.Frontends.Dragon13.Types
-import           Commands.Grammar
-import           Commands.Grammar.Types
-import           Control.Alternative.Free.Tree
+-- import           Commands.Etc
+import Commands.Command.Types
+import Commands.Frontends.Dragon13.Types
+import Commands.Grammar
+import Commands.Grammar.Types
+import Control.Alternative.Free.Tree
 
-import           Control.Applicative
-import           Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
-import qualified Data.Map.Strict                   as Map
-import           Data.Maybe                        (catMaybes, fromMaybe,
-                                                    mapMaybe)
+import Control.Applicative
+import Data.Foldable                     (foldMap)
+import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
+import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
+import Data.Monoid                       ((<>))
+
 -- import           Data.Text.Lazy                    (Text)
 -- import qualified Data.Text.Lazy                    as T
 
 
--- |
---
--- uses the given 'Rule' as the 'dnsExport'.
-renderGrammar :: Rule x -> DNSGrammar String String
-renderGrammar (Rule l rs) = DNSGrammar export productions
- where
- export = renderProduction (Rule l rs)
- productions
-  = fmap (\(l, Some rs) -> renderProduction (Rule l rs))
-  . Map.toList
-  . Map.delete l
-  $ reifyRule (Rule l rs)
+renderRule :: Rule x -> DNSGrammar String String
+renderRule (Rule l r) = DNSGrammar
+ (renderProduction $ Rule l r)
+ (getChildren r)
+
 
 -- |
 --
@@ -56,10 +51,21 @@ renderRHS_ (fs :<*> xs) = DNSSequence <$> (nonEmpty . catMaybes $ [renderRHS_ fs
 -- |
 renderSymbol :: Symbol x -> DNSRHS String String
 renderSymbol = symbol
- (\(Word t)   -> DNSTerminal $ DNSToken t)
- (\(Rule l _) -> DNSNonTerminal $ renderLHS l)
+ (\(Word t) -> DNSTerminal $ DNSToken t)
+ (\(Command {_grammar = DNSGrammar (DNSProduction lhs _) _}) -> DNSNonTerminal lhs)
 
 -- |
 emptyList :: DNSRHS String String
 emptyList = DNSNonTerminal $ DNSList "emptyList"
 
+-- |
+--
+-- TODO is this a traversal or something? over the functor
+--
+-- TODO remove unique s with equality instance
+getChildren :: RHS x -> [DNSProduction False String String]
+getChildren (Pure _)     = []
+getChildren (Many rs)    = getChildren `foldMap` rs
+getChildren (fs `App` x) = getChildren fs <> symbol (const [])
+ (\Command {_grammar = DNSGrammar p ps} -> downcastDNSProduction p : ps) x
+getChildren (fs :<*> xs) = getChildren fs <> getChildren xs

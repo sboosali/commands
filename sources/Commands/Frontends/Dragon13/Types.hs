@@ -70,6 +70,9 @@ data DNSProduction (e :: Bool) n t where
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
  DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
 
+downcastDNSProduction :: DNSProduction True n t -> DNSProduction False n t
+downcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
+
 deriving instance (Show n, Show t) => Show (DNSProduction e n t)
 
 instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault

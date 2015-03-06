@@ -1,24 +1,26 @@
-{-# LANGUAGE ScopedTypeVariables, DataKinds #-}
+{-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
 module Commands.Command where
+import           Commands.Command.Types
 import           Commands.Etc
-import Commands.Command.Types
-import Commands.Grammar
-import Commands.Grammar.Types
-import Commands.Parse
-import Commands.Parse.Types
--- import Commands.Frontends.Dragon13
-import Commands.Frontends.Dragon13.Types
-import Commands.Frontends.Dragon13.Text
-import Commands.Frontends.Dragon13.Render
+import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Render
+import           Commands.Grammar
+import           Commands.Grammar.Types
+import           Commands.Parse
+import           Commands.Parse.Types
+-- import           Commands.Frontends.Dragon13.Text
+import           Commands.Frontends.Dragon13.Types
 import           Control.Alternative.Free.Tree
 
+import           Control.Applicative
+import           Control.Monad.Catch                (SomeException (..))
+import           Data.Bifunctor                     (bimap)
+import           Data.Foldable                      (asum)
 import           Data.Proxy
-import           Language.Haskell.TH.Syntax    (Name)
-import           Data.Foldable                 (asum)
-import           Data.Typeable                 (Typeable)
-import Control.Applicative
-import           Data.Bifunctor                    (bimap)
-import qualified Data.Text.Lazy                    as T
+import qualified Data.Text.Lazy                     as T
+import           Data.Typeable                      (Typeable)
+import           Language.Haskell.TH.Syntax         (Name)
+
 
 infix  2 <=>
 -- infixl 3 <|>
@@ -45,19 +47,18 @@ defaultCommand = genericCommand
  (guiOf (Proxy :: Proxy a))
  (asum . fmap con $ constructors)
 
--- | 
+-- |
 genericCommand :: LHS -> RHS a -> Command a
-genericCommand l r = Command rule g p
+genericCommand l r = Command l g p
  where
- g = bimap T.pack T.pack  $ renderProduction rule -- TODO 
- p = gparser rule
- rule = Rule l r
+ -- g = bimap T.pack T.pack $ renderRHS r
+ g = renderRule (Rule l r)
+ p = rparser r
 
 -- | builds a special 'Command' directly, not indirectly via 'Rule'.
-specialCommand :: Name -> DNSProduction True Text Text -> Parser a -> Command a
-specialCommand name g p = Command rule g p
+specialCommand :: Name -> DNSGrammar String String -> Parser a -> Command a
+specialCommand name g p = Command l g p
  where
- rule = Rule l empty
  Just l = fromName name
 
 -- (&) :: (Grammatical a) => RHSs (a -> b) -> a -> RHSs b
@@ -83,9 +84,10 @@ f # x = f <$> x
 --  toR (NonTerminal _ r) = r
 
 project :: Command a -> RHS a
-project (Command rule _ _) = lift . fromRule $ rule
+project = lift . fromCommand
 
--- -- |
--- renders :: Command x -> DNSGrammar Text Text
--- renders = bimap T.pack T.pack . render
+serialized :: Command x -> Either [SomeException] T.Text
+serialized Command{_grammar} = serialize $ bimap T.pack T.pack $ _grammar
 
+parses :: Command a -> String -> Possibly a
+parses Command{_parser} = parsing _parser

@@ -1,5 +1,6 @@
-{-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE GADTs, NamedFieldPuns, RankNTypes #-}
 module Commands.Parse where
+import Commands.Command.Types
 import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
@@ -16,12 +17,17 @@ import Data.Typeable                 (cast)
 
 
 sparser :: Symbol a -> Parser a
-sparser s context = symbol (flip wparser $ context) (flip gparser $ context) s
+sparser s context = symbol (flip wparser $ context) (flip cparser $ context) s
 
 wparser :: Word -> Parser a
 wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 
--- | build a parser from a grammar.
+cparser :: Command a -> Parser a
+cparser Command {_lhs, _parser} context = _parser context <?> showLHS _lhs
+-- gparser (Rule _ rs) context = rparser rs context
+
+-- | build a parser from a right-hand side.
+--
 --
 -- Implementation Detail: we use 'foldr' (not @foldl@, nor @foldr'@) to support infinitely many alternatives.
 --
@@ -56,30 +62,22 @@ wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 --
 --
 --
-gparser :: Rule a -> Parser a
-gparser (Rule l rs) context = try (rparser rs context <?> showLHS l)
-
--- | build a parser from a right-hand side.
---
 -- always returns a 'Parsec' wrapped in 'try'
 rparser :: RHS a -> Parser a
 rparser (Pure a) _ = pure a
 rparser (Many rs) context = try p
  where
- ps = fmap (flip rparser $ context) rs
  p = asum ps
+ ps = fmap (flip rparser $ context) rs
 rparser (fs `App` x) context = try (p <*> q)
  where
- q = sparser x  context
  p = rparser fs (Some q)
+ q = sparser x  context
 rparser (fs :<*> xs) context = try (p <*> q)
  where
- q = rparser xs context
  p = rparser fs (Some q)
+ q = rparser xs context
 
-parses :: Parser a -> String -> Possibly a
-parses sp s = parse (fp <* eof) s
- where fp = sp (Some eof)
 
 {-
 
@@ -99,6 +97,11 @@ ps :: [Parsec a]
 p :: Parsec a
 
 -}
+
+
+parsing :: Parser a -> String -> Possibly a
+parsing sp s = parse (fp <* eof) s
+ where fp = sp (Some eof)
 
 -- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
 _ParseError :: Prism' SomeException ParseError

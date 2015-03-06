@@ -91,3 +91,4 @@ serialized Command{_grammar} = serialize $ bimap T.pack T.pack $ _grammar
 
 parses :: Command a -> String -> Possibly a
 parses Command{_parser} = parsing _parser
+

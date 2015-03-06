@@ -241,10 +241,6 @@ main = do
  -- attemptSerialize root
 
  putStrLn ""
- attemptSerialize root
- attemptSerialize directions
-
- putStrLn ""
  attemptParse positive "9"
  attemptParse dictation "this and that"
  attemptParse root "no"
@@ -265,3 +261,7 @@ main = do
  -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City "
 
  putStrLn ""
+ attemptSerialize directions_
+ putStrLn ""
+ attemptSerialize root
+

@@ -34,7 +34,7 @@ data DNSGrammar n t = DNSGrammar
  { dnsExport      :: DNSProduction True n t
  , dnsProductions :: [DNSProduction False n t]
  }
- deriving Show
+ deriving (Show, Eq)
 
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
 instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
@@ -64,16 +64,22 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
 -- not 'DNSList's. a 'DNSVocabulary' can be named only by 'LHSList's, as
 -- a 'DNSProduction' can be named only by 'LHSRule's.
 --
--- a 'LHSRule'\'s 'DNSRHS' must be 'NonEmpty', but a 'LHSList'\'s 'DNSToken's may be empty.
+-- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
 data DNSProduction (e :: Bool) n t where
  DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
  DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
 
-downcastDNSProduction :: DNSProduction True n t -> DNSProduction False n t
-downcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
+-- equalDNSProduction :: (Eq n) => DNSProduction e1 n t1 -> DNSProduction e2 n t2 -> Bool
+-- equalDNSProduction x y = equalDNSLHS  (lhsOfDNSProduction  x) $ lhsOfDNSProduction y
+
+-- lhsOfDNSProduction :: (Eq n) => DNSProduction e n t -> DNSLHS l n
+-- lhsOfDNSProduction (DNSProduction l _) = l
+-- lhsOfDNSProduction (DNSVocabulary l _) = l
+-- lhsOfDNSProduction (DNSImport l) = l
 
 deriving instance (Show n, Show t) => Show (DNSProduction e n t)
+deriving instance (Eq n, Eq t) => Eq (DNSProduction e n t)
 
 instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
@@ -82,19 +88,31 @@ instance Bitraversable (DNSProduction e) where
  bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
  bitraverse f _ (DNSImport l)        = DNSImport     <$> traverse f l
 
+upcastDNSProduction :: DNSProduction True n t -> DNSProduction e n t
+upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
+
 -- | the
 -- <https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form EBNF>-like
 -- grammar specification.
 --
+-- 'Eq' instance is manual because a constructor ('DNSNonTerminal') is existentially-quantified.
 data DNSRHS n t
  = DNSTerminal (DNSToken t) -- ^ e.g. @"terminal"@
- | forall l. DNSNonTerminal (DNSLHS l n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
+ | forall (l :: LHSKind). DNSNonTerminal (DNSLHS l n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
  | DNSSequence (NonEmpty (DNSRHS n t)) -- ^ e.g. @first second ...@
  | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
  | DNSOptional (DNSRHS n t) -- ^ e.g. @[optional]@
  | DNSMultiple (DNSRHS n t) -- ^ e.g. @(multiple)+@
 
 deriving instance (Show n, Show t) => Show (DNSRHS n t)
+instance (Eq n, Eq t) => Eq (DNSRHS n t) where
+ DNSTerminal     x == DNSTerminal     y = x == y
+ DNSNonTerminal  x == DNSNonTerminal  y = x `equalDNSLHS` y
+ DNSSequence     x == DNSSequence     y = x == y
+ DNSAlternatives x == DNSAlternatives y = x == y
+ DNSOptional     x == DNSOptional     y = x == y
+ DNSMultiple     x == DNSMultiple     y = x == y
+ _                 == _                 = False
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault
@@ -117,7 +135,7 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
 --
 -- * @"\<rule>"@ is a 'DNSRule'
 -- * @"\<dgndictation>"@ is a 'DNSBuiltin'
--- * @"{list}@ is a 'DNSList
+-- * @"{list}@ is a 'DNSList'
 --
 -- a @GADT@ to distinguish 'LHSRule's from 'LHSList's, which behave
 -- differently. without @GADT@s, we would need sacrifice
@@ -138,6 +156,15 @@ data DNSLHS (l :: LHSKind) n where
  DNSList    :: n          -> DNSLHS LHSList n
 
 deriving instance (Show n) => Show (DNSLHS l n)
+-- deriving instance (Eq n) => Eq (DNSLHS l n)
+instance (Eq n) => Eq (DNSLHS l n) where (==) = equalDNSLHS
+
+-- | heterogeneous (but only in the phantom) equality
+equalDNSLHS :: (Eq n) => DNSLHS l1 n -> DNSLHS l2 n -> Bool
+DNSRule    x `equalDNSLHS` DNSRule    y = x == y
+DNSBuiltin x `equalDNSLHS` DNSBuiltin y = x == y
+DNSList    x `equalDNSLHS` DNSList    y = x == y
+_            `equalDNSLHS` _            = False
 
 instance Functor     (DNSLHS l) where fmap     = fmapDefault
 instance Foldable    (DNSLHS l) where foldMap  = foldMapDefault

@@ -114,5 +114,8 @@ with = local . const
 --
 --
 guiOf :: (Typeable a) => proxy a -> GUI
-guiOf = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t)) . typeRepTyCon . typeRep
+guiOf
+ = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t))
+ . typeRepTyCon
+ . typeRep
 

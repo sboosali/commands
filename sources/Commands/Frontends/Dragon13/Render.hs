@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, ExistentialQuantification #-}
+{-# LANGUAGE DataKinds, ExistentialQuantification, NamedFieldPuns #-}
 module Commands.Frontends.Dragon13.Render where
--- import           Commands.Etc
 import Commands.Command.Types
+import Commands.Etc
 import Commands.Frontends.Dragon13.Types
 import Commands.Grammar
 import Commands.Grammar.Types
@@ -9,19 +9,23 @@ import Control.Alternative.Free.Tree
 
 import Control.Applicative
 import Data.Foldable                     (foldMap)
+import Data.Function                     (on)
+import Data.List                         (nub, nubBy)
 import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
-import Data.Monoid                       ((<>))
+
 
 -- import           Data.Text.Lazy                    (Text)
 -- import qualified Data.Text.Lazy                    as T
 
 
+-- |
+--
+-- TODO slow because 'nub' has quadratic-time, but fast because it's really 'nubBy' on a part ('DNSLHS'), not the whole.
 renderRule :: Rule x -> DNSGrammar String String
-renderRule (Rule l r) = DNSGrammar
- (renderProduction $ Rule l r)
- (getChildren r)
-
+renderRule rule = DNSGrammar
+ (renderProduction rule)
+ (renderChildren rule)
 
 -- |
 --
@@ -60,12 +64,12 @@ emptyList = DNSNonTerminal $ DNSList "emptyList"
 
 -- |
 --
--- TODO is this a traversal or something? over the functor
---
--- TODO remove unique s with equality instance
-getChildren :: RHS x -> [DNSProduction False String String]
-getChildren (Pure _)     = []
-getChildren (Many rs)    = getChildren `foldMap` rs
-getChildren (fs `App` x) = getChildren fs <> symbol (const [])
- (\Command {_grammar = DNSGrammar p ps} -> downcastDNSProduction p : ps) x
-getChildren (fs :<*> xs) = getChildren fs <> getChildren xs
+-- excludes the current 'Command', to terminate.
+renderChildren :: Rule x -> [DNSProduction False String String]
+renderChildren
+ = nub
+ . foldMap (\(Some (Command {_grammar = DNSGrammar p ps})) -> upcastDNSProduction p : ps)
+ . nubBy ((==) `on` theLHS)
+ . getChildren
+ where
+ theLHS = (\(Some (Command{_lhs})) -> _lhs)

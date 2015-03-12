@@ -26,8 +26,10 @@ main = do
   , "sources/Commands/Frontends/Dragon13/Text"
   , "sources/Commands/Frontends/Dragon13/Render"
 
-  , "sources/Commands/Command/Types"
   , "sources/Commands/Command"
+  , "sources/Commands/Command/Types"
+  , "sources/Commands/Command/Sugar"
+  , "sources/Commands/Command/Combinator"
 
   , "sources/Commands/Munging"
 

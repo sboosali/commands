@@ -74,6 +74,8 @@ library
 
   Commands.Command
   Commands.Command.Types
+  Commands.Command.Sugar
+  Commands.Command.Combinator
 
   Commands.Munging
 

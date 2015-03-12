@@ -11,6 +11,7 @@ import Control.Alternative.Free.Tree
 import Control.Applicative
 import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
+import Control.Monad                 ((>=>))
 import Control.Monad.Catch           (Handler, SomeException (..))
 import Data.Foldable                 (asum)
 import Data.Typeable                 (cast)
@@ -111,6 +112,6 @@ _ParseError = prism SomeException $ \(SomeException e) -> case cast e of
 
 parseHandlers :: [Handler IO ()]
 parseHandlers =
- [ handler _ParseError print
- , handler _ErrorCall print
+ [ handler _ParseError $ print >=> const (putStrLn "")
+ , handler _ErrorCall  $ print
  ]

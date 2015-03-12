@@ -4,6 +4,8 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Command
+import           Commands.Command.Combinator
+import           Commands.Command.Sugar
 import           Commands.Command.Types             ()
 import           Commands.Etc                       ()
 import           Commands.Frontends.Dragon13
@@ -68,12 +70,12 @@ root = 'root <=> empty
  <|> Repeat      # positive & root
  <|> Dictated    # "say" & dictation
  <|> Click_      # click
- -- <|> Roots       # (multiple root)
+ -- <|> Roots       # (multipleC root)
 
 data Click = Click Times Button deriving (Show,Eq)
 click :: Command Click
 click = 'click
- <=>  Click # optionC Single times & optionC LeftButton button & "click"
+ <=>  Click # (optionC Single) times & (optionC LeftButton) button & "click"
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
 times = defaultCommand :: Command Times
@@ -84,7 +86,7 @@ button = 'button
  <=> LeftButton   # "left"
  <|> MiddleButton # "middle"
  <|> RightButton  # "right"
- -- TODO qualified enumeration
+ -- TODO qualified enumeration qualifiedC. defaultC magically detects prefix or suffix qualification and elides the infix with qualifiedC? otherwise enumeratedC
 
 newtype Positive = Positive Int deriving (Show,Eq)
 positive :: Command Positive
@@ -261,8 +263,9 @@ main = do
  -- putStrLn ""
  -- attempt . print . renders $ root
  putStrLn ""
- attemptSerialize root
- -- attemptSerialize
+ attemptSerialize root -- timed out. fast after Commands.Commands.Sugar, I think. Theory: may be left associated tree is efficient, wall arbitrarily associated free alternatives is obscenely polynomial inefficient. But even for such a small grammar? May be non-left association causes non-termination?
+ -- I don't think so: {<|> Repeat     <$> liftCommand positive <*> liftCommand root} still terminates in both the serialization in the parsing. Maybe because all the alternatives (or their children) were not left associated? I don't know
+ -- See also: attemptParse (multipleC root) "no 1 replace this and that with that and this"
 
  putStrLn ""
  attemptParse positive "9"
@@ -277,7 +280,7 @@ main = do
  attemptParse (multipleC root) "no no"
  attemptParse (multipleC root) "no replace this with that"
  attemptParse (multipleC root) "no 1 replace this with that"
- -- attemptParse (multipleC root) "no 1 replace this and that with that and this" -- times out, probably left recursion
+ attemptParse (multipleC root) "no 1 replace this and that with that and this" -- timed out. left recursion?
 
  putStrLn ""
  attemptParse click "single left click"

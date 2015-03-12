@@ -36,7 +36,7 @@ infixl 4 #
 infixl 4 <&>
 infixl 4 <&
 infixl 4 &>
--- infixl 9 &
+infixl 4 &
 
 
 (<&>) :: (R f,  R x,  ToR f ~ (a -> b),  ToR x ~ a)  =>  f -> x -> RHS b
@@ -53,11 +53,26 @@ instance R String      where  type ToR String      = String;  toR = liftString
 instance R (Command a) where  type ToR (Command a) = a;       toR = liftCommand
 instance R (RHS a)     where  type ToR (RHS a)     = a;       toR = id
 
-(#) :: Applicative f => (a -> b) -> f a -> f b
-(#) = (<$>)
 
--- (&) :: Applicative f => f (a -> b) -> f a -> f b
--- f & x = f <*> x
+-- | e.g. inference for @True # "true"@ (__no__ @OverloadedStrings@):
+--
+-- @
+-- (#) :: (AppR a) => LeftR a b -> a -> RHS b
+-- -- given string literal ("true" :: String)
+-- a ~ String
+-- (#) :: (AppR String) => LeftR String b -> String -> RHS b
+-- -- accept constraint 'AppR' and expand type family 'LeftR'
+-- (#) :: b -> String -> RHS b
+-- @
+--
+(#) :: (AppR a) => LeftR a b -> a -> RHS b
+f # x = pure f `appR` x
+
+-- | e.g. inference for @TODO@ (__no__ @OverloadedStrings@):
+--
+-- @
+(&) :: (AppR a) => RHS (LeftR a b) -> a -> RHS b
+(&) = appR
 
 -- | specialized 'appR' has types:
 --
@@ -66,10 +81,19 @@ instance R (RHS a)     where  type ToR (RHS a)     = a;       toR = id
 -- * @(a -> b) -> RHS a     -> RHS b@
 --
 --
--- class    (R a) => R0 a  where  type AppR a           :: *;      appR :: AppR b a
--- instance R0 String      where  type AppR String    = a -> String -> RHS a;  appR f x = f <$  toR x
--- instance R0 (Command a) where  type AppR (Command a) = (a -> b) -> Command a -> RHS b;       appR f x = f <$> toR x
--- instance R0 (RHS a)     where  type AppR (RHS a)     = (a -> b) -> RHS a     -> RHS b;       appR f x = f <$>     x
+class (R a) => AppR a where
+ type LeftR a b :: *
+ appR  :: RHS (LeftR a b) -> a -> RHS b
+
+instance AppR String      where
+ type LeftR String b      = b
+ appR f x = f <*  toR x
+instance AppR (Command a) where
+ type LeftR (Command a) b = (a -> b)
+ appR f x = f <*> toR x
+instance AppR (RHS a)     where
+ type LeftR (RHS a) b     = (a -> b)
+ appR f x = f <*>     x
 
 -- class Command a b c | a b -> c where
 -- instance Command String  String

@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase           #-}
-{-# LANGUAGE NamedFieldPuns, OverloadedStrings, PatternSynonyms, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections            #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Command
@@ -62,18 +62,18 @@ data Root
 
 root :: Command Root
 root = 'root <=> empty
- <|> ReplaceWith # ("replace" &> dictation) <&> ("with" &> dictation)
- <|> Undo        <$ liftString "no way"
- <|> Undo        <$ liftString "no"
- <|> Repeat      # liftCommand positive <&> root
- <|> Dictated    # ("say" &> dictation)
- <|> Click_       <$> liftCommand click
+ <|> ReplaceWith # "replace" & dictation & "with" & dictation
+ <|> Undo        # "no"         -- order matters..
+ <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
+ <|> Repeat      # positive & root
+ <|> Dictated    # "say" & dictation
+ <|> Click_      # click
  -- <|> Roots       # (multiple root)
 
 data Click = Click Times Button deriving (Show,Eq)
 click :: Command Click
 click = 'click
- <=>  Click # liftCommand (optionC Single times) <&> ((optionC LeftButton button) <& "click")
+ <=>  Click # optionC Single times & optionC LeftButton button & "click"
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
 times = defaultCommand :: Command Times
@@ -81,9 +81,9 @@ times = defaultCommand :: Command Times
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Typeable)
 button :: Command Button
 button = 'button
- <=> LeftButton <$ liftString "left"
- <|> MiddleButton <$ liftString "middle"
- <|> RightButton <$ liftString "right"
+ <=> LeftButton   # "left"
+ <|> MiddleButton # "middle"
+ <|> RightButton  # "right"
  -- TODO qualified enumeration
 
 newtype Positive = Positive Int deriving (Show,Eq)
@@ -157,52 +157,54 @@ exampleDirections =
 --  , Directions_ (Just (Place "here")) (Just (Place "there")) (Just Bike)
 --  ]
 
-grammar = DNSGrammar export [command, subcommand, flag] :: DNSGrammar Text Text
-
-export = DNSProduction (DNSRule "export") $ fromList
- [ DNSSequence $ fromList
-   [ DNSNonTerminal (DNSList "command")
-   , DNSNonTerminal (DNSRule "subcommand")
-   , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
-   ]
- , DNSTerminal (DNSToken "ls")
- ]
-
-command = DNSVocabulary (DNSList "command")
- [ DNSToken "git"
- , DNSToken "rm"
- ]
-
-subcommand = DNSProduction (DNSRule "subcommand") $ fromList
- [ DNSTerminal (DNSToken "status")
- , DNSNonTerminal (DNSBuiltin DGNDictation)
- ]
-
-flag = DNSVocabulary (DNSList "flag")
- [ DNSPronounced "-f" "force"
- , DNSPronounced "-r" "recursive"
- , DNSPronounced "-a" "all"
- , DNSPronounced "-i" "interactive"
- ]
-
--- | traverse with monoidal error collecting
-badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") $ fromList [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
 
 
-isPythonDict :: String -> Bool
-isPythonDict s = case parseExpr s "" of
- Right (Dictionary {}, _) -> True
- _ -> False
+-- grammar = DNSGrammar export [command, subcommand, flag] :: DNSGrammar Text Text
 
-isPythonString :: String -> Bool
-isPythonString s = case parseExpr s "" of
- Right (Strings {}, _) -> True
- _ -> False
+-- export = DNSProduction (DNSRule "export") $ fromList
+--  [ DNSSequence $ fromList
+--    [ DNSNonTerminal (DNSList "command")
+--    , DNSNonTerminal (DNSRule "subcommand")
+--    , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
+--    ]
+--  , DNSTerminal (DNSToken "ls")
+--  ]
 
-isPythonModule :: String -> Bool
-isPythonModule s = case parseModule s "" of
- Right {} -> True
- _ -> False
+-- command = DNSVocabulary (DNSList "command")
+--  [ DNSToken "git"
+--  , DNSToken "rm"
+--  ]
+
+-- subcommand = DNSProduction (DNSRule "subcommand") $ fromList
+--  [ DNSTerminal (DNSToken "status")
+--  , DNSNonTerminal (DNSBuiltin DGNDictation)
+--  ]
+
+-- flag = DNSVocabulary (DNSList "flag")
+--  [ DNSPronounced "-f" "force"
+--  , DNSPronounced "-r" "recursive"
+--  , DNSPronounced "-a" "all"
+--  , DNSPronounced "-i" "interactive"
+--  ]
+
+-- -- | traverse with monoidal error collecting
+-- badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") $ fromList [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
+
+
+-- isPythonDict :: String -> Bool
+-- isPythonDict s = case parseExpr s "" of
+--  Right (Dictionary {}, _) -> True
+--  _ -> False
+
+-- isPythonString :: String -> Bool
+-- isPythonString s = case parseExpr s "" of
+--  Right (Strings {}, _) -> True
+--  _ -> False
+
+-- isPythonModule :: String -> Bool
+-- isPythonModule s = case parseModule s "" of
+--  Right {} -> True
+--  _ -> False
 
 oneSecond :: Int
 oneSecond = round (1e6 :: Double)

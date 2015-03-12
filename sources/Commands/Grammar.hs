@@ -5,49 +5,57 @@
 {-# LANGUAGE StandaloneDeriving, TypeFamilies, TypeOperators                #-}
 -- |
 module Commands.Grammar where
+import Commands.Command.Types        ()
 import Commands.Etc
-import Commands.Command.Types
 import Commands.Grammar.Types
 import Commands.Munging
 import Control.Alternative.Free.Tree
 
 import Control.Applicative
-import Data.Foldable                 (asum,foldMap)
+import Data.Foldable                 (asum, foldMap)
 import Data.Hashable
 import Data.List                     (intercalate)
 import Data.Monoid                   ((<>))
 import Data.Typeable                 (Typeable)
+import Language.Haskell.TH.Syntax    (Name)
 import Numeric
 
-
-terminal :: String -> RHS a
-terminal = lift . fromWord . Word
 
 alias :: [String] -> RHS String
 alias = asum . fmap str
 
 con :: (Show a) => a -> RHS a
-con c = c <$ (terminal . intercalate " " . unCamelCase . show) c
+con c = c <$ (liftString . intercalate " " . unCamelCase . show) c
 
 int :: Int -> RHS Int
 int = con
 
 str :: String -> RHS String
-str s = s <$ terminal s
+str s = s <$ liftString s
 
 lhsOfType :: (Typeable a) => proxy a -> LHS
-lhsOfType = guiOf
+lhsOfType = LHS . guiOf
+
+-- |
+--
+-- warning: partial function.
+unsafeLHSFromName :: Name -> LHS
+unsafeLHSFromName name = LHS gui
+ where Just gui = fromName name
+
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
--- >>> take 10 $ showLHS (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
+-- >>> take 10 $ showLHS (LHS (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier")))
 -- "identifier"
 --
+-- TODO for correctness, safely associate LHSApp by checking depth
 --
 -- TODO for compactness, keep unique fully qualified identifier, but later render as unqualified identifier with possible compact unique suffix
 showLHS :: LHS -> String
-showLHS (GUI (Package pkg) (Module mod) (Identifier occ))
+showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
  = occ <> "__" <> showHex (abs . hash $ pkg <> "__" <> mod <> "__" <> occ) ""
+showLHS (l `LHSApp` ls) = intercalate "___" (showLHS l : fmap showLHS ls)
 
 -- |
 --

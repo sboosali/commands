@@ -10,6 +10,7 @@ import           Commands.Etc
 
 import           Control.Applicative hiding (optional)
 import           Control.Monad.Catch (throwM)
+import           Data.Monoid         ((<>))
 import           Text.Parsec         hiding (Parsec, many, parse, space, (<|>))
 import qualified Text.Parsec         as Parsec
 
@@ -61,17 +62,25 @@ manyUntil p (Some q) = (:) <$> p <*> p `manyTill` (try . lookAhead) q
 -- >>> parse anyWord "two words"
 -- "two"
 --
--- uses @'noneOf' 'separators'@
 --
 anyWord :: Parsec Token
-anyWord = (spaced . Parsec.many1 $ noneOf separators) <?> "a word"
+anyWord = (spaced . Parsec.many1 $ noneOf separatorChars) <?> "a word"
 
--- | @separators = ",;:. \\t\\n\\r"@
+anyBlack :: Parsec Token
+anyBlack = (spaced . Parsec.many1 $ noneOf whitespaceChars) <?> "a word"
+
+-- | @separatorChars = ",;:. \\t\\n\\r"@
 --
 -- assumes the @Recognize@r should return only letters.
 --
-separators :: String
-separators = ",;:. \t\n\r"
+separatorChars :: String
+separatorChars = punctuationChars <> whitespaceChars
+
+punctuationChars :: String
+punctuationChars = ",;:."
+
+whitespaceChars :: String
+whitespaceChars = " \t\n\r"
 
 -- | let's you treat words (i.e. 'String's) as "tokens"; when your
 -- 'Stream' is a 'String', and thus your real tokens are 'Char's.
@@ -79,7 +88,7 @@ separators = ",;:. \t\n\r"
 -- >>> parse (word "word") "word"
 -- "word"
 --
--- >>> parse (word "word") "  word  "
+-- >>> parse (word "word") " word "
 -- "word"
 --
 -- >>> parse (word "word") "drow"
@@ -93,7 +102,8 @@ word = spaced . string
 -- |
 --
 spaced :: Parsec a -> Parsec a
-spaced = between (many space) (many space)
+-- spaced = between (many space) (many space)
+spaced = between (optional space) (optional space)
 
 -- | matches only the space character
 --

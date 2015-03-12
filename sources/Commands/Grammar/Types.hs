@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveFunctor, GADTs, PackageImports, RankNTypes #-}
 module Commands.Grammar.Types where
-import Commands.Command.Types
+import Commands.Command.Types            ()
 import Commands.Etc
+import Commands.Frontends.Dragon13.Types
+import Commands.Parse.Types
 import Control.Alternative.Free.Tree
 
 import Data.Functor.Constant
@@ -9,12 +11,28 @@ import "transformers-compat" Data.Functor.Sum
 
 
 -- |
+--
+-- Command ~ LHS * DNSGrammar Text Text * Parser a
+--
+-- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
+--
+data Command a = Command
+ { _lhs     :: LHS
+ -- , _rule     :: Rule a
+ , _grammar :: (DNSGrammar String String)
+ , _parser  :: (Parser a)
+ }
+ deriving (Functor)
+
+-- |
 data Rule a = Rule !LHS (RHS a)
  deriving (Functor)
 
 -- |
-type LHS = GUI
+-- type LHS = GUI
 -- data LHS = LHS !Package !Module !Identifier deriving (Show, Eq, Ord)
+data LHS = LHS !GUI | LHSApp !LHS ![LHS]
+ deriving (Show, Eq, Ord)
 
 -- |
 --
@@ -42,3 +60,9 @@ fromWord = InL . Constant
 -- | constructor.
 fromCommand :: Command a -> Symbol a
 fromCommand = InR
+
+liftCommand :: Command a -> RHS a
+liftCommand = lift . fromCommand
+
+liftString :: String -> RHS a
+liftString = lift . fromWord . Word

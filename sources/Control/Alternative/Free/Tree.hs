@@ -130,3 +130,6 @@ pattern Empty = Many []
 
 lift :: f a -> Alt f a
 lift ga = Pure id `App` ga
+
+fell :: (Alternative f) => Alt f a -> f a
+fell = undefined

@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, RankNTypes #-}
 module Commands.Parse where
-import Commands.Command.Types
+import Commands.Command.Types        ()
 import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
@@ -98,7 +98,7 @@ p :: Parsec a
 
 -}
 
-
+-- TODO strip whitespace from either end and when more than one space
 parsing :: Parser a -> String -> Possibly a
 parsing sp s = parse (fp <* eof) s
  where fp = sp (Some eof)
@@ -114,4 +114,3 @@ parseHandlers =
  [ handler _ParseError print
  , handler _ErrorCall print
  ]
-

@@ -23,6 +23,7 @@ import           Data.Either.Validation            (Validation,
                                                     validationToEither)
 import           Data.Foldable                     (toList)
 import           Data.List                         (nub)
+import           Data.List.NonEmpty                (NonEmpty (..))
 import           Data.Maybe                        (mapMaybe)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
@@ -334,4 +335,7 @@ getNames = nub . bifoldMap (:[]) (const [])
 --
 getWords :: (Eq t) => DNSGrammar n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
+
+hoistDNSRHS :: (DNSRHS n t -> DNSRHS n t) -> DNSProduction True n t -> NonEmpty (DNSRHS n t)
+hoistDNSRHS f (DNSProduction l _) = f (DNSNonTerminal l) :| []
 

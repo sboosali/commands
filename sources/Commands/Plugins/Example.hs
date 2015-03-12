@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Command
-import           Commands.Command.Types
+import           Commands.Command.Types             ()
 import           Commands.Etc                       ()
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Render
@@ -55,15 +55,36 @@ data Root
  = ReplaceWith Dictation Dictation
  | Undo
  | Repeat Positive Root
+ | Dictated Dictation
+ | Click_ Click
+ -- Roots [Root]
  deriving (Show,Eq)
 
 root :: Command Root
 root = 'root <=> empty
- -- <|> ReplaceWith <$> (terminal "replace" *> project dictation) <*> (terminal "with" *> project dictation)
- <|> (ReplaceWith <$ terminal "replace") <*> (project dictation <* terminal "with") <*> project dictation
- <|> Undo        <$ terminal "no way"
- <|> Undo        <$ terminal "no"
- <|> Repeat      <$> project positive <*> project root
+ <|> ReplaceWith # ("replace" &> dictation) <&> ("with" &> dictation)
+ <|> Undo        <$ liftString "no way"
+ <|> Undo        <$ liftString "no"
+ <|> Repeat      # liftCommand positive <&> root
+ <|> Dictated    # ("say" &> dictation)
+ <|> Click_       <$> liftCommand click
+ -- <|> Roots       # (multiple root)
+
+data Click = Click Times Button deriving (Show,Eq)
+click :: Command Click
+click = 'click
+ <=>  Click # liftCommand (optionC Single times) <&> ((optionC LeftButton button) <& "click")
+
+data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
+times = defaultCommand :: Command Times
+
+data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Typeable)
+button :: Command Button
+button = 'button
+ <=> LeftButton <$ liftString "left"
+ <|> MiddleButton <$ liftString "middle"
+ <|> RightButton <$ liftString "right"
+ -- TODO qualified enumeration
 
 newtype Positive = Positive Int deriving (Show,Eq)
 positive :: Command Positive
@@ -74,31 +95,31 @@ newtype Dictation = Dictation [String] deriving (Show,Eq)
 dictation :: Command Dictation
 dictation = specialCommand 'dictation
  (DNSGrammar (DNSProduction (DNSRule "dictation") (DNSNonTerminal (DNSBuiltin DGNDictation) :| [])) [])
- (\context -> Dictation <$> anyWord `manyUntil` context)
+ (\context -> Dictation <$> anyBlack `manyUntil` context)
 
 
--- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
-data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
-directions :: Command Directions
-directions = 'directions <=> terminal "directions" *> (runPerms $ Directions
- <$> atom (terminal "from" *> project dictation)
- <*> atom (terminal "to"   *> project dictation)
- <*> atom (terminal "by"   *> project dictation))
+-- -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
+-- data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
+-- directions :: Command Directions
+-- directions = 'directions <=> liftString "directions" &> (runPerms $ Directions
+--  <$> atom (liftString "from" &> liftCommand dictation)
+--  <&> atom (liftString "to"   &> liftCommand dictation)
+--  <&> atom (liftString "by"   &> liftCommand dictation))
 
--- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtom'
-data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions_ :: Command Directions_
-directions_ = 'directions_ <=> terminal "directions" *> (runPerms $ Directions_
- <$> maybeAtom (terminal "from" *> project place)
- <*> maybeAtom (terminal "to"   *> project place)
- <*> maybeAtom (terminal "by"   *> project transport))
+-- -- | context-free grammars (like from 'twig' or 'anyWord') can use 'rhsMaybe'
+-- data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
+-- directions_ :: Command Directions_
+-- directions_ = 'directions_ <=> liftString "directions" &> (runPerms $ Directions_
+--  <$> rhsMaybe (liftString "from" &> liftCommand place)
+--  <&> rhsMaybe (liftString "to"   &> liftCommand place)
+--  <&> rhsMaybe (liftString "by"   &> liftCommand transport))
 
-data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
-directions__ :: Command Directions__
-directions__ = 'directions__ <=> terminal "directions" *> (runPerms $ Directions__
- <$> maybeAtom (terminal "from" *> project dictation)
- <*> maybeAtom (terminal "to"   *> project dictation)
- <*> maybeAtom (terminal "by"   *> project dictation))
+-- data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
+-- directions__ :: Command Directions__
+-- directions__ = 'directions__ <=> terminal "directions" &> (runPerms $ Directions__
+--  <$> rhsMaybe (terminal "from" &> liftCommand dictation)
+--  <&> rhsMaybe (terminal "to"   &> liftCommand dictation)
+--  <&> rhsMaybe (terminal "by"   &> liftCommand dictation))
 
 
 newtype Place = Place String deriving (Show,Eq)
@@ -196,7 +217,7 @@ attemptAsynchronously action = do
 
 attempt = attemptAsynchronously
 
-attemptParse command s = attempt (print =<< (command `parses` s))
+attemptParse command = attempt . handleParse command
 
 -- attemptSerialize (Command _ g _) = attempt $ either print print $ (serializeProduction (renderProduction g))
 attemptSerialize command = attempt $ either print T.putStrLn $ serialized command
@@ -237,8 +258,9 @@ main = do
 
  -- putStrLn ""
  -- attempt . print . renders $ root
- -- putStrLn ""
- -- attemptSerialize root
+ putStrLn ""
+ attemptSerialize root
+ -- attemptSerialize
 
  putStrLn ""
  attemptParse positive "9"
@@ -246,22 +268,36 @@ main = do
  attemptParse root "no"
  attemptParse root "no way"
  attemptParse root "replace this and that with that and this"
- attemptParse root "1 replace this with that"
  attemptParse root "1 1 no"
+ attemptParse root "say 638 Pine St., Redwood City 94063"
+ attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
+
+ attemptParse (multipleC root) "no no"
+ attemptParse (multipleC root) "no replace this with that"
+ attemptParse (multipleC root) "no 1 replace this with that"
+ -- attemptParse (multipleC root) "no 1 replace this and that with that and this" -- times out, probably left recursion
 
  putStrLn ""
- traverse_ (attemptParse directions_) exampleDirections
+ attemptParse click "single left click"
+ attemptParse click "left click"
+ attemptParse click "single click"
+ attemptParse click "click"
 
- putStrLn ""
- traverse_ (attemptParse directions) exampleDirections
- attemptParse directions "directions from Redwood City to San Francisco by public transit"
+ -- putStrLn ""
+ -- traverse_ (attemptParse directions_) exampleDirections
 
- putStrLn ""
- traverse_ (attemptParse directions__) exampleDirections
- -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City "
+ -- putStrLn ""
+ -- traverse_ (attemptParse directions) exampleDirections
+ -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
 
- putStrLn ""
- attemptSerialize directions_
- putStrLn ""
- attemptSerialize root
+ -- putStrLn ""
+ -- traverse_ (attemptParse directions__) exampleDirections
+
+ -- putStrLn ""
+ -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City"
+
+ -- putStrLn ""
+ -- attemptSerialize directions_
+ -- putStrLn ""
+ -- attemptSerialize root
 

@@ -58,7 +58,7 @@ failure = throwM . userError . showName
 showName :: Name -> String
 showName = either show showGUI . fromName
 
--- | only 'NameG' is global.
+-- | only 'NameG' is global, i.e. is unique modulo package and module.
 fromName :: Name -> Possibly GUI
 fromName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
 fromName (Name (OccName occ) _) = failed occ

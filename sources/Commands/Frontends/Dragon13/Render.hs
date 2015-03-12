@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, ExistentialQuantification, NamedFieldPuns #-}
 module Commands.Frontends.Dragon13.Render where
-import Commands.Command.Types
+import Commands.Command.Types            ()
 import Commands.Etc
 import Commands.Frontends.Dragon13.Types
 import Commands.Grammar

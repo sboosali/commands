@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, GADTs, PackageImports, RankNTypes #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, PackageImports, RankNTypes #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
@@ -8,6 +8,8 @@ import Control.Alternative.Free.Tree
 
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
+import Data.Hashable                     (Hashable)
+import GHC.Generics                      (Generic)
 
 
 -- |
@@ -29,10 +31,12 @@ data Rule a = Rule !LHS (RHS a)
  deriving (Functor)
 
 -- |
--- type LHS = GUI
--- data LHS = LHS !Package !Module !Identifier deriving (Show, Eq, Ord)
-data LHS = LHS !GUI | LHSApp !LHS ![LHS]
- deriving (Show, Eq, Ord)
+data LHS
+ = LHS    !GUI                  -- ^ for tokens guaranteed unique by Haskell's name resolution modulo package
+ | LHSInt !Int                  -- ^ for tokens guaranteed unique by safe/monadic generation
+ | LHSApp !LHS ![LHS]           -- ^ for reifying @app@lication of higher-order 'Rule's like @multiple@
+ deriving (Show, Eq, Ord, Generic)
+instance Hashable LHS
 
 -- |
 --
@@ -43,7 +47,7 @@ type RHS = Alt Symbol
 type Symbol = Sum (Constant Word) Command
 
 -- |
-newtype Word = Word String
+newtype Word = Word { unWord :: String }
  deriving (Show, Eq, Ord)
 
 -- | exhaustive destructor.

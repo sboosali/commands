@@ -40,8 +40,8 @@ handleParse command s = do
 -- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Command's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
 --
 --
-defaultCommand :: forall a. (Typeable a, Enum a, Show a) => Command a
-defaultCommand = genericCommand
+enumCommand :: forall a. (Typeable a, Enum a, Show a) => Command a
+enumCommand = genericCommand
  (LHS . guiOf $ (Proxy :: Proxy a))
  (asum . fmap con $ constructors)
 

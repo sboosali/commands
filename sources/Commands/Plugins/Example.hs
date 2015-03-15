@@ -53,34 +53,89 @@ import           Text.PrettyPrint.Leijen.Text       hiding (empty, int, (<$>),
 -- import Data.Traversable (traverse)
 
 
+
+
 data Root
- = ReplaceWith Dictation Dictation
+ = Repeat Positive Root
+ | Edit Action Region
  | Undo
- | Repeat Positive Root
- | Dictated Dictation
+ | ReplaceWith Dictation Dictation
  | Click_ Click
+ | Dictated Dictation
  -- Roots [Root]
  deriving (Show,Eq)
 
 root :: Command Root
 root = 'root <=> empty
+ <|> Repeat      # positive & root
  <|> ReplaceWith # "replace" & dictation & "with" & dictation
  <|> Undo        # "no"         -- order matters..
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
- <|> Repeat      # positive & root
  <|> Dictated    # "say" & dictation
  <|> Click_      # click
+ <|> Edit        # action    & region
  -- <|> Roots       # (multipleC root)
+
+
+
+data Action = Copy | Delete | Next deriving (Show,Eq,Enum,Typeable)
+action = enumCommand
+
+data Region = Char | Word | Line deriving (Show,Eq,Enum,Typeable)
+region = enumCommand
+
+-- Action = Pick | Go |
+-- Region = Selection |
+-- Direction = Whole | Backwards | Forwards
+
+
+
+type Key = Char
+type Keyword = Word
+type Words = Dictation
+type Separator = String
+
+-- data Phrase
+--  deriving (Show)
+
+-- Escaped    "lit" Keyword Phrase        -- ^ "freezes" Phrase into a Word, isomorphic to @['Phrase']@
+-- Quoted     "quote" Words "unquote" Phrase  -- ^ "freezes" Phrase into Words
+-- Verbatim   "say" Words              -- ^ "freezes" Phrase into Words
+
+-- -- |  will tokens (i.e. Char) work wrt parsing/recognizing? sure, with optional whitespace before/after
+-- Pressed "press" [Key] Phrase -- this isn't a Phrase.. it's a Command
+-- Spelled "spell" [Char] Phrase  -- ^ manually instantiate NonEmpty, higher-kinded types not in grammar yet, isomorphic to @['Phrase']@
+-- Letter  Char Phrase  -- ^ isomorphic to @['Phrase']@
+-- Cap     "cap" Char Phrase -- ^ isomorphic to @['Phrase']@
+
+-- -- |
+-- -- whitespace or punctuation. un-parsable. Unless I prioritize it?
+-- -- no left recursion in parsec, causes bottom. Perform this static check On grammar.
+-- -- unless I consume a Word, and then recur? [Separated   Word Phrase Separator Phrase ]
+-- -- maybe I can encode the grouping in the right-recursive "modifying" nodes: [Case   Casing Phrase (Maybe Separator)] or both [Case   Casing Phrase] and [CaseSep   Casing Phrase Separator]
+-- Separated  Phrase Separator Phrase  --e.g. Space Phrase "space" Phrase
+-- --
+-- Case     Casing   Phrase
+-- Join     Joiner   Phrase
+-- Surround Brackets Phrase
+-- --
+-- Dictated Words  -- ^ the default
+
 
 data Click = Click Times Button deriving (Show,Eq)
 click :: Command Click
-click = 'click
- <=>  Click # (optionC Single) times & (optionC LeftButton) button & "click"
+click = 'click <=>
+ Click # optionalEnum times & optionalEnum button & "click"
+ -- type inference with the {&} sugar even works for:
+ --  Click # optionalEnum enumCommand & optionalEnum enumCommand & "click"
+ -- the terminal "click" makes the grammar "non-canonical" i.e.
+ --  where product types are merged with <*> (after "lifting" into RHS)
+ --  and sum types are merged with <|> (after "tagging" with the constructor)
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = defaultCommand :: Command Times
+times = enumCommand :: Command Times
 
-data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Typeable)
+data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button :: Command Button
 button = 'button
  <=> LeftButton   # "left"
@@ -100,37 +155,37 @@ dictation = specialCommand 'dictation
  (\context -> Dictation <$> anyBlack `manyUntil` context)
 
 
--- -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
--- data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
--- directions :: Command Directions
--- directions = 'directions <=> liftString "directions" &> (runPerms $ Directions
---  <$> atom (liftString "from" &> liftCommand dictation)
---  <&> atom (liftString "to"   &> liftCommand dictation)
---  <&> atom (liftString "by"   &> liftCommand dictation))
+-- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
+data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
+directions :: Command Directions
+directions = 'directions <=> "directions" &> (runPerms $ Directions
+ <$> atom ("from" &> dictation)
+ <*> atom ("to"   &> dictation)
+ <*> atom ("by"   &> dictation))
 
--- -- | context-free grammars (like from 'twig' or 'anyWord') can use 'rhsMaybe'
--- data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
--- directions_ :: Command Directions_
--- directions_ = 'directions_ <=> liftString "directions" &> (runPerms $ Directions_
---  <$> rhsMaybe (liftString "from" &> liftCommand place)
---  <&> rhsMaybe (liftString "to"   &> liftCommand place)
---  <&> rhsMaybe (liftString "by"   &> liftCommand transport))
+-- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtomR'
+data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
+directions_ :: Command Directions_
+directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
+ <$> maybeAtomR ("from" &> place)
+ <*> maybeAtomR ("to"   &> place)
+ <*> maybeAtomR ("by"   &> transport))
 
 -- data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
 -- directions__ :: Command Directions__
--- directions__ = 'directions__ <=> terminal "directions" &> (runPerms $ Directions__
---  <$> rhsMaybe (terminal "from" &> liftCommand dictation)
---  <&> rhsMaybe (terminal "to"   &> liftCommand dictation)
---  <&> rhsMaybe (terminal "by"   &> liftCommand dictation))
+-- directions__ = 'directions__ <=> "directions" &> (runPerms $ Directions__
+ -- <$> maybeAtomR ("from" &> dictation)
+ -- <*> maybeAtomR ("to"   &> dictation)
+ -- <*> maybeAtomR ("by"   &> dictation))
 
 
 newtype Place = Place String deriving (Show,Eq)
 place = 'place <=> Place # alias ["this","that","bike","here","there"]
 
 data Transport = Foot | Bike | Bus | Car | PublicTransit deriving (Show,Ord,Eq,Enum,Typeable)
-transport = defaultCommand
+transport = enumCommand
 
-exampleDirections =
+exampleDirections = fmap (unwords . words)
  [ "directions from here to there  by bike"
  , "directions from here by bike   to there"
  , "directions to there  from here by bike"
@@ -214,7 +269,7 @@ oneSecond = round (1e6 :: Double)
 attemptAsynchronously action = do
  (timeout oneSecond action) `withAsync` (waitCatch >=> \case
    Left error     -> print error
-   Right Nothing  -> putStrLn "."
+   Right Nothing  -> putStrLn "..."
    Right (Just _) -> return ()
   )
 
@@ -225,6 +280,8 @@ attemptParse command = attempt . handleParse command
 
 -- attemptSerialize (Command _ g _) = attempt $ either print print $ (serializeProduction (renderProduction g))
 attemptSerialize command = attempt $ either print T.putStrLn $ serialized command
+
+attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 
 
 main = do
@@ -262,10 +319,22 @@ main = do
 
  -- putStrLn ""
  -- attempt . print . renders $ root
+
+
+
+
+
+
+
+
+
+
  putStrLn ""
  attemptSerialize root -- timed out. fast after Commands.Commands.Sugar, I think. Theory: may be left associated tree is efficient, wall arbitrarily associated free alternatives is obscenely polynomial inefficient. But even for such a small grammar? May be non-left association causes non-termination?
  -- I don't think so: {<|> Repeat     <$> liftCommand positive <*> liftCommand root} still terminates in both the serialization in the parsing. Maybe because all the alternatives (or their children) were not left associated? I don't know
  -- See also: attemptParse (multipleC root) "no 1 replace this and that with that and this"
+
+
 
  putStrLn ""
  attemptParse positive "9"
@@ -288,21 +357,32 @@ main = do
  attemptParse click "single click"
  attemptParse click "click"
 
- -- putStrLn ""
- -- traverse_ (attemptParse directions_) exampleDirections
+ putStrLn ""
+ -- attemptParse phrase
+
+
+
+ putStrLn ""
+ attemptNameRHS ("from" &> place)
+ attemptNameRHS ("to" &> place)
+ attemptNameRHS ("by" &> transport)
+
+
+
+ putStrLn ""
+ attemptSerialize directions
+ putStrLn ""
+ traverse_ (attemptParse directions) exampleDirections
+ attemptParse directions "directions from Redwood City to San Francisco by public transit"
+
+ putStrLn ""
+ attemptSerialize directions_
+ putStrLn ""
+ traverse_ (attemptParse directions_) exampleDirections
 
  -- putStrLn ""
- -- traverse_ (attemptParse directions) exampleDirections
- -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
-
+ -- attemptSerialize directions__
  -- putStrLn ""
  -- traverse_ (attemptParse directions__) exampleDirections
-
- -- putStrLn ""
  -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City"
-
- -- putStrLn ""
- -- attemptSerialize directions_
- -- putStrLn ""
- -- attemptSerialize root
 

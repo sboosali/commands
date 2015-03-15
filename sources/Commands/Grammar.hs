@@ -2,7 +2,8 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving      #-}
 {-# LANGUAGE LambdaCase, NamedFieldPuns, RankNTypes, ScopedTypeVariables    #-}
-{-# LANGUAGE StandaloneDeriving, TypeFamilies, TypeOperators                #-}
+{-# LANGUAGE StandaloneDeriving, TemplateHaskell, TypeFamilies              #-}
+{-# LANGUAGE TypeOperators                                                  #-}
 -- |
 module Commands.Grammar where
 import Commands.Command.Types        ()
@@ -18,7 +19,6 @@ import Data.List                     (intercalate)
 import Data.Monoid                   ((<>))
 import Data.Typeable                 (Typeable)
 import Language.Haskell.TH.Syntax    (Name)
-import Numeric
 
 
 alias :: [String] -> RHS String
@@ -38,11 +38,31 @@ lhsOfType = LHS . guiOf
 
 -- |
 --
--- warning: partial function.
+-- warning: partial function:
+--
+-- * match fails on non-global 'Name's
 unsafeLHSFromName :: Name -> LHS
 unsafeLHSFromName name = LHS gui
  where Just gui = fromName name
 
+-- | output should be unique, for "simple" inputs.
+--
+-- warning: partial function:
+--
+-- * doesn't terminate on recursive 'RHS'
+-- * doesn't distinguish between different 'Pure's
+--
+-- TODO deracinate this abomination
+unsafeLHSFromRHS :: RHS x -> LHS
+unsafeLHSFromRHS rhs = unsafeLHSFromName 'unsafeLHSFromRHS `LHSApp` [LHSInt (unsafeHashRHS rhs)]
+ where
+ unsafeHashRHS :: RHS x -> Int
+ unsafeHashRHS (Pure _)     = hash "Pure"
+ unsafeHashRHS (Many rs)    = hash "Many" `hashWithSalt` fmap unsafeHashRHS rs
+ unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
+ unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
+ hashSymbol :: Symbol x -> Int
+ hashSymbol = symbol (hash . unWord) (hash . _lhs)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -54,7 +74,9 @@ unsafeLHSFromName name = LHS gui
 -- TODO for compactness, keep unique fully qualified identifier, but later render as unqualified identifier with possible compact unique suffix
 showLHS :: LHS -> String
 showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
- = occ <> "__" <> showHex (abs . hash $ pkg <> "__" <> mod <> "__" <> occ) ""
+ = intercalate "__" [occ, mod, pkg]
+ -- = occ <> "__" <> hashAlphanumeric (pkg <> "__" <> mod <> "__" <> occ)
+showLHS (LHSInt i) = hashAlphanumeric i
 showLHS (l `LHSApp` ls) = intercalate "___" (showLHS l : fmap showLHS ls)
 
 -- |

@@ -1,19 +1,22 @@
-{-# LANGUAGE ExistentialQuantification, RankNTypes #-}
+{-# LANGUAGE DeriveGeneric, ExistentialQuantification, RankNTypes #-}
 module Commands.Etc where
 import           Commands.Instances           ()
 import           Control.Applicative
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
+import           Data.Hashable
 import           Data.Monoid                  ((<>))
 import           Data.Text.Lazy               (Text)
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
                                                typeRepTyCon)
 import qualified Debug.Trace
+import           GHC.Generics                 (Generic)
 import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                NameFlavour (NameG),
                                                OccName (OccName),
                                                PkgName (PkgName))
+import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 
@@ -78,16 +81,28 @@ data Some f = forall x. Some (f x)
 -- >>> constructors :: [Bool]
 -- [False,True]
 --
+-- (Bounded Constraint elided for convenience; doesn't terminate on un@Bounded@ @Enum@erations)
+--
 constructors :: (Enum a) => [a]
 constructors = enumFrom (toEnum 0)
 
-newtype Package    = Package    String deriving (Show, Eq, Ord)
-newtype Module     = Module     String deriving (Show, Eq, Ord)
-newtype Identifier = Identifier String deriving (Show, Eq, Ord)
+-- | The first constructor of a (zero-based) Enum.
+--
+-- >>> enumDefault :: Bool
+-- False
+--
+-- (Bounded Constraint elided for convenience; doesn't terminate on un@Bounded@ @Enum@erations)
+--
+enumDefault :: (Enum a) => a
+enumDefault = toEnum 0
 
+newtype Package    = Package    String deriving (Show, Eq, Ord, Generic); instance Hashable Package
+newtype Module     = Module     String deriving (Show, Eq, Ord, Generic); instance Hashable Module
+newtype Identifier = Identifier String deriving (Show, Eq, Ord, Generic); instance Hashable Identifier
 
--- | should have four field: @Version@.
-data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord)
+-- | could have fourth field: @Version@.
+data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord, Generic)
+instance Hashable GUI
 
 display :: Doc -> Text
 display = displayT . renderPretty 1.0 80
@@ -118,4 +133,7 @@ guiOf
  = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t))
  . typeRepTyCon
  . typeRep
+
+hashAlphanumeric :: (Hashable a) => a -> String
+hashAlphanumeric = flip showHex "" . abs . hash
 

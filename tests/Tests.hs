@@ -36,5 +36,7 @@ main = do
   , "sources/Commands/Plugins/Example"
 
   , "sources/Control/Alternative/Free/Tree"
+  , "sources/Commands/Graph"
   ]
+
  tastytest

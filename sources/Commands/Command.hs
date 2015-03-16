@@ -74,17 +74,17 @@ enumCommand = genericCommand
 -- identifiers to be qualified (to avoid conflicts). e.g.:
 --
 -- >>> :set -XDeriveDataTypeable
--- >>> data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
+-- >>> data Button = LeftButton | ButtonMiddleButton | ButtonRight deriving (Show,Eq,Enum,Typeable)
 -- >>> let button = qualifiedCommand :: Command Button
 -- >>> getWords . _grammar $ button
 -- ["left","middle","right"]
 --
+-- (the qualification is exaggerated to show the filtering behavior:
+-- it's consistent in idiomatic declarations).
+--
 -- we didn't define @data Button = Left | Middle | Right@ because it
 -- conflicts with 'Either', but the derived grammar is identical.
 --
--- -- >>> data = deriving (Show,Eq,Enum,Typeable)
--- -- >>> let = qualifiedCommand :: Command
--- -- >>>
 --
 --
 --

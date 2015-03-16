@@ -56,7 +56,7 @@ lhsFromName name = do
 --
 -- TODO deracinate this abomination
 unsafeLHSFromRHS :: RHS x -> LHS
-unsafeLHSFromRHS rhs = lhs `LHSApp` [LHSInt (unsafeHashRHS rhs)]
+unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  where
  unsafeHashRHS :: RHS x -> Int
  unsafeHashRHS (Pure _)     = hash "Pure"
@@ -65,7 +65,6 @@ unsafeLHSFromRHS rhs = lhs `LHSApp` [LHSInt (unsafeHashRHS rhs)]
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: Symbol x -> Int
  hashSymbol = symbol (hash . unWord) (hash . _lhs)
- Just lhs = lhsFromName 'unsafeLHSFromRHS
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -79,8 +78,8 @@ showLHS :: LHS -> String
 showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
  = intercalate "__" [occ, mod, pkg]
  -- = occ <> "__" <> hashAlphanumeric (pkg <> "__" <> mod <> "__" <> occ)
-showLHS (LHSInt i) = hashAlphanumeric i
-showLHS (l `LHSApp` ls) = intercalate "___" (showLHS l : fmap showLHS ls)
+showLHS (LHSInt i) = "i_" <> hashAlphanumeric i
+showLHS (l `LHSApp` ls) = intercalate "____" (showLHS l : fmap showLHS ls)
 
 -- nameOfLHS :: LHS -> String
 -- nameOfLHS (LHS (GUI _ _ (Identifier occ))) = occ

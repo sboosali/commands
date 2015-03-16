@@ -81,6 +81,7 @@ library
 
   Commands.Plugins.Example
 
+  Commands.Graph
   Control.Alternative.Free.Tree
 
  -- modules included in this library, but not exported

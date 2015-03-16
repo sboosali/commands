@@ -69,14 +69,15 @@ unsafeDNSText = DNSText
 -- construction is a partial function
 escapeDNSName :: Text -> Possibly DNSName
 escapeDNSName s
- | isDNSName n = return . DNSName $ n
- | otherwise = failed $ "escapeDNSName " <> show s
+ | isDNSName n = return $ DNSName n
+ | otherwise   = failed $ "escapeDNSName " <> show s
  where n = T.replace "." "_" . T.replace "-" "_" $ s
 
 isDNSName :: Text -> Bool
 isDNSName s = T.all isAscii s && case T.uncons s of
  Nothing    -> False
- Just (c,s) -> isAlpha c && T.all ((||) <$> isAlphaNum <*> (=='_')) s
+ Just (c,s) -> ((||) <$> isAlpha <*> (=='_')) c
+            && T.all ((||) <$> isAlphaNum <*> (=='_')) s
 
 -- | Its output should be:
 --
@@ -104,8 +105,8 @@ isDNSName s = T.all isAscii s && case T.uncons s of
 --
 escapeDNSText :: Text -> Possibly DNSText
 escapeDNSText s
- | isDNSText s = return . DNSText $ s
- | otherwise = failed $ "escapeDNSText " <> show s
+ | isDNSText s = return $ DNSText s
+ | otherwise   = failed $ "escapeDNSText " <> show s
 
 isDNSText :: Text -> Bool
 isDNSText s

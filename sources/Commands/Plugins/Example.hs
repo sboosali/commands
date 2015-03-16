@@ -14,6 +14,7 @@ import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Graph
 import           Commands.Parse
 import           Commands.Parse.Types
 import           Commands.Parsec
@@ -384,3 +385,13 @@ main = do
 
  putStrLn ""
  print (getWords . _grammar $ button)
+
+ putStrLn ""
+ print $ cycles $
+  [ ("non recursive",        "N", [])
+  , ("self recursive",       "S", ["S"])
+  , ("mutually recursive A", "A", ["B"])
+  , ("mutually recursive B", "B", ["A","C"])
+  , ("mutually recursive C", "C", ["A","S","N"])
+  ]
+

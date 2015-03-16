@@ -9,6 +9,7 @@ import Control.Applicative
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
+import Data.Char           (toLower)
 import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
@@ -88,6 +89,11 @@ instance Bitraversable (DNSProduction e) where
  bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
  bitraverse f _ (DNSImport l)        = DNSImport     <$> traverse f l
 
+-- nameOfDNSProduction :: (Eq n) => DNSProduction e n t -> DNSLHS l n
+-- nameOfDNSProduction (DNSProduction l _) = l
+-- nameOfDNSProduction (DNSVocabulary l _) = l
+-- nameOfDNSProduction (DNSImport l)       = l
+
 upcastDNSProduction :: DNSProduction True n t -> DNSProduction e n t
 upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
 
@@ -98,7 +104,9 @@ upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
 -- 'Eq' instance is manual because a constructor ('DNSNonTerminal') is existentially-quantified.
 data DNSRHS n t
  = DNSTerminal (DNSToken t) -- ^ e.g. @"terminal"@
- | forall (l :: LHSKind). DNSNonTerminal (DNSLHS l n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
+ | forall l. DNSNonTerminal (DNSLHS l n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
+ -- SomeDNSLHS
+ -- | forall l. DNSNonTerminal (DNSLHS l n)
  | DNSSequence (NonEmpty (DNSRHS n t)) -- ^ e.g. @first second ...@
  | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
  | DNSOptional (DNSRHS n t) -- ^ e.g. @[optional]@
@@ -173,10 +181,15 @@ instance Traversable (DNSLHS l) where
  traverse f (DNSList n) = DNSList <$> f n
  traverse _ (DNSBuiltin x) = pure $ DNSBuiltin x
 
+data SomeDNSLHS n = forall l. SomeDNSLHS (DNSLHS l n)
+
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
 data DNSBuiltin = DGNDictation | DGNWords | DGNLetters
  deriving (Show, Eq, Ord, Enum)
+
+displayDNSBuiltin :: DNSBuiltin -> String
+displayDNSBuiltin = fmap toLower . show
 
 -- | the "leaves" of the grammar.
 data DNSToken t

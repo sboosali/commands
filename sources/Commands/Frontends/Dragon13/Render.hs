@@ -22,7 +22,7 @@ import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 -- |
 --
 -- TODO slow because 'nub' has quadratic-time, but fast because it's really 'nubBy' on a part ('DNSLHS'), not the whole.
-renderRule :: Rule x -> DNSGrammar String String
+renderRule :: Rule x -> DNSGrammar DNSCommandName String
 renderRule rule = DNSGrammar
  (renderProduction rule)
  (renderChildren rule)
@@ -30,7 +30,7 @@ renderRule rule = DNSGrammar
 -- |
 --
 -- 'RHS' instantiate @Alternative@, and so may be @empty@. but 'DNSProduction' take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ for empty 'RHS's (later optimized away).
-renderProduction :: Rule x -> DNSProduction e String String
+renderProduction :: Rule x -> DNSProduction e DNSCommandName String
 renderProduction (Rule l r) = DNSProduction lhs rhs
  where
  lhs = renderLHS l
@@ -40,32 +40,35 @@ renderLHS :: LHS -> DNSLHS LHSRule String
 renderLHS = DNSRule . showLHS
 
 -- |
-renderRHS :: RHS x -> NonEmpty (DNSRHS String String)
+renderRHS :: RHS x -> NonEmpty (DNSRHS DNSCommandName String)
 renderRHS r = case fromMaybe emptyList . renderRHS_ $ r of
  DNSAlternatives rs -> rs
  r -> r :| []
 
 -- |
-renderRHS_ :: RHS x -> Maybe (DNSRHS String String)
+renderRHS_ :: RHS x -> Maybe (DNSRHS DNSCommandName String)
 renderRHS_ (Pure _)     = Nothing
 renderRHS_ (Many rs)    = DNSAlternatives <$> (nonEmpty . mapMaybe renderRHS_ $ rs)
-renderRHS_ (fs `App` x) = DNSSequence <$> (nonEmpty . catMaybes $ [renderRHS_ fs, Just (renderSymbol x)])
-renderRHS_ (fs :<*> xs) = DNSSequence <$> (nonEmpty . catMaybes $ [renderRHS_ fs, renderRHS_ xs])
+renderRHS_ (fs `App` x) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS_ fs, Just (renderSymbol x)])
+renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS_ fs, renderRHS_ xs])
 
 -- |
-renderSymbol :: Symbol x -> DNSRHS String String
+renderSymbol :: Symbol x -> DNSRHS DNSCommandName String
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal $ DNSToken t)
  (\(Command {_grammar = DNSGrammar (DNSProduction lhs _) _}) -> DNSNonTerminal lhs)
 
 -- |
-emptyList :: DNSRHS String String
+emptyList :: DNSRHS DNSCommandName String
 emptyList = DNSNonTerminal $ DNSList "emptyList"
+
+-- emptyList :: DNSProduction False DNSCommandName String
+-- emptyList = DNSVocabulary (DNSNonTerminal $ DNSList "emptyList") []
 
 -- |
 --
 -- excludes the current 'Command', to terminate.
-renderChildren :: Rule x -> [DNSProduction False String String]
+renderChildren :: Rule x -> [DNSProduction False DNSCommandName String]
 renderChildren
  = nub
  . foldMap (\(Some (Command {_grammar = DNSGrammar p ps})) -> upcastDNSProduction p : ps)

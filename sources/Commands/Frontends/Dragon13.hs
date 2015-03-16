@@ -200,7 +200,8 @@ serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
 serializeLHS :: DNSLHS l DNSName -> Doc
 serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
 serializeLHS (DNSRule (DNSName s)) = "<" <> text s <> ">"
-serializeLHS (DNSBuiltin b)        = "<" <> (text . T.toLower . T.pack . show $ b) <> ">"
+serializeLHS (DNSBuiltin b)        = "<" <> text s <> ">"
+ where s = T.pack $ displayDNSBuiltin b
 
 -- | wraps tokens containing whitespace with 'dquotes'.
 --

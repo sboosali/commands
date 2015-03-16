@@ -91,6 +91,11 @@ library
 
     base          ==4.7.*
   , containers    ==0.5.*
+  , transformers  ==0.3.*
+  , transformers-compat  ==0.4.*
+  , mtl   ==2.1.*
+  , template-haskell ==2.9.*
+
   , exceptions    ==0.6.*
   , lens          ==4.7.*
   , bifunctors    ==4.2.*
@@ -101,15 +106,11 @@ library
   , text ==1.2.*
   , wl-pprint-text  ==1.1.*
   , language-python  ==0.4.*
-  , template-haskell ==2.9.*
   , async  ==2.0.*
   , parallel  ==3.2.*
   , action-permutations ==0.0.*
   , hashable ==1.2.*
-
-  , transformers  ==0.3.*
-  , transformers-compat  ==0.4.*
-  , mtl   ==2.1.*
+  , data-default-generics ==0.3.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

@@ -13,6 +13,7 @@ import Commands.Munging
 import Control.Alternative.Free.Tree
 
 import Control.Applicative
+import Data.Char
 import Data.Foldable                 (asum, foldMap)
 import Data.Hashable
 import Data.List                     (intercalate)
@@ -21,8 +22,11 @@ import Data.Typeable                 (Typeable)
 import Language.Haskell.TH.Syntax    (Name)
 
 
-alias :: [String] -> RHS String
-alias = asum . fmap str
+vocabulary :: [String] -> RHS String
+vocabulary = asum . fmap str
+
+str :: String -> RHS String
+str s = s <$ liftString s
 
 con :: (Show a) => a -> RHS a
 con c = c <$ (liftString . intercalate " " . unCamelCase . show) c
@@ -30,20 +34,18 @@ con c = c <$ (liftString . intercalate " " . unCamelCase . show) c
 int :: Int -> RHS Int
 int = con
 
-str :: String -> RHS String
-str s = s <$ liftString s
+-- |
+qualifiedCon :: (Show a) => String -> a -> RHS a
+qualifiedCon q c = c <$ (liftString . intercalate " " . filter (/= fmap toLower q) . unCamelCase . show) c
 
 lhsOfType :: (Typeable a) => proxy a -> LHS
 lhsOfType = LHS . guiOf
 
 -- |
---
--- warning: partial function:
---
--- * match fails on non-global 'Name's
-unsafeLHSFromName :: Name -> LHS
-unsafeLHSFromName name = LHS gui
- where Just gui = fromName name
+lhsFromName :: Name -> Possibly LHS
+lhsFromName name = do
+ gui <- fromName name
+ return $ LHS gui
 
 -- | output should be unique, for "simple" inputs.
 --
@@ -54,7 +56,7 @@ unsafeLHSFromName name = LHS gui
 --
 -- TODO deracinate this abomination
 unsafeLHSFromRHS :: RHS x -> LHS
-unsafeLHSFromRHS rhs = unsafeLHSFromName 'unsafeLHSFromRHS `LHSApp` [LHSInt (unsafeHashRHS rhs)]
+unsafeLHSFromRHS rhs = lhs `LHSApp` [LHSInt (unsafeHashRHS rhs)]
  where
  unsafeHashRHS :: RHS x -> Int
  unsafeHashRHS (Pure _)     = hash "Pure"
@@ -63,6 +65,7 @@ unsafeLHSFromRHS rhs = unsafeLHSFromName 'unsafeLHSFromRHS `LHSApp` [LHSInt (uns
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: Symbol x -> Int
  hashSymbol = symbol (hash . unWord) (hash . _lhs)
+ Just lhs = lhsFromName 'unsafeLHSFromRHS
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -78,6 +81,11 @@ showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
  -- = occ <> "__" <> hashAlphanumeric (pkg <> "__" <> mod <> "__" <> occ)
 showLHS (LHSInt i) = hashAlphanumeric i
 showLHS (l `LHSApp` ls) = intercalate "___" (showLHS l : fmap showLHS ls)
+
+-- nameOfLHS :: LHS -> String
+-- nameOfLHS (LHS (GUI _ _ (Identifier occ))) = occ
+-- nameOfLHS (LHSInt i)
+-- nameOfLHS (LHSApp f _)
 
 -- |
 --

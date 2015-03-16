@@ -137,11 +137,7 @@ times = enumCommand :: Command Times
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button :: Command Button
-button = 'button
- <=> LeftButton   # "left"
- <|> MiddleButton # "middle"
- <|> RightButton  # "right"
- -- TODO qualified enumeration qualifiedC. defaultC magically detects prefix or suffix qualification and elides the infix with qualifiedC? otherwise enumeratedC
+button = qualifiedCommand
 
 newtype Positive = Positive Int deriving (Show,Eq)
 positive :: Command Positive
@@ -180,9 +176,9 @@ directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
 
 
 newtype Place = Place String deriving (Show,Eq)
-place = 'place <=> Place # alias ["this","that","bike","here","there"]
+place = 'place <=> Place # vocabulary ["here","there"]
 
-data Transport = Foot | Bike | Bus | Car | PublicTransit deriving (Show,Ord,Eq,Enum,Typeable)
+data Transport = Foot | Bike | PublicTransit | Car deriving (Show,Ord,Eq,Enum,Typeable)
 transport = enumCommand
 
 exampleDirections = fmap (unwords . words)
@@ -364,8 +360,8 @@ main = do
 
  putStrLn ""
  attemptNameRHS ("from" &> place)
- attemptNameRHS ("to" &> place)
- attemptNameRHS ("by" &> transport)
+ attemptNameRHS ("to"   &> place)
+ attemptNameRHS ("by"   &> transport)
 
 
 
@@ -386,3 +382,5 @@ main = do
  -- traverse_ (attemptParse directions__) exampleDirections
  -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City"
 
+ putStrLn ""
+ print (getWords . _grammar $ button)

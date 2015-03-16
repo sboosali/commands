@@ -19,12 +19,21 @@ import GHC.Generics                      (Generic)
 -- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
 --
 data Command a = Command
- { _lhs     :: LHS
+ { _lhs     :: !LHS
  -- , _rule     :: Rule a
- , _grammar :: (DNSGrammar String String)
- , _parser  :: (Parser a)
+ , _grammar :: DNSGrammar DNSCommandName String
+ , _parser  :: Parser a
  }
  deriving (Functor)
+
+-- | 'String' because user-facing "config" modules (e.g.
+-- "Commands.Plugins.Example") can't use:
+--
+-- * both OverloadedStrings
+-- * and type class sugar
+--
+--
+type DNSCommandName = String -- LHS
 
 -- |
 data Rule a = Rule !LHS (RHS a)
@@ -41,6 +50,16 @@ instance Hashable LHS
 -- |
 --
 -- (see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors> for background).
+--
+-- 'RHS's must never be recursively defined, only 'Command's can be
+-- recursively defined. 'Command's are like 'RHS's tagged with unique
+-- 'LHS's, providing a token to keep track of during evaluation
+-- (like "searching a graph").
+-- Some functions on 'RHS's assume non-recursive 'RHS's, just
+-- like @('length' :: [a] -> Int)@ assumes non-recursive @[a]@.
+-- ("data not codata"?)
+--
+--
 type RHS = Alt Symbol
 
 -- |

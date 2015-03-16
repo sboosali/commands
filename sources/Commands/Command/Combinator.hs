@@ -31,7 +31,8 @@ multipleC Command{_lhs,_grammar,_parser} = Command
  -- (\context -> _parser (Some parserUnit) `manyUntil` context) -- assumes _parser is context free
  (\context -> _parser context `manyUntil` context)
  where
- lhs = unsafeLHSFromName 'multipleC `LHSApp` [_lhs]
+ lhs = l `LHSApp` [_lhs]
+ Just l = lhsFromName 'multipleC
 
 multipleDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
 multipleDNSGrammar name (DNSGrammar production productions) = DNSGrammar
@@ -50,9 +51,10 @@ unsafeFellRHS rhs = genericCommand (unsafeLHSFromRHS rhs) rhs
 maybeAtomC :: Command a -> Perms RHS (Maybe a)
 maybeAtomC Command{_lhs,_grammar,_parser} = (maybeAtom . liftCommand) $ Command lhs grammar parser
  where
- lhs     = unsafeLHSFromName 'maybeAtomC `LHSApp` [_lhs]
+ lhs     = l `LHSApp` [_lhs]
  grammar = (optionalDNSGrammar (showLHS lhs) _grammar)
  parser  = _parser
+ Just l = lhsFromName 'maybeAtomC
  -- = optAtom Nothing . liftCommand . optionalC
 
 
@@ -65,14 +67,16 @@ optionC theDefault Command{_lhs,_grammar,_parser} = Command
  (optionalDNSGrammar (showLHS lhs) _grammar)
  (\context -> Parsec.option theDefault $ _parser context)
  where
- lhs = unsafeLHSFromName 'optionC `LHSApp` [_lhs]
+ lhs = l `LHSApp` [_lhs]
+ Just l = lhsFromName 'optionC
 
 optionalC :: Command a -> Command (Maybe a)
 optionalC Command{_lhs,_grammar,_parser} = Command lhs grammar parser
  where
- lhs     = unsafeLHSFromName 'optionalC `LHSApp` [_lhs]
+ lhs     = l `LHSApp` [_lhs]
  grammar = (optionalDNSGrammar (showLHS lhs) _grammar)
  parser  = (\context -> Parsec.optionMaybe $ _parser context)
+ Just l  = lhsFromName 'optionalC
 
 optionalDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
 optionalDNSGrammar name (DNSGrammar production productions) = DNSGrammar

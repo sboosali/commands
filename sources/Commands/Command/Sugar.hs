@@ -24,7 +24,7 @@ infixl 4 &
 (<=>) :: Name -> RHS a -> Command a
 name <=> r = genericCommand l r
  where
- l = unsafeLHSFromName name
+ Just l = lhsFromName name
 
 
 

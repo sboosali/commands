@@ -32,8 +32,9 @@ instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction False n t) where
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSRHS n t) where
  arbitrary = oneof
   [ DNSTerminal     <$> arbitrary
-  , DNSNonTerminal  <$> (arbitrary :: Gen (DNSLHS LHSList n)) -- avoids @OverlappingInstances@
-  , DNSNonTerminal  <$> (arbitrary :: Gen (DNSLHS LHSRule n))
+
+  , (DNSNonTerminal . SomeDNSLHS) <$> (arbitrary :: Gen (DNSLHS LHSList n)) -- avoids @OverlappingInstances@
+  , (DNSNonTerminal . SomeDNSLHS) <$> (arbitrary :: Gen (DNSLHS LHSRule n))
 
   , DNSOptional     <$> resized 2 arbitrary
   , DNSMultiple     <$> resized 2 arbitrary

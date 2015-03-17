@@ -56,11 +56,11 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 renderSymbol :: Symbol x -> DNSRHS DNSCommandName String
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal $ DNSToken t)
- (\(Command {_grammar = DNSGrammar (DNSProduction lhs _) _}) -> DNSNonTerminal lhs)
+ (\(Command {_grammar = DNSGrammar (DNSProduction lhs _) _}) -> DNSNonTerminal (SomeDNSLHS lhs))
 
 -- |
 emptyList :: DNSRHS DNSCommandName String
-emptyList = DNSNonTerminal $ DNSList "emptyList"
+emptyList = DNSNonTerminal $ SomeDNSLHS $ DNSList "emptyList"
 
 -- emptyList :: DNSProduction False DNSCommandName String
 -- emptyList = DNSVocabulary (DNSNonTerminal $ DNSList "emptyList") []

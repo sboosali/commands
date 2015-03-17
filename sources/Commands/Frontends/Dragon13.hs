@@ -38,9 +38,9 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 >>> :{
 let root = DNSProduction (DNSRule "root")
             [ DNSSequence
-              [ DNSNonTerminal (DNSList "command")
-              , DNSNonTerminal (DNSRule "subcommand")
-              , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
+              [                           DNSNonTerminal (SomeDNSLHS (DNSList "command"))
+              ,                           DNSNonTerminal (SomeDNSLHS (DNSRule "subcommand"))
+              , DNSOptional (DNSMultiple (DNSNonTerminal (SomeDNSLHS (DNSList "flag"))))
               ]
             , DNSTerminal (DNSToken "ls")
             ]
@@ -55,8 +55,8 @@ let root = DNSProduction (DNSRule "root")
                       , DNSToken "rm"
                       ]
     subcommand = DNSProduction (DNSRule "subcommand")
-                       [ DNSTerminal (DNSToken "status")
-                       , DNSNonTerminal (DNSBuiltin DGNDictation)
+                       [ DNSTerminal    (DNSToken "status")
+                       , DNSNonTerminal (SomeDNSLHS (DNSBuiltin DGNDictation))
                        ]
     Right grammar = escapeDNSGrammar (DNSGrammar root [command, subcommand, flag])
 :}
@@ -173,19 +173,27 @@ serializeProduction (DNSImport l) = return $
 serializeProduction DNSVocabulary{} = failed "serializeProduction"
 -- serializeProduction DNSVocabulary{} = mempty -- not identity to vertical alignment
 
--- |
---
--- >>> serializeRHS $ DNSAlternatives [DNSSequence [DNSTerminal (DNSToken (DNSText "hello")), DNSTerminal (DNSToken (DNSText "world"))], DNSOptional (DNSMultiple (DNSNonTerminal (DNSRule (DNSName "word")))) ]
--- ("hello" "world" | [(<word>)+])
---
---
+{- |
+
+>>> :{
+serializeRHS $ DNSAlternatives
+ [ DNSSequence
+   [ DNSTerminal (DNSToken (DNSText "hello"))
+   , DNSTerminal (DNSToken (DNSText "world"))
+   ]
+ , DNSOptional (DNSMultiple (DNSNonTerminal (SomeDNSLHS (DNSRule (DNSName "word")))))
+ ]
+:}
+("hello" "world" | [(<word>)+])
+
+-}
 serializeRHS :: DNSRHS DNSName DNSText -> Doc
 serializeRHS (DNSTerminal t)      = serializeToken t
-serializeRHS (DNSNonTerminal l)   = serializeLHS l
-serializeRHS (DNSSequence (toList -> rs))     = align . fillSep . fmap serializeRHS $ rs
-serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . fmap serializeRHS $ rs) <> ")"
+serializeRHS (DNSNonTerminal (SomeDNSLHS l))   = serializeLHS l
 serializeRHS (DNSOptional r)      = "[" <> serializeRHS r <> "]"
 serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
+serializeRHS (DNSSequence     (toList -> rs)) = align . fillSep . fmap serializeRHS $ rs
+serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . fmap serializeRHS $ rs) <> ")"
 
 -- |
 --
@@ -338,5 +346,5 @@ getWords :: (Eq t) => DNSGrammar n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
 
 hoistDNSRHS :: (DNSRHS n t -> DNSRHS n t) -> DNSProduction True n t -> NonEmpty (DNSRHS n t)
-hoistDNSRHS f (DNSProduction l _) = f (DNSNonTerminal l) :| []
+hoistDNSRHS f (DNSProduction l _) = f (DNSNonTerminal (SomeDNSLHS l)) :| []
 

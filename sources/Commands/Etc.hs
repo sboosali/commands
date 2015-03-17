@@ -1,6 +1,9 @@
-{-# LANGUAGE DeriveGeneric, ExistentialQuantification, RankNTypes #-}
+{-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts #-}
+{-# LANGUAGE RankNTypes                                                 #-}
+-- {-# LANGUAGE GADTs, PolyKinds, KindSignatures #-}
 module Commands.Etc where
 import           Commands.Instances           ()
+
 import           Control.Applicative
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
@@ -18,6 +21,8 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                PkgName (PkgName))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+-- import Data.Traversable
+-- import Data.Foldable
 
 
 -- | generalized 'Maybe':
@@ -70,11 +75,6 @@ fromName (Name (OccName occ) _) = failed occ
 -- "package-Module.SubModule.identifier"
 showGUI :: GUI -> String
 showGUI (GUI (Package pkg) (Module mod) (Identifier occ)) = pkg <> "-" <> mod <> "." <> occ
-
--- | existentially-quantify any unary type-constructor
---
---
-data Some f = forall x. Some (f x)
 
 -- | The constructors of a (zero-based) Enum.
 --
@@ -137,3 +137,52 @@ guiOf
 hashAlphanumeric :: (Hashable a) => a -> String
 hashAlphanumeric = flip showHex "" . abs . hash
 
+-- | existentially-quantify any unary type-constructor
+--
+-- >>> :t Some Nothing
+-- Some Nothing :: Some Maybe
+--
+-- >>> case Some [] of Some xs -> length xs
+-- 0
+--
+data Some f = forall x. Some (f x)
+
+{- | existentially-quantify the first type-argument of any binary type-constructor
+
+>>> :t Some2 (Right True)
+Some2 (Right True) :: Some2 Either Bool
+
+>>> :{
+case Some2 (Right True) of
+ Some2 (Left {}) -> False
+ Some2 (Right b) -> b
+:}
+True
+
+>>> :t Some (Some2 (Right ()))
+Some (Some2 (Right ())) :: Some (Some2 Either)
+
+>>> :{
+case Some (Some2 (Right ())) of
+ Some (Some2 (Left  {})) -> "Left"
+ Some (Some2 (Right {})) -> "Right"
+:}
+"Right"
+
+-}
+data Some2 f y = forall x. Some2 (f x y)
+
+-- instance (Show (f x y)) => Show (Some2 f y) where show (Some2 x) = "Some2 (" <> show x <> ")"
+-- instance Functor     (f x) => Functor     (Some2 f) where fmap     = fmapDefault
+-- instance Foldable    (f x) => Foldable    (Some2 f) where foldMap  = foldMapDefault
+-- instance Traversable (f x) => Traversable (Some2 f) where traverse f (Some2 x) = Some2 <$> traverse f x
+
+
+-- -- | existentially-quantify any (non-nullary) type-constructor
+-- --
+-- --
+-- data Some' (f :: * -> k) where
+ -- Some1 :: [a]           -> Some []
+ -- Some2 :: Either a b    -> Some Either b
+ -- Some2 :: Compose f g a -> Some Compose g a
+ -- SomeN :: ?

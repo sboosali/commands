@@ -14,7 +14,6 @@ import Data.List                         (nub, nubBy)
 import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 
-
 -- import           Data.Text.Lazy                    (Text)
 -- import qualified Data.Text.Lazy                    as T
 

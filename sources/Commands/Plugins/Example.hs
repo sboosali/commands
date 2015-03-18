@@ -38,8 +38,8 @@ import           Language.Python.Common.AST         (Expr (Dictionary, Strings))
 import           Language.Python.Version2.Parser    (parseExpr, parseModule)
 import           Prelude                            hiding (foldr)
 import           System.Timeout                     (timeout)
-import           Text.PrettyPrint.Leijen.Text       hiding (empty, int, (<$>),
-                                                     (<>))
+import           Text.PrettyPrint.Leijen.Text       hiding (brackets, empty,
+                                                     int, (<$>), (<>))
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -121,6 +121,23 @@ type Separator = String
 -- Surround Brackets Phrase
 -- --
 -- Dictated Words  -- ^ the default
+
+data Joiner = Camel | Class | Snake | Dash | File | Squeeze deriving (Show,Eq,Ord,Enum,Typeable)
+data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
+-- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
+
+data Brackets = Brackets String String | Bracket Char deriving (Show,Eq,Ord,Typeable)
+brackets = 'brackets
+ <=> Bracket # "round" & character
+ <|> Brackets "(" ")" # "par"
+ <|> Brackets "[" "]" # "square"
+ <|> Brackets "{" "}" # "curl"
+ <|> Brackets "<" ">" # "angles"
+ <|> Bracket '"' # "string"
+ <|> Bracket '|' # "norm"
+
+character :: Command Char
+character = 'character <=> undefined
 
 
 data Click = Click Times Button deriving (Show,Eq)

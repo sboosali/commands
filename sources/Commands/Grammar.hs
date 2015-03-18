@@ -28,6 +28,9 @@ vocabulary = asum . fmap str
 str :: String -> RHS String
 str s = s <$ liftString s
 
+chr :: Char -> RHS Char
+chr c = c <$ liftString [c]
+
 con :: (Show a) => a -> RHS a
 con c = c <$ (liftString . intercalate " " . unCamelCase . show) c
 

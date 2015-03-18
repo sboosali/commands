@@ -27,22 +27,22 @@ module Commands
  , module Control.Alternative.Free.Tree
  ) where
 
-import Commands.Etc
-import Commands.Instances ()
 import Commands.Command.Combinator
 import Commands.Command.Sugar
+import Commands.Etc
+import Commands.Instances                   ()
 -- import Commands.Command.Types
 import Commands.Command
+import Commands.Frontends.Dragon13
 import Commands.Frontends.Dragon13.Optimize
 import Commands.Frontends.Dragon13.Render
 import Commands.Frontends.Dragon13.Text
 import Commands.Frontends.Dragon13.Types
-import Commands.Frontends.Dragon13
-import Commands.Grammar.Types
 import Commands.Grammar
+import Commands.Grammar.Types
 import Commands.Graph
 import Commands.Munging
-import Commands.Parse.Types
 import Commands.Parse
-import Commands.Parsec hiding (optional,lower,runParser)
-import Control.Alternative.Free.Tree hiding  (Empty)
+import Commands.Parse.Types
+import Commands.Parsec                      hiding (lower, optional, runParser)
+import Control.Alternative.Free.Tree        hiding (Empty)

@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, PackageImports, RankNTypes #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, PackageImports #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                         #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
@@ -6,10 +7,12 @@ import Commands.Frontends.Dragon13.Types
 import Commands.Parse.Types
 import Control.Alternative.Free.Tree
 
+import Control.Lens
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
 import Data.Hashable                     (Hashable)
 import GHC.Generics                      (Generic)
+import Numeric.Natural                   (Natural)
 
 
 -- |
@@ -33,7 +36,9 @@ data Command a = Command
 -- * and type class sugar
 --
 --
-type DNSCommandName = String -- LHS
+type DNSCommandName = String -- DNSMetaName
+
+
 
 -- |
 data Rule a = Rule !LHS (RHS a)
@@ -89,3 +94,38 @@ liftCommand = lift . fromCommand
 
 liftString :: String -> RHS a
 liftString = lift . fromWord . Word
+
+
+
+-- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
+--
+--
+data DNSInfo = DNSInfo
+ { _dnsExpand :: Natural -- ^ how many times to expand a recursive 'DNSProduction'
+ , _dnsInline :: Bool    -- ^ whether or not to inline a 'DNSProduction'
+ }
+
+makeLenses ''DNSInfo
+
+-- | no expansion and no inlining.
+defaultDNSInfo :: DNSInfo
+defaultDNSInfo = DNSInfo 0 False
+
+-- | a name, with metadata:
+--
+-- * the 'Natural' tracks which expansion (of the expanded recursive
+-- one) its 'DNSProduction' is.
+--
+--
+-- TODO lenses
+data DNSMetaName = DNSMetaName
+ { _dnsMetaInfo       :: DNSInfo
+ , _dnsMetaExpansions :: Maybe Natural
+ , _dnsMetaLHS        :: LHS
+ }
+
+makeLenses ''DNSMetaName
+
+-- | yet un-expanded
+defaultDNSMetaName :: LHS -> DNSMetaName
+defaultDNSMetaName = DNSMetaName defaultDNSInfo Nothing

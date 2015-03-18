@@ -25,6 +25,7 @@ main = do
   , "sources/Commands/Frontends/Dragon13/Types"
   , "sources/Commands/Frontends/Dragon13/Text"
   , "sources/Commands/Frontends/Dragon13/Render"
+  , "sources/Commands/Frontends/Dragon13/Optimize"
 
   , "sources/Commands/Command"
   , "sources/Commands/Command/Types"

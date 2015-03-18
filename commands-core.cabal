@@ -57,6 +57,8 @@ library
 
  -- modules exported by the library
  exposed-modules:
+  Commands
+
   Commands.Etc
   Commands.Instances
 
@@ -71,6 +73,7 @@ library
   Commands.Frontends.Dragon13.Types
   Commands.Frontends.Dragon13.Text
   Commands.Frontends.Dragon13.Render
+  Commands.Frontends.Dragon13.Optimize
 
   Commands.Command
   Commands.Command.Types
@@ -98,7 +101,7 @@ library
   , template-haskell ==2.9.*
 
   , exceptions    ==0.6.*
-  , lens          ==4.7.*
+  , lens          ==4.8.*
   , bifunctors    ==4.2.*
   , parsec        ==3.1.*
   , split         ==0.2.*
@@ -112,6 +115,7 @@ library
   , action-permutations ==0.0.*
   , hashable ==1.2.*
   , data-default-generics ==0.3.*
+  , nats
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

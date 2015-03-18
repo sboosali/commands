@@ -32,9 +32,10 @@ multipleC Command{_lhs,_grammar,_parser} = Command
 
 -- |
 multipleDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
-multipleDNSGrammar name (DNSGrammar production productions) = DNSGrammar
- (DNSProduction (DNSRule name) (hoistDNSRHS DNSMultiple production))
- (upcastDNSProduction production : productions)
+multipleDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
+ (DNSProduction (DNSRule name) (hoistDNSRHS DNSMultiple _dnsExport))
+ _dnsImports
+ (upcastDNSProduction _dnsExport : _dnsProductions)
 
 
 
@@ -67,9 +68,10 @@ optionalC Command{_lhs,_grammar,_parser} = Command lhs grammar parser
 
 -- |
 optionalDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
-optionalDNSGrammar name (DNSGrammar production productions) = DNSGrammar
- (DNSProduction (DNSRule name) (hoistDNSRHS DNSOptional production))
- (upcastDNSProduction production : productions)
+optionalDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
+ (DNSProduction (DNSRule name) (hoistDNSRHS DNSOptional _dnsExport))
+ _dnsImports
+ (upcastDNSProduction _dnsExport : _dnsProductions)
 
 
 

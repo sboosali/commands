@@ -17,15 +17,13 @@ import           Test.QuickCheck
 
 
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSGrammar n t) where
- arbitrary = DNSGrammar <$> arbitrary <*> resized 2 arbitrary
+ arbitrary = DNSGrammar <$> arbitrary <*> pure [] <*> resized 2 arbitrary -- TODO  pure []
 
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction True n t) where
  arbitrary = DNSProduction <$> arbitrary <*> resized 2 arbitrary
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction False n t) where
  arbitrary = oneof
-  [ DNSImport     <$> arbitrary
-
-  , DNSProduction <$> arbitrary <*> resized 2 arbitrary
+  [ DNSProduction <$> arbitrary <*> resized 2 arbitrary
   , DNSVocabulary <$> arbitrary <*> resized 2 arbitrary
   ]
 

@@ -24,6 +24,7 @@ import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 renderRule :: Rule x -> DNSGrammar DNSCommandName String
 renderRule rule = DNSGrammar
  (renderProduction rule)
+ []
  (renderChildren rule)
 
 -- |
@@ -55,7 +56,7 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 renderSymbol :: Symbol x -> DNSRHS DNSCommandName String
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal $ DNSToken t)
- (\(Command {_grammar = DNSGrammar (DNSProduction lhs _) _}) -> DNSNonTerminal (SomeDNSLHS lhs))
+ (\(Command {_grammar = DNSGrammar {_dnsExport = DNSProduction lhs _}}) -> DNSNonTerminal (SomeDNSLHS lhs))
 
 -- |
 emptyList :: DNSRHS DNSCommandName String
@@ -70,7 +71,7 @@ emptyList = DNSNonTerminal $ SomeDNSLHS $ DNSList "emptyList"
 renderChildren :: Rule x -> [DNSProduction False DNSCommandName String]
 renderChildren
  = nub
- . foldMap (\(Some (Command {_grammar = DNSGrammar p ps})) -> upcastDNSProduction p : ps)
+ . foldMap (\(Some (Command {_grammar = DNSGrammar p _ ps})) -> upcastDNSProduction p : ps)
  . nubBy ((==) `on` theLHS)
  . getChildren
  where

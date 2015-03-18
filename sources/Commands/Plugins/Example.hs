@@ -165,7 +165,7 @@ positive = 'positive
 newtype Dictation = Dictation [String] deriving (Show,Eq)
 dictation :: Command Dictation
 dictation = specialCommand 'dictation
- (DNSGrammar (DNSProduction (DNSRule "dictation") (DNSNonTerminal (SomeDNSLHS (DNSBuiltin DGNDictation)) :| [])) [])
+ (DNSGrammar (DNSProduction (DNSRule "dictation") (DNSNonTerminal (SomeDNSLHS (DNSBuiltin DGNDictation)) :| [])) [] [])
  (\context -> Dictation <$> anyBlack `manyUntil` context)
 
 

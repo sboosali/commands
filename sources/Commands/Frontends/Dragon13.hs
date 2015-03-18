@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, OverloadedStrings, PatternSynonyms #-}
-{-# LANGUAGE RankNTypes, ViewPatterns                             #-}
+{-# LANGUAGE RankNTypes, ViewPatterns, NamedFieldPuns                            #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 -- | Uses pretty printer combinators for readability of serialization.
 --
@@ -27,6 +27,7 @@ import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
 import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
+import Control.Lens
 
 
 {- $setup
@@ -56,7 +57,7 @@ let root = DNSProduction (DNSRule "root")
                        [ DNSTerminal    (DNSToken "status")
                        , DNSNonTerminal (SomeDNSLHS (DNSBuiltin DGNDictation))
                        ]
-    Right grammar = escapeDNSGrammar (DNSGrammar root [command, subcommand, flag])
+    Right grammar = escapeDNSGrammar (DNSGrammar root [] [command, subcommand, flag])
 :}
 
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
@@ -103,15 +104,19 @@ serialize = isPythonFile
 --
 -- as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long grammars. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
 --
+-- ('DNSImport's don't need to be at the start of the grammar or even above the production that uses it. but it looks nice)
+--
 serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
 serializeGrammar grammar = grammar_
  where
  grammar_ = vsep $ punctuate "\n"
   [ "_commands_rules_ =" <+> "'''"
+  , imports_
   , rules_
   , "'''"
   , "_commands_lists_ =" <+> lists_
   ]
+ imports_ = serializeImports (dnsHeader <> grammar ^. dnsImports)
  rules_ = serializeRules grammar
  lists_ = serializeLists grammar
 
@@ -121,15 +126,14 @@ serializeGrammar grammar = grammar_
 --
 --
 serializeRules :: DNSGrammar DNSName DNSText -> Doc
-serializeRules (DNSGrammar export productions) = serializeImports dnsHeader <> line
- <$$>
- ( cat
+serializeRules (DNSGrammar{_dnsExport,_dnsProductions})
+ = cat
  . punctuate "\n"
- . (serializeExport export :)
+ . (serializeExport _dnsExport :)
  . concatMap serializeProduction
- $ productions)
+ $ _dnsProductions
 
--- | like 'serializeProduction', but only inserts one newline between imports, not
+-- | not unlike 'serializeProduction', but only inserts one newline between imports, not
 -- two as between productions, for readability.
 --
 -- >>> serializeImports dnsHeader
@@ -137,8 +141,8 @@ serializeRules (DNSGrammar export productions) = serializeImports dnsHeader <> l
 -- <dgnwords> imported;
 -- <dgnletters> imported;
 --
-serializeImports :: [DNSProduction False DNSName DNSText] -> Doc
-serializeImports = vsep . mapMaybe serializeProduction
+serializeImports :: [DNSImport DNSName] -> Doc
+serializeImports = vsep . fmap (\l ->serializeLHS l <+> "imported" <> ";")
 
 -- | like @'serializeProduction' ('DNSProduction' ...)@, only
 -- it inserts @"exported"@.
@@ -154,20 +158,14 @@ serializeExport (DNSProduction l (toList -> rs)) =
 --
 -- >>> serializeProduction $ DNSProduction (DNSRule (DNSName "rule")) [DNSTerminal (DNSToken (DNSText "hello"))]
 -- <rule>  = "hello";
--- >>> serializeProduction $ DNSImport (DNSRule (DNSName "rule"))
--- <rule> imported;
 -- >>> serializeProduction $ DNSVocabulary undefined undefined :: Maybe Doc
 -- Nothing
---
--- 'DNSImport's don't need to be at the start of the grammar or even above the production that uses it.
 --
 -- see 'serializeVocabulary' for the 'DNSVocabulary' case.
 --
 serializeProduction :: DNSProduction False DNSName DNSText -> Possibly Doc
 serializeProduction (DNSProduction l (toList -> rs)) = return $
  serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
-serializeProduction (DNSImport l) = return $
- serializeLHS l <+> "imported" <> ";"
 serializeProduction DNSVocabulary{} = failed "serializeProduction"
 -- serializeProduction DNSVocabulary{} = mempty -- not identity to vertical alignment
 
@@ -223,8 +221,8 @@ serializeToken :: DNSToken DNSText -> Doc
 serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
-dnsHeader :: [DNSProduction False name token]
-dnsHeader = fmap (DNSImport . DNSBuiltin) constructors
+dnsHeader :: [DNSImport DNSName]
+dnsHeader = fmap DNSBuiltin constructors
 
 -- | serialize the 'DNSList's that were ignored by 'serializeRules'.
 --

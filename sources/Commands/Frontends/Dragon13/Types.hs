@@ -9,7 +9,6 @@ import Commands.Instances  ()
 import Control.Applicative
 import Control.Lens
 import Data.Bifoldable
-import Data.Bifunctor
 import Data.Bitraversable
 import Data.Char           (toLower)
 import Data.Foldable
@@ -157,7 +156,6 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
 -- * @"\<rule> = ...;"@ has type @'DNSProduction' 'False'@
 -- * @"\<rule> exported = ...;"@ has type @'DNSProduction' 'True'@
 -- * @"self.setList('list', [...])"@ is a 'DNSVocabulary'
--- * @"\<rule> imported;"@ is a 'DNSImport'
 --
 -- a @GADT@ to constrain the exportability and the right-hand sides of
 -- its constructors.
@@ -170,7 +168,6 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
 data DNSProduction (e :: Bool) n t where
  DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
- DNSImport     :: DNSLHS LHSRule n                          -> DNSProduction False n x
 
 -- makePrisms ''DNSProduction
 
@@ -190,7 +187,6 @@ instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSProduction e) where
  bitraverse f g (DNSProduction l rs) = DNSProduction <$> traverse f l <*> traverse (bitraverse f g) rs
  bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
- bitraverse f _ (DNSImport l)        = DNSImport     <$> traverse f l
 
 -- nameOfDNSProduction :: DNSProduction e n t -> SomeDNSLHS n
 -- nameOfDNSProduction (DNSProduction l _) = SomeDNSLHS l
@@ -204,7 +200,6 @@ dnsProductionName :: Getter (DNSProduction e n t) (Maybe n)
 dnsProductionName = to $ \case
  DNSProduction l _ -> l ^. dnsLHSName
  DNSVocabulary l _ -> l ^. dnsLHSName
- (DNSImport l) -> l ^. dnsLHSName
 
 dnsProductionNonTerminals :: Traversal' (DNSProduction e n t) (SomeDNSLHS n)
 dnsProductionNonTerminals = undefined
@@ -218,6 +213,8 @@ dnsProductionNonTerminals = undefined
 -- _DNSProductionRHS =
 
 -- ================================================================ --
+
+type DNSImport n = DNSLHS LHSRule n
 
 -- | a Dragon NaturallySpeaking (\"DNS") grammar has
 -- one or more 'DNSProduction's, exactly one of which is an export.
@@ -236,6 +233,7 @@ dnsProductionNonTerminals = undefined
 --
 data DNSGrammar n t = DNSGrammar
  { _dnsExport      :: DNSProduction True n t
+ , _dnsImports     :: [DNSImport n]
  , _dnsProductions :: [DNSProduction False n t]
  }
  deriving (Show, Eq)
@@ -245,6 +243,7 @@ makeLenses ''DNSGrammar
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
 instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
 instance Bitraversable DNSGrammar where -- valid Bitraversable?
- bitraverse f g (DNSGrammar production productions) =
-  DNSGrammar <$> bitraverse f g production
-             <*> traverse (bitraverse f g) productions
+ bitraverse f g (DNSGrammar export imports productions) = DNSGrammar
+  <$> bitraverse f g export
+  <*> traverse (traverse f) imports
+  <*> traverse (bitraverse f g) productions

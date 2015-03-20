@@ -14,7 +14,6 @@ import Data.Char           (toLower)
 import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
-import GHC.Exts            (IsString (..))
 import Prelude             hiding (mapM)
 
 
@@ -77,7 +76,7 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
 --
 -- a @GADT@ to constrain the exportability and the right-hand sides of
 -- its constructors.
--- you can import and export only 'DNSRule's (including 'DNSBuiltin's),
+-- you can import and export only 'DNSRule's (including 'DNSBuiltinRule's),
 -- not 'DNSList's. a 'DNSVocabulary' can be named only by 'LHSList's, as
 -- a 'DNSProduction' can be named only by 'LHSRule's.
 --
@@ -160,17 +159,30 @@ instance Plated (DNSRHS n t) where
  plate f (DNSAlternatives rs) = DNSAlternatives <$> traverse f rs
  plate _ r = pure r
 
--- | @emptyDNSRHS = DNSNonTerminal (SomeDNSLHS 'dnsEmptyList')@
+-- | @emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList'))@
 --
 -- can be used as:
 --
 -- * identity to 'DNSAlternatives'
 -- * annihilator to 'DNSSequence'
 --
--- ("verified" by "experimenting" with Dragon NaturallySpeaking)
+-- ("verified" by experimenting with Dragon NaturallySpeaking)
 --
-emptyDNSRHS :: (IsString n) => DNSRHS n t
-emptyDNSRHS = DNSNonTerminal (SomeDNSLHS dnsEmptyList)
+-- these properties are used at different stages of building the
+-- grammar (e.g. "Commands.Frontends.Dragon13.Render" and
+-- "Commands.Frontends.Dragon13.Optimize"). these stages use different
+-- name types (i.e. the @n@ in @DNSRHS n t@): not the same one, and
+-- not just Strings. Thus, we need a parametrically polymorphic
+-- 'emptyDNSRHS', rather than the simple but non-@n@-polymorphic:
+--
+-- @
+-- emptyDNSRHS :: DNSRHS String t
+-- emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSList "emptyList"))
+-- @
+--
+--
+emptyDNSRHS :: DNSRHS n t
+emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 
 
 -- ================================================================ --
@@ -185,7 +197,7 @@ emptyDNSRHS = DNSNonTerminal (SomeDNSLHS dnsEmptyList)
 -- in relation to NatLink's concrete syntax:
 --
 -- * @"\<rule>"@ is a 'DNSRule'
--- * @"\<dgndictation>"@ is a 'DNSBuiltin'
+-- * @"\<dgndictation>"@ is a 'DNSBuiltinRule'
 -- * @"{list}@ is a 'DNSList'
 --
 -- a @GADT@ to distinguish 'LHSRule's from 'LHSList's, which behave
@@ -203,9 +215,10 @@ emptyDNSRHS = DNSNonTerminal (SomeDNSLHS dnsEmptyList)
 -- (see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
 --
 data DNSLHS (l :: LHSKind) n where
- DNSBuiltin :: DNSBuiltin -> DNSLHS LHSRule x
- DNSRule    :: n          -> DNSLHS LHSRule n
- DNSList    :: n          -> DNSLHS LHSList n
+ DNSRule        :: n              -> DNSLHS LHSRule n
+ DNSBuiltinRule :: DNSBuiltinRule -> DNSLHS LHSRule x
+ DNSList        :: n              -> DNSLHS LHSList n
+ DNSBuiltinList :: DNSBuiltinList -> DNSLHS LHSList x
 
 deriving instance (Show n) => Show (DNSLHS l n)
 instance (Eq n) => Eq (DNSLHS l n) where (==) = equalDNSLHS
@@ -215,29 +228,32 @@ instance Foldable    (DNSLHS l) where foldMap  = foldMapDefault
 instance Traversable (DNSLHS l) where
  traverse f (DNSRule n) = DNSRule <$> f n
  traverse f (DNSList n) = DNSList <$> f n
- traverse _ (DNSBuiltin x) = pure $ DNSBuiltin x
+ traverse _ (DNSBuiltinRule x) = pure (DNSBuiltinRule x)
+ traverse _ (DNSBuiltinList x) = pure (DNSBuiltinList x)
 
 -- | heterogeneous (but only in the phantom) equality
 equalDNSLHS :: (Eq n) => DNSLHS l1 n -> DNSLHS l2 n -> Bool
-DNSRule    x `equalDNSLHS` DNSRule    y = x == y
-DNSBuiltin x `equalDNSLHS` DNSBuiltin y = x == y
-DNSList    x `equalDNSLHS` DNSList    y = x == y
-_            `equalDNSLHS` _            = False
+DNSRule        x `equalDNSLHS` DNSRule        y = x == y
+DNSBuiltinRule x `equalDNSLHS` DNSBuiltinRule y = x == y
+DNSList        x `equalDNSLHS` DNSList        y = x == y
+DNSBuiltinList x `equalDNSLHS` DNSBuiltinList y = x == y
+_                `equalDNSLHS` _                = False
 
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
-data DNSBuiltin = DGNDictation | DGNWords | DGNLetters
+data DNSBuiltinRule = DGNDictation | DGNWords | DGNLetters
  deriving (Show, Eq, Ord, Enum)
 
-displayDNSBuiltin :: DNSBuiltin -> String
-displayDNSBuiltin = fmap toLower . show
+displayDNSBuiltinRule :: DNSBuiltinRule -> String
+displayDNSBuiltinRule = fmap toLower . show
 
--- | a built-in.
+-- | Builtin 'DNSVocabulary's.
 --
--- @dnsEmptyList = DNSList "emptyList"@
---
-dnsEmptyList :: (IsString n) => DNSLHS LHSList n
-dnsEmptyList = DNSList $ fromString "emptyList"
+data DNSBuiltinList = DNSEmptyList
+ deriving (Show, Eq, Ord, Enum)
+
+displayDNSBuiltinList :: DNSBuiltinList -> String
+displayDNSBuiltinList DNSEmptyList = "emptyList"
 
 -- | for promotion by @DataKinds@.
 --

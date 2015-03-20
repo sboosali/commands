@@ -41,11 +41,16 @@ instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSRHS n t) where
   , DNSAlternatives <$> resized 2 arbitrary
   ]
 
-instance (Arbitrary n) => Arbitrary (DNSLHS LHSList n) where arbitrary = DNSList <$> arbitrary
+instance (Arbitrary n) => Arbitrary (DNSLHS LHSList n) where
+ arbitrary = oneof
+  [ DNSList        <$> arbitrary
+  , DNSBuiltinList <$> arbitrary
+  ]
+
 instance (Arbitrary n) => Arbitrary (DNSLHS LHSRule n) where
  arbitrary = oneof
-  [ DNSRule    <$> arbitrary
-  , DNSBuiltin <$> arbitrary
+  [ DNSRule        <$> arbitrary
+  , DNSBuiltinRule <$> arbitrary
   ]
 
 instance (Arbitrary t) => Arbitrary (DNSToken t) where
@@ -54,7 +59,9 @@ instance (Arbitrary t) => Arbitrary (DNSToken t) where
   , DNSPronounced <$> arbitrary <*> arbitrary
   ]
 
-instance Arbitrary DNSBuiltin where arbitrary = elements constructors
+instance Arbitrary DNSBuiltinRule where arbitrary = elements constructors
+
+instance Arbitrary DNSBuiltinList where arbitrary = elements constructors
 
 instance Arbitrary Text where arbitrary = T.pack <$> arbitrary
 

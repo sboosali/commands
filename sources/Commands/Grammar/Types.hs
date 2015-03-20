@@ -24,20 +24,22 @@ import Numeric.Natural                   (Natural)
 data Command a = Command
  { _lhs     :: !LHS
  -- , _rule     :: Rule a
- , _grammar :: DNSGrammar DNSCommandName String
+ , _grammar :: DNSGrammar DNSCommandName DNSCommandToken
  , _parser  :: Parser a
  }
  deriving (Functor)
 
--- | 'String' because user-facing "config" modules (e.g.
+-- |
+--
+type DNSCommandName = String -- DNSMetaName LHS
+
+-- | not 'Text' because user-facing "config" modules (e.g.
 -- "Commands.Plugins.Example") can't use:
 --
 -- * both OverloadedStrings
 -- * and type class sugar
 --
---
-type DNSCommandName = String -- DNSMetaName
-
+type DNSCommandToken = String
 
 
 -- |

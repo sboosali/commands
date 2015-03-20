@@ -54,7 +54,7 @@ let root = DNSProduction (DNSRule "root")
                       ]
     subcommand = DNSProduction (DNSRule "subcommand")
                        [ DNSTerminal    (DNSToken "status")
-                       , DNSNonTerminal (SomeDNSLHS (DNSBuiltin DGNDictation))
+                       , DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))
                        ]
     Right grammar = escapeDNSGrammar (DNSGrammar root [] [command, subcommand, flag])
 :}
@@ -121,7 +121,7 @@ serializeGrammar grammar = grammar_
 
 -- | serializes a grammar into a Python string.
 --
--- imports all 'DNSBuiltins', whether used or not.
+-- imports all 'DNSBuiltinRules', whether used or not.
 --
 --
 serializeRules :: DNSGrammar DNSName DNSText -> Doc
@@ -194,17 +194,19 @@ serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . 
 --
 -- >>> serializeLHS $ DNSRule (DNSName "rule")
 -- <rule>
--- >>> serializeLHS $ DNSBuiltin DGNDictation
+-- >>> serializeLHS $ DNSBuiltinRule DGNDictation
 -- <dgndictation>
 -- >>> serializeLHS $ DNSList (DNSName "list")
 -- {list}
 --
 --
 serializeLHS :: DNSLHS l DNSName -> Doc
-serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
 serializeLHS (DNSRule (DNSName s)) = "<" <> text s <> ">"
-serializeLHS (DNSBuiltin b)        = "<" <> text s <> ">"
- where s = T.pack $ displayDNSBuiltin b
+serializeLHS (DNSBuiltinRule b)    = "<" <> text s <> ">"
+ where s = T.pack $ displayDNSBuiltinRule b
+serializeLHS (DNSList (DNSName s)) = "{" <> text s <> "}"
+serializeLHS (DNSBuiltinList b)    = "{" <> text s <> "}"
+ where s = T.pack $ displayDNSBuiltinList b
 
 -- | wraps tokens containing whitespace with 'dquotes'.
 --
@@ -220,8 +222,8 @@ serializeToken :: DNSToken DNSText -> Doc
 serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
-dnsHeader :: [DNSImport DNSName]
-dnsHeader = fmap DNSBuiltin constructors
+dnsHeader :: [DNSImport n]
+dnsHeader = fmap DNSBuiltinRule constructors
 
 -- | serialize the 'DNSList's that were ignored by 'serializeRules'.
 --

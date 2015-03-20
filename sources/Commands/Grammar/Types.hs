@@ -31,7 +31,7 @@ data Command a = Command
 
 -- |
 --
-type DNSCommandName = String -- DNSMetaName LHS
+type DNSCommandName = DNSMetaName LHS
 
 -- | not 'Text' because user-facing "config" modules (e.g.
 -- "Commands.Plugins.Example") can't use:

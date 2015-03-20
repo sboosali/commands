@@ -34,7 +34,7 @@ renderProduction (Rule l r) = DNSProduction lhs rhs
  rhs = renderRHS r
 
 renderLHS :: LHS -> DNSLHS LHSRule DNSCommandName
-renderLHS = DNSRule . showLHS -- defaultDNSMetaName
+renderLHS = DNSRule . defaultDNSMetaName
 
 -- |
 renderRHS :: RHS x -> NonEmpty (DNSRHS DNSCommandName DNSCommandToken)

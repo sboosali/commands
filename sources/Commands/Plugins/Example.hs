@@ -166,9 +166,11 @@ positive = 'positive
 newtype Dictation = Dictation [String] deriving (Show,Eq)
 dictation :: Command Dictation
 dictation = specialCommand 'dictation
- (DNSGrammar (DNSProduction (DNSRule "dictation") (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)) :| [])) [] [])
+ (DNSGrammar (DNSProduction (DNSRule name)
+                            (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)) :| [])) [] [])
  (\context -> Dictation <$> anyBlack `manyUntil` context)
-
+ where
+ name = set (dnsMetaInfo.dnsInline) True $ defaultDNSMetaName (unsafeLHSFromName 'dictation)
 
 -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
 data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)

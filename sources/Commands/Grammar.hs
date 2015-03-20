@@ -20,6 +20,7 @@ import Data.List                     (intercalate)
 import Data.Monoid                   ((<>))
 import Data.Typeable                 (Typeable)
 import Language.Haskell.TH.Syntax    (Name)
+import Data.Maybe (fromJust)
 
 
 vocabulary :: [String] -> RHS String
@@ -49,6 +50,17 @@ lhsFromName :: Name -> Possibly LHS
 lhsFromName name = do
  gui <- fromName name
  return $ LHS gui
+
+-- | safe on obviously global 'Name's, like reifying a top-level binding:
+--
+-- @
+-- dictation = ... ('unsafeLHSFromName' \'dictation) ...
+-- @
+--
+-- warning: partial function:
+--
+unsafeLHSFromName :: Name -> LHS
+unsafeLHSFromName = fromJust . lhsFromName
 
 -- | output should be unique, for "simple" inputs.
 --

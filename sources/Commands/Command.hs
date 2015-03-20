@@ -3,6 +3,7 @@ module Commands.Command where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Render
+import           Commands.Frontends.Dragon13.Optimize
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
@@ -14,7 +15,7 @@ import           Commands.Parse.Types
 -- import           Control.Applicative
 import           Control.Monad.Catch                (SomeException (..),
                                                      catches)
-import           Data.Bifunctor                     (bimap)
+import           Data.Bifunctor                     (second)
 import           Data.Foldable                      (asum)
 import           Data.Proxy
 import qualified Data.Text.Lazy                     as T
@@ -24,7 +25,7 @@ import           Language.Haskell.TH.Syntax         (Name)
 
 
 serialized :: Command x -> Either [SomeException] T.Text
-serialized Command{_grammar} = serialize $ bimap T.pack T.pack $ _grammar
+serialized Command{_grammar} = serialize $ second T.pack $ optimizeGrammar $ _grammar
 
 parses :: Command a -> String -> Possibly a
 parses Command{_parser} = parsing _parser
@@ -47,7 +48,7 @@ genericCommand l r = Command l g p
 -- warning: partial function:
 --
 -- * match fails on non-global 'Name's
-specialCommand :: Name -> DNSGrammar String String -> Parser a -> Command a
+specialCommand :: Name -> DNSGrammar DNSCommandName DNSCommandToken -> Parser a -> Command a
 specialCommand name g p = Command l g p
  where
  Just l = lhsFromName name

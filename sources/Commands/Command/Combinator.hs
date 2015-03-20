@@ -8,9 +8,8 @@ import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
--- import           Control.Alternative.Free.Tree
 
--- import           Control.Applicative
+import           Control.Lens
 import           Control.Applicative.Permutation
 import qualified Text.Parsec                       as Parsec
 
@@ -23,15 +22,15 @@ multiple = multipleC
 multipleC :: Command a -> Command [a]
 multipleC Command{_lhs,_grammar,_parser} = Command
  lhs
- (multipleDNSGrammar (showLHS lhs) _grammar)
- -- (\context -> _parser (Some parserUnit) `manyUntil` context) -- assumes _parser is context free
+ (multipleDNSGrammar (combinatorDNSCommandName lhs) _grammar)
  (\context -> _parser context `manyUntil` context)
+ -- (\context -> _parser (Some parserUnit) `manyUntil` context) -- forces _parser to the context free
  where
- lhs = l `LHSApp` [_lhs]
+ lhs    = l `LHSApp` [_lhs]
  Just l = lhsFromName 'multipleC
 
 -- |
-multipleDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
+multipleDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
 multipleDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
  (DNSProduction (DNSRule name) (hoistDNSRHS DNSMultiple _dnsExport))
  _dnsImports
@@ -49,25 +48,24 @@ optionalEnum = optionC enumDefault
 
 -- |
 optionC :: a -> Command a -> Command a
-optionC theDefault Command{_lhs,_grammar,_parser} = Command
- lhs
- (optionalDNSGrammar (showLHS lhs) _grammar)
+optionC theDefault Command{_lhs,_grammar,_parser} = Command lhs
+ (optionalDNSGrammar (combinatorDNSCommandName lhs) _grammar)
  (\context -> Parsec.option theDefault $ _parser context)
  where
- lhs = l `LHSApp` [_lhs]
+ lhs    = l `LHSApp` [_lhs]
  Just l = lhsFromName 'optionC
 
 -- |
 optionalC :: Command a -> Command (Maybe a)
-optionalC Command{_lhs,_grammar,_parser} = Command lhs grammar parser
+optionalC Command{_lhs,_grammar,_parser} = Command lhs
+ (optionalDNSGrammar (combinatorDNSCommandName lhs) _grammar)
+ (\context -> Parsec.optionMaybe $ _parser context)
  where
- lhs     = l `LHSApp` [_lhs]
- Just l  = lhsFromName 'optionalC
- grammar = (optionalDNSGrammar (showLHS lhs) _grammar)
- parser  = (\context -> Parsec.optionMaybe $ _parser context)
+ lhs    = l `LHSApp` [_lhs]
+ Just l = lhsFromName 'optionalC
 
 -- |
-optionalDNSGrammar :: String -> DNSGrammar String t -> DNSGrammar String t
+optionalDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
 optionalDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
  (DNSProduction (DNSRule name) (hoistDNSRHS DNSOptional _dnsExport))
  _dnsImports
@@ -96,7 +94,13 @@ maybeAtomC :: Command a -> Perms RHS (Maybe a)
 maybeAtomC Command{_lhs,_grammar,_parser} = (maybeAtom . liftCommand) $ Command lhs grammar parser
  where
  lhs     = l `LHSApp` [_lhs]
- Just l = lhsFromName 'maybeAtomC
- grammar = (optionalDNSGrammar (showLHS lhs) _grammar)
+ Just l  = lhsFromName 'maybeAtomC
+ grammar = optionalDNSGrammar (combinatorDNSCommandName lhs) _grammar
  parser  = _parser
+
+
+combinatorDNSCommandName :: LHS -> DNSCommandName
+combinatorDNSCommandName
+ = set (dnsMetaInfo.dnsInline) True
+ . defaultDNSMetaName
 

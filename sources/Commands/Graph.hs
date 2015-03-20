@@ -32,9 +32,10 @@ properties:
 
 -}
 cycles :: Ord k => [Adjacency k n] -> [[n]]
-cycles = sccs2lists . stronglyConnComp
+cycles = sccs2cycles . stronglyConnComp
 
-sccs2lists :: [SCC n] -> [[n]]
-sccs2lists = mapMaybe $ \case
+sccs2cycles :: [SCC n] -> [[n]]
+sccs2cycles = mapMaybe $ \case
  AcyclicSCC _ -> Nothing
  CyclicSCC ns -> Just ns
+

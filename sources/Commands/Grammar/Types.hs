@@ -110,7 +110,7 @@ data DNSMetaName n = DNSMetaName
  , _dnsMetaExpansion :: Maybe Natural
  , _dnsMetaName      :: n
  }
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Functor)
 
 -- | yet un-expanded
 defaultDNSMetaName :: n -> DNSMetaName n

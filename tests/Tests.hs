@@ -11,7 +11,8 @@ tastytest = defaultMain $ testGroup "QuickCheck"
 
 main = do
  doctest
-  [ "sources/Commands/Etc"
+  [ "sources/Commands"
+  , "sources/Commands/Etc"
   , "sources/Commands/Instances"
 
   , "sources/Commands/Grammar/Types"

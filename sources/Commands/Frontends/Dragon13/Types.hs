@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
-{-# LANGUAGE KindSignatures, RankNTypes, StandaloneDeriving              #-}
+{-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, RankNTypes      #-}
+{-# LANGUAGE StandaloneDeriving, ViewPatterns                            #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc        ()
 import Commands.Instances  ()
@@ -11,6 +12,7 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Char           (toLower)
+import Data.Either         (partitionEithers)
 import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
@@ -57,6 +59,16 @@ instance Bitraversable DNSGrammar where -- valid Bitraversable?
   <*> traverse (traverse f) imports
   <*> traverse (bitraverse f g) productions
 
+-- | partitions a grammar's productions into 'DNSVocabulary's and
+-- 'DNSProduction's, although only the latter is certain from the
+-- type.
+--
+partitionDNSGrammar :: DNSGrammar n t -> ([DNSProduction False n t], [DNSProduction True n t])
+partitionDNSGrammar DNSGrammar{_dnsExport,_dnsProductions}
+ = partitionEithers
+ . fmap downcastDNSProduction
+ $ upcastDNSProduction _dnsExport : _dnsProductions
+
 
 -- ================================================================ --
 
@@ -98,33 +110,9 @@ instance Bitraversable (DNSProduction e) where
 upcastDNSProduction :: DNSProduction True n t -> DNSProduction e n t
 upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
 
-downcastDNSProduction :: DNSProduction e n t -> Maybe (DNSProduction True n t)
-downcastDNSProduction (DNSProduction l rs) = Just (DNSProduction l rs)
-downcastDNSProduction (DNSVocabulary {})   = Nothing
-
-
--- ================================================================ --
-
--- |
-data SomeDNSLHS n = forall l. SomeDNSLHS (DNSLHS l n)
-
-instance (Show n) => Show (SomeDNSLHS n) where
- showsPrec d (SomeDNSLHS l) = showParen (d > 10)
-  (showString "SomeDNSLHS " . showsPrec (10+1) l)
-
-instance (Eq   n) => Eq   (SomeDNSLHS n) where SomeDNSLHS l1 == SomeDNSLHS l2 = l1 `equalDNSLHS` l2
-
-instance Functor     SomeDNSLHS where fmap     = fmapDefault
-instance Foldable    SomeDNSLHS where foldMap  = foldMapDefault
-instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$> traverse f l
-
--- ================================================================ --
-
--- | the "leaves" of the grammar.
-data DNSToken t
- = DNSToken t -- ^ e.g. @"word or phrase"@
- | DNSPronounced t t -- ^ e.g. @written\\spoken@
- deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+downcastDNSProduction :: DNSProduction e n t -> Either (DNSProduction e n t) (DNSProduction True n t)
+downcastDNSProduction (DNSProduction l rs) = Right (DNSProduction l rs)
+downcastDNSProduction p = Left p
 
 -- ================================================================ --
 
@@ -222,6 +210,7 @@ data DNSLHS (l :: LHSKind) n where
 
 deriving instance (Show n) => Show (DNSLHS l n)
 instance (Eq n) => Eq (DNSLHS l n) where (==) = equalDNSLHS
+instance (Ord n) => Ord (DNSLHS l n) where compare = compareDNSLHS
 
 instance Functor     (DNSLHS l) where fmap     = fmapDefault
 instance Foldable    (DNSLHS l) where foldMap  = foldMapDefault
@@ -238,6 +227,21 @@ DNSBuiltinRule x `equalDNSLHS` DNSBuiltinRule y = x == y
 DNSList        x `equalDNSLHS` DNSList        y = x == y
 DNSBuiltinList x `equalDNSLHS` DNSBuiltinList y = x == y
 _                `equalDNSLHS` _                = False
+
+-- | heterogeneous (wrt the phantom) comparison
+compareDNSLHS :: (Ord n) => DNSLHS l1 n -> DNSLHS l2 n -> Ordering
+DNSRule        x  `compareDNSLHS` DNSRule        y  = x `compare` y
+DNSBuiltinRule x  `compareDNSLHS` DNSBuiltinRule y  = x `compare` y
+DNSList        x  `compareDNSLHS` DNSList        y  = x `compare` y
+DNSBuiltinList x  `compareDNSLHS` DNSBuiltinList y  = x `compare` y
+(rankDNSLHS -> x) `compareDNSLHS` (rankDNSLHS -> y) = x `compare` y
+
+rankDNSLHS :: DNSLHS l n -> Integer
+rankDNSLHS = \case
+ DNSRule        {} -> 0
+ DNSBuiltinRule {} -> 1
+ DNSList        {} -> 2
+ DNSBuiltinList {} -> 3
 
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
@@ -264,3 +268,26 @@ data LHSKind = LHSRule | LHSList
 
 
 -- ================================================================ --
+
+-- |
+data SomeDNSLHS n = forall l. SomeDNSLHS (DNSLHS l n)
+
+instance (Show n) => Show (SomeDNSLHS n) where
+ showsPrec d (SomeDNSLHS l) = showParen (d > 10)
+  (showString "SomeDNSLHS " . showsPrec (10+1) l)
+
+instance (Eq   n) => Eq   (SomeDNSLHS n) where SomeDNSLHS l1 == SomeDNSLHS l2 = l1 `equalDNSLHS` l2
+instance (Ord  n) => Ord  (SomeDNSLHS n) where SomeDNSLHS l1 `compare` SomeDNSLHS l2 = l1 `compareDNSLHS` l2
+
+instance Functor     SomeDNSLHS where fmap     = fmapDefault
+instance Foldable    SomeDNSLHS where foldMap  = foldMapDefault
+instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$> traverse f l
+
+-- ================================================================ --
+
+-- | the "leaves" of the grammar.
+data DNSToken t
+ = DNSToken t -- ^ e.g. @"word or phrase"@
+ | DNSPronounced t t -- ^ e.g. @written\\spoken@
+ deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+

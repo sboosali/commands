@@ -4,42 +4,27 @@
 {-# LANGUAGE ViewPatterns                                         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
-import           Commands.Command
-import           Commands.Command.Combinator
-import           Commands.Command.Sugar
-import           Commands.Command.Types             ()
-import           Commands.Etc                       ()
-import           Commands.Frontends.Dragon13
-import           Commands.Frontends.Dragon13.Render
-import           Commands.Frontends.Dragon13.Text
-import           Commands.Frontends.Dragon13.Types
-import           Commands.Grammar
-import           Commands.Grammar.Types
-import           Commands.Graph
-import           Commands.Parse
-import           Commands.Parse.Types
-import           Commands.Parsec
-import           Control.Alternative.Free.Tree
+import           Commands
 
 import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
-import           Control.Lens                       hiding (( # ), (&))
-import           Control.Monad                      (void, (<=<), (>=>))
-import           Control.Monad.Catch                (catches)
+import           Control.Lens                    hiding (( # ), (&))
+import           Control.Monad                   (void, (<=<), (>=>))
+import           Control.Monad.Catch             (catches)
 import           Control.Parallel
 import           Data.Bitraversable
-import           Data.Either                        (either)
-import           Data.Foldable                      (Foldable (..), asum,
-                                                     traverse_)
-import           Data.List.NonEmpty                 (NonEmpty (..), fromList)
-import qualified Data.Text.Lazy.IO                  as T
+import           Data.Either                     (either)
+import           Data.Foldable                   (Foldable (..), asum,
+                                                  traverse_)
+import           Data.List.NonEmpty              (NonEmpty (..), fromList)
+import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
-import           Prelude                            hiding (foldr)
-import           System.Timeout                     (timeout)
-import           Text.PrettyPrint.Leijen.Text       hiding (brackets, empty,
-                                                     int, (<$>), (<>))
+import           Prelude                         hiding (foldr)
+import           System.Timeout                  (timeout)
+import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
+                                                  (<$>), (<>))
 
 
 -- import qualified Data.Text.Lazy                    as T
@@ -138,7 +123,7 @@ brackets = 'brackets
  <|> Bracket '|' # "norm"
 
 character :: Command Char
-character = 'character <=> undefined
+character = 'character <=> empty
 
 
 data Click = Click Times Button deriving (Show,Eq)

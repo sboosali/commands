@@ -4,8 +4,13 @@ import Commands.Frontends.Dragon13.Types
 
 import Control.Applicative
 import Control.Lens
+import Data.Function                     (on)
 import Data.List.NonEmpty                (NonEmpty (..))
+import Data.Maybe                        (mapMaybe)
 
+
+-- dnsAllProductions :: Traversal' (DNSGrammar n t) (DNSProduction e n t)
+-- dnsAllProductions = DNSGrammar <$> f . downcastDNSProduction <*> pure <*> fmap f
 
 _DNSProduction :: Prism' (DNSProduction e n t) (DNSLHS LHSRule n, NonEmpty (DNSRHS n t))
 _DNSProduction = prism' (uncurry DNSProduction) $ \case
@@ -19,9 +24,21 @@ _DNSProduction = prism' (uncurry DNSProduction) $ \case
 dnsProductionRHS :: Traversal' (DNSProduction e n t) (DNSRHS n t)
 dnsProductionRHS = _DNSProduction._2.traversed
 
+-- |
+getNonTerminals :: DNSProduction e n t -> [SomeDNSLHS n]
+getNonTerminals
+ = mapMaybe (\case
+    DNSNonTerminal l -> Just l
+    _                -> Nothing)
+ . universeOn dnsProductionRHS
+
+-- | equality projected 'on' the left-hand sides of productions.
+equalDNSProduction :: (Eq n) => DNSProduction e n t -> DNSProduction e n t -> Bool
+equalDNSProduction = (==) `on` view dnsProductionLHS
+
 -- TODO.
 -- not a Lens, because we can't set the existentially quantified LHS.
-dnsProductionLHS :: Getter  (DNSProduction e n t) (SomeDNSLHS n)
+dnsProductionLHS :: Getter (DNSProduction e n t) (SomeDNSLHS n)
 dnsProductionLHS = to $ \case
  DNSProduction l _ -> SomeDNSLHS l
  DNSVocabulary l _ -> SomeDNSLHS l

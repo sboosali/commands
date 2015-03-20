@@ -17,10 +17,10 @@ import Data.Char
 import Data.Foldable                 (asum, foldMap)
 import Data.Hashable
 import Data.List                     (intercalate)
+import Data.Maybe                    (fromJust)
 import Data.Monoid                   ((<>))
 import Data.Typeable                 (Typeable)
 import Language.Haskell.TH.Syntax    (Name)
-import Data.Maybe (fromJust)
 
 
 vocabulary :: [String] -> RHS String

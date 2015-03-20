@@ -35,11 +35,11 @@ import Commands.Instances                   ()
 -- import Commands.Command.Types
 import Commands.Command
 import Commands.Frontends.Dragon13
+import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Optimize
 import Commands.Frontends.Dragon13.Render
 import Commands.Frontends.Dragon13.Text
 import Commands.Frontends.Dragon13.Types
-import Commands.Frontends.Dragon13.Lens
 import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Graph

@@ -9,8 +9,8 @@ import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
 
-import           Control.Lens
 import           Control.Applicative.Permutation
+import           Control.Lens
 import qualified Text.Parsec                       as Parsec
 
 

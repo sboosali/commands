@@ -172,17 +172,3 @@ case Some (Some2 (Right ())) of
 -}
 data Some2 f y = forall x. Some2 (f x y)
 
--- instance (Show (f x y)) => Show (Some2 f y) where show (Some2 x) = "Some2 (" <> show x <> ")"
--- instance Functor     (f x) => Functor     (Some2 f) where fmap     = fmapDefault
--- instance Foldable    (f x) => Foldable    (Some2 f) where foldMap  = foldMapDefault
--- instance Traversable (f x) => Traversable (Some2 f) where traverse f (Some2 x) = Some2 <$> traverse f x
-
-
--- -- | existentially-quantify any (non-nullary) type-constructor
--- --
--- --
--- data Some' (f :: * -> k) where
- -- Some1 :: [a]           -> Some []
- -- Some2 :: Either a b    -> Some Either b
- -- Some2 :: Compose f g a -> Some Compose g a
- -- SomeN :: ?

@@ -1,16 +1,17 @@
-{-# LANGUAGE DataKinds, GADTs, OverloadedStrings, PatternSynonyms #-}
-{-# LANGUAGE RankNTypes, ViewPatterns, NamedFieldPuns                            #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# LANGUAGE DataKinds, GADTs, NamedFieldPuns, OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms, RankNTypes, ViewPatterns           #-}
 -- | Uses pretty printer combinators for readability of serialization.
 --
 --
 module Commands.Frontends.Dragon13 where
 
 import           Commands.Etc
+import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Instances                ()
 
+import           Control.Lens
 import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bifoldable
@@ -27,13 +28,11 @@ import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
 import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
-import Control.Lens
 
 
 {- $setup
 
->>> :set -XOverloadedLists
->>> :set -XOverloadedStrings
+>>> :set -XOverloadedLists -XOverloadedStrings
 >>> :{
 let root = DNSProduction (DNSRule "root")
             [ DNSSequence
@@ -325,20 +324,24 @@ isPythonFile s = case parseModule (T.unpack s) "" of
 --
 -- a 'bifoldMap' on the left.
 --
+-- e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
+--
 -- >>> map unDNSName $ getNames grammar
 -- ["root","command","subcommand","flag"]
 --
-getNames :: (Eq n) => DNSGrammar n t -> [n]
+getNames :: (Eq n, Bifoldable p) => p n t -> [n]
 getNames = nub . bifoldMap (:[]) (const [])
 
 -- | get all the words in the terminals of the grammar, without duplicates.
 --
 -- a 'bifoldMap' on the right.
 --
+-- e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
+--
 -- >>> map unDNSText $ getWords grammar
 -- ["ls","git","rm","status","-f","force","-r","recursive","-a","all","-i","interactive"]
 --
-getWords :: (Eq t) => DNSGrammar n t -> [t]
+getWords :: (Eq t, Bifoldable p) => p n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
 
 hoistDNSRHS :: (DNSRHS n t -> DNSRHS n t) -> DNSProduction True n t -> NonEmpty (DNSRHS n t)

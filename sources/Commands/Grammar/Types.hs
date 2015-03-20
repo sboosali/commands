@@ -48,7 +48,7 @@ data Rule a = Rule !LHS (RHS a)
 data LHS
  = LHS    !GUI                  -- ^ for tokens guaranteed unique by Haskell's name resolution modulo package
  | LHSInt !Int                  -- ^ for tokens guaranteed unique by safe/monadic generation
- | LHSApp !LHS ![LHS]           -- ^ for reifying @app@lication of higher-order 'Rule's like @multiple@
+ | LHSApp !LHS [LHS]           -- ^ for reifying @app@lication of higher-order 'Rule's like @multiple@
  deriving (Show, Eq, Ord, Generic)
 instance Hashable LHS
 
@@ -96,21 +96,6 @@ liftString :: String -> RHS a
 liftString = lift . fromWord . Word
 
 
-
--- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
---
---
-data DNSInfo = DNSInfo
- { _dnsExpand :: Natural -- ^ how many times to expand a recursive 'DNSProduction'
- , _dnsInline :: Bool    -- ^ whether or not to inline a 'DNSProduction'
- }
-
-makeLenses ''DNSInfo
-
--- | no expansion and no inlining.
-defaultDNSInfo :: DNSInfo
-defaultDNSInfo = DNSInfo 0 False
-
 -- | a name, with metadata:
 --
 -- * the 'Natural' tracks which expansion (of the expanded recursive
@@ -118,14 +103,31 @@ defaultDNSInfo = DNSInfo 0 False
 --
 --
 -- TODO lenses
-data DNSMetaName = DNSMetaName
- { _dnsMetaInfo       :: DNSInfo
- , _dnsMetaExpansions :: Maybe Natural
- , _dnsMetaLHS        :: LHS
+data DNSMetaName n = DNSMetaName
+ { _dnsMetaInfo      :: !DNSInfo
+ , _dnsMetaExpansion :: Maybe Natural
+ , _dnsMetaName      :: n
  }
+ deriving (Show,Eq,Ord)
+
+-- | yet un-expanded
+defaultDNSMetaName :: n -> DNSMetaName n
+defaultDNSMetaName = DNSMetaName defaultDNSInfo Nothing
+
+-- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
+--
+--
+data DNSInfo = DNSInfo
+ { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
+ , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
+ }
+ deriving (Show,Eq,Ord)
+
+-- | no expansion and no inlining.
+defaultDNSInfo :: DNSInfo
+defaultDNSInfo = DNSInfo 0 False
+
 
 makeLenses ''DNSMetaName
 
--- | yet un-expanded
-defaultDNSMetaName :: LHS -> DNSMetaName
-defaultDNSMetaName = DNSMetaName defaultDNSInfo Nothing
+makeLenses ''DNSInfo

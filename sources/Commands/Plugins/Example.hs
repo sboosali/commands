@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
+{-# LANGUAGE ViewPatterns                                         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands.Command
@@ -24,6 +25,7 @@ import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
+import           Control.Lens                       hiding (( # ), (&))
 import           Control.Monad                      (void, (<=<), (>=>))
 import           Control.Monad.Catch                (catches)
 import           Control.Parallel
@@ -34,12 +36,11 @@ import           Data.Foldable                      (Foldable (..), asum,
 import           Data.List.NonEmpty                 (NonEmpty (..), fromList)
 import qualified Data.Text.Lazy.IO                  as T
 import           Data.Typeable
-import           Language.Python.Common.AST         (Expr (Dictionary, Strings))
-import           Language.Python.Version2.Parser    (parseExpr, parseModule)
 import           Prelude                            hiding (foldr)
 import           System.Timeout                     (timeout)
 import           Text.PrettyPrint.Leijen.Text       hiding (brackets, empty,
                                                      int, (<$>), (<>))
+
 
 -- import qualified Data.Text.Lazy                    as T
 -- import Control.Lens (alongside,Prism',Traversal',Lens)
@@ -229,56 +230,7 @@ exampleDirections = fmap (unwords . words)
 --  ]
 
 
-
--- grammar = DNSGrammar export [command, subcommand, flag] :: DNSGrammar Text Text
-
--- export = DNSProduction (DNSRule "export") $ fromList
---  [ DNSSequence $ fromList
---    [ DNSNonTerminal (DNSList "command")
---    , DNSNonTerminal (DNSRule "subcommand")
---    , DNSOptional (DNSMultiple (DNSNonTerminal (DNSList "flag")))
---    ]
---  , DNSTerminal (DNSToken "ls")
---  ]
-
--- command = DNSVocabulary (DNSList "command")
---  [ DNSToken "git"
---  , DNSToken "rm"
---  ]
-
--- subcommand = DNSProduction (DNSRule "subcommand") $ fromList
---  [ DNSTerminal (DNSToken "status")
---  , DNSNonTerminal (DNSBuiltin DGNDictation)
---  ]
-
--- flag = DNSVocabulary (DNSList "flag")
---  [ DNSPronounced "-f" "force"
---  , DNSPronounced "-r" "recursive"
---  , DNSPronounced "-a" "all"
---  , DNSPronounced "-i" "interactive"
---  ]
-
--- -- | traverse with monoidal error collecting
--- badGrammar = DNSGrammar (DNSProduction (DNSRule "bad root") $ fromList [DNSTerminal (DNSToken "'")]) [] :: DNSGrammar Text Text
-
-
--- isPythonDict :: String -> Bool
--- isPythonDict s = case parseExpr s "" of
---  Right (Dictionary {}, _) -> True
---  _ -> False
-
--- isPythonString :: String -> Bool
--- isPythonString s = case parseExpr s "" of
---  Right (Strings {}, _) -> True
---  _ -> False
-
--- isPythonModule :: String -> Bool
--- isPythonModule s = case parseModule s "" of
---  Right {} -> True
---  _ -> False
-
-oneSecond :: Int
-oneSecond = round (1e6 :: Double)
+oneSecond = round (1e6 :: Double) :: Int
 
 attemptAsynchronously action = do
  (timeout oneSecond action) `withAsync` (waitCatch >=> \case
@@ -286,7 +238,6 @@ attemptAsynchronously action = do
    Right Nothing  -> putStrLn "..."
    Right (Just _) -> return ()
   )
-
 
 attempt = attemptAsynchronously
 
@@ -411,4 +362,17 @@ main = do
   , ("mutually recursive B", "B", ["A","C"])
   , ("mutually recursive C", "C", ["A","S","N"])
   ]
+
+ putStrLn ""
+ print $ SomeDNSLHS (DNSList "n")
+ print $ DNSNonTerminal (SomeDNSLHS (DNSList "n"))
+ print $ DNSOptional (DNSNonTerminal (SomeDNSLHS (DNSList "n")))
+
+ putStrLn ""
+ let name = DNSNonTerminal (SomeDNSLHS (DNSList "A"))
+ let rhs = DNSAlternatives $ fromList [ name, DNSSequence $ fromList [DNSTerminal (DNSToken "t"), DNSNonTerminal (SomeDNSLHS (DNSList "B")), DNSOptional (DNSMultiple name)] ]
+ print $ transform (\case
+   DNSNonTerminal ((== (SomeDNSLHS (DNSList "A"))) -> True) -> DNSNonTerminal (SomeDNSLHS (DNSList "XXX"))
+   r -> r)
+  rhs
 

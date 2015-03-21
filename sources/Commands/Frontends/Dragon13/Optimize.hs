@@ -33,6 +33,9 @@ type DNSExpanded n t = [SomeDNSLHS (DNSMetaName n)]
 type DNSInlined n t = Map (SomeDNSLHS (DNSMetaName n)) (DNSRHS (DNSMetaName n) t)
 
 
+
+-- ================================================================ --
+
 -- | transforms a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts:
 --
 -- * grammars with recursive productions crash Dragon
@@ -53,13 +56,14 @@ optimizeGrammar
 
 
 
+-- ================================================================ --
 
 -- |
 expandGrammar :: (Eq n, Ord n) => DNSGrammar (DNSMetaName n) t -> DNSGrammar (DNSMetaName n) t
 expandGrammar g@DNSGrammar{_dnsExport,_dnsImports}
  = DNSGrammar e _dnsImports (vocabularies <> fmap upcastDNSProduction ps)
  where
- ([e], ps) = partition (equalDNSProduction _dnsExport) expanded -- TODO if pattern match fails, expansion has corrupted the grammar
+ ([e], ps) = partition (`equalDNSProduction` _dnsExport) expanded -- TODO if pattern match fails, expansion has corrupted the grammar
  expanded = expandSCCs . stronglyConnComp . fmap dnsAdjacency $ productions
  (vocabularies,productions) = partitionDNSGrammar g
 
@@ -85,7 +89,7 @@ references outside the cycle.
 
 -- TODO nonempty
 
--- TODO prop> length (expandProductionCycle c) == expandProductionCycle_measure c
+-- TODO? prop> length (expandProductionCycle c) == expandProductionCycle_measure c
 
 -- TODO Arbitrary newtype must be biased towards mutually recursive productions
 
@@ -93,7 +97,7 @@ references outside the cycle.
 expandProductionCycle :: (Eq n) => [DNSProduction True (DNSMetaName n) t] -> [DNSProduction True (DNSMetaName n) t]
 expandProductionCycle ps = concatMap (expandProductionCycleTo ls (expandProductionMaxDepth ps)) ps
  where
- ls = fmap (view dnsProductionLHS) ps
+ ls = ps ^.. (each.dnsProductionLHS)
 
 -- |
 --
@@ -149,6 +153,8 @@ expandProductionMaxDepth
 
 
 
+-- ================================================================ --
+
 -- | we don't in-line 'DNSVocabulary's because they:
 --
 -- * have simple names, for easy debugging.
@@ -159,19 +165,22 @@ inlineGrammar :: (Ord n) => DNSGrammar (DNSMetaName n) t -> DNSGrammar (DNSMetaN
 inlineGrammar g@DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}
  = DNSGrammar e _dnsImports (vocabularies <> fmap upcastDNSProduction ps)
  where
- e  = inlineProduction theInlined _dnsExport
- ps = fmap (inlineProduction theInlined) notInlined -- TODO  rewriteOn?
+ ([e], ps) = partition (`equalDNSProduction` _dnsExport) isInlined -- TODO if pattern match fails, inlining has corrupted the grammar
+ isInlined = fmap (inlineProduction theInlined) notInlined -- TODO  rewriteOn?
  (notInlined, theInlined) = partitionInlined productions
  (vocabularies, productions) = partitionDNSGrammar g
 
 inlineAway :: (Ord n) => DNSInlined n t -> [DNSProduction True (DNSMetaName n) t] -> [DNSProduction True (DNSMetaName n) t]
-inlineAway = undefined
+inlineAway = undefined -- TODO  rewriteOn?
 
 -- TODO  rewriteOn because:
 inlineProduction :: (Ord n) => DNSInlined n t -> DNSProduction True (DNSMetaName n) t -> DNSProduction True (DNSMetaName n) t
 inlineProduction lrs = transformOn dnsProductionRHS $ \case
- DNSNonTerminal ((flip Map.lookup) lrs -> Just r) -> r
+ DNSNonTerminal (shouldInline lrs -> Just r) -> r
  r -> r
+
+shouldInline :: (Ord n) => DNSInlined n t -> SomeDNSLHS (DNSMetaName n) -> Maybe (DNSRHS (DNSMetaName n) t)
+shouldInline lrs l = Map.lookup l lrs
 
 toBeInlined
  :: DNSProduction True (DNSMetaName n) t
@@ -187,11 +196,16 @@ partitionInlined ps = (notInlined, theInlined)
  theInlined = Map.fromList . fmap (\(DNSProduction l rs) -> (SomeDNSLHS l, DNSAlternatives rs)) $ yesInlined
  (notInlined, yesInlined) = partitionEithers . fmap toBeInlined $ ps
 
+
+
+-- ================================================================ --
+
 -- |
 vocabulariseGrammar :: (Eq n) => DNSGrammar (DNSMetaName n) t -> DNSGrammar (DNSMetaName n) t
 vocabulariseGrammar = id
 
 
+-- ================================================================ --
 
 -- |
 renderDNSMetaName :: DNSMetaName Text -> Text
@@ -209,3 +223,5 @@ compactLHS (l `LHSApp` ls) = compactLHS l `LHSApp` fmap compactLHS ls
 compactLHS l = l
 -- TODO safely compact i.e. unambiguously. compare each against all, with getNames. Build a Trie
 
+
+-- ================================================================ --

@@ -1,10 +1,19 @@
 {-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell                   #-}
+{- | 'Command' combinators. i.e. higher-order grammatical rules.
+
+'manyC' and 'multipleC' share the same 'grammar' ('multipleDNSGrammar'), but different in 'parser' ('Parsec.many1' versus 'manyUntil' respectively).
+
+'optionalC' and 'optionC' share the same 'grammar' ('optionalDNSGrammar'), but different in 'parser' ('Parsec.option' versus 'Parsec.optionMaybe' respectively).
+
+
+-}
 module Commands.Command.Combinator where
 import           Commands.Command
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Types
+import           Commands.Frontends.Dragon13.Lens ()
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
@@ -18,6 +27,10 @@ import qualified Text.Parsec                       as Parsec
 multiple :: Command a -> Command [a]
 multiple = multipleC
 
+-- | @= 'manyC'@
+many :: Command a -> Command [a]
+many = manyC
+
 -- |
 multipleC :: Command a -> Command [a]
 multipleC Command{_lhs,_grammar,_parser} = Command
@@ -28,6 +41,17 @@ multipleC Command{_lhs,_grammar,_parser} = Command
  where
  lhs    = l `LHSApp` [_lhs]
  Just l = lhsFromName 'multipleC
+
+-- |
+manyC :: Command a -> Command [a]
+manyC Command{_lhs,_grammar,_parser} = Command
+ lhs
+ (multipleDNSGrammar (combinatorDNSCommandName lhs) _grammar)
+ (\context -> Parsec.many1 (_parser context))
+ where
+ lhs    = l `LHSApp` [_lhs]
+ Just l = lhsFromName 'manyC
+
 
 -- |
 multipleDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
@@ -75,7 +99,10 @@ optionalDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = D
 
 -- |
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
-maybeAtomR = maybeAtomC . unsafeFellRHS
+maybeAtomR
+ = maybeAtomC
+ -- . set (grammar .dnsExport .dnsProductionName .dnsMetaInfo .dnsInline) True
+ . unsafeFellRHS
 
 -- |
 unsafeFellRHS :: RHS a -> Command a

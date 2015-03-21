@@ -1,3 +1,17 @@
+{- | only re-exports, for convenience. use the whole package with a single import.
+
+it conflicts with the @lens@ and @parsec@ and @base@ I use, but only a bit:
+
+@
+import Control.Lens hiding ((#), (&))
+import Control.Applicative hiding (many)
+@
+
+you can import it to your "configuration" module, which should just define several 'Command's anyway.
+
+
+
+-}
 module Commands
  ( module Commands.Etc
  -- , module Commands.Instances
@@ -46,5 +60,5 @@ import Commands.Graph
 import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
-import Commands.Parsec                      hiding (lower, optional, runParser)
+import Commands.Parsec                      hiding (lower, option, optional, runParser)
 import Control.Alternative.Free.Tree        hiding (Empty)

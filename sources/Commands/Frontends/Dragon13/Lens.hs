@@ -9,7 +9,7 @@ import Data.List.NonEmpty                (NonEmpty (..))
 import Data.Maybe                        (mapMaybe)
 
 
--- dnsAllProductions :: Traversal' (DNSGrammar n t) (DNSProduction e n t)
+-- dnsAllProductions :: Traversal' (DNSGrammar n t) (DNSProduction True n t)
 -- dnsAllProductions = DNSGrammar <$> f . downcastDNSProduction <*> pure <*> fmap f
 
 _DNSProduction :: Prism' (DNSProduction e n t) (DNSLHS LHSRule n, NonEmpty (DNSRHS n t))

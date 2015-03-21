@@ -6,11 +6,11 @@
 module Commands.Plugins.Example where
 import           Commands
 
-import           Control.Applicative
+import           Control.Applicative hiding  (many) 
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding (( # ), (&))
+import           Control.Lens                    hiding ((#), (&))
 import           Control.Monad                   (void, (<=<), (>=>))
 import           Control.Monad.Catch             (catches)
 import           Control.Parallel
@@ -27,43 +27,25 @@ import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
                                                   (<$>), (<>))
 
 
--- import qualified Data.Text.Lazy                    as T
--- import Control.Lens (alongside,Prism',Traversal',Lens)
--- import Control.Exception.Lens (handling, _IOException, AsIOException)
--- import System.IO.Error.Lens (description, location)
--- -- import System.IO.Error.Lens (errorType,_UserError,description)
--- import           Data.Monoid                       ((<>))
--- import           Data.Either.Validation            (Validation (..))
--- import Control.Applicative.Permutation
--- import Data.List                       (intercalate)
--- import Data.Monoid                     ((<>))
--- import Data.Traversable (traverse)
-
-
-
-
 data Root
  = Repeat Positive Root
  | Edit Action Region
  | Undo
  | ReplaceWith Dictation Dictation
  | Click_ Click
- | Dictated Dictation
+ | Phrase_ Phrase
  -- Roots [Root]
  deriving (Show,Eq)
 
-root :: Command Root
 root = 'root <=> empty
  <|> Repeat      # positive & root
  <|> ReplaceWith # "replace" & dictation & "with" & dictation
  <|> Undo        # "no"         -- order matters..
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
- <|> Dictated    # "say" & dictation
  <|> Click_      # click
  <|> Edit        # action    & region
+ <|> Phrase_     # phrase
  -- <|> Roots       # (multipleC root)
-
-
 
 data Action = Copy | Delete | Next deriving (Show,Eq,Enum,Typeable)
 action = enumCommand
@@ -77,53 +59,73 @@ region = enumCommand
 
 
 
-type Key = Char
-type Keyword = Word
-type Words = Dictation
-type Separator = String
 
--- data Phrase
---  deriving (Show)
 
--- Escaped    "lit" Keyword Phrase        -- ^ "freezes" Phrase into a Word, isomorphic to @['Phrase']@
--- Quoted     "quote" Words "unquote" Phrase  -- ^ "freezes" Phrase into Words
--- Verbatim   "say" Words              -- ^ "freezes" Phrase into Words
+data Phrase
+ = Verbatim   Dictation 
+ | Escaped    Keyword Phrase
+ | Quoted     Dictation Phrase
 
--- -- |  will tokens (i.e. Char) work wrt parsing/recognizing? sure, with optional whitespace before/after
--- Pressed "press" [Key] Phrase -- this isn't a Phrase.. it's a Command
--- Spelled "spell" [Char] Phrase  -- ^ manually instantiate NonEmpty, higher-kinded types not in grammar yet, isomorphic to @['Phrase']@
--- Letter  Char Phrase  -- ^ isomorphic to @['Phrase']@
--- Cap     "cap" Char Phrase -- ^ isomorphic to @['Phrase']@
+ | Pressed [Key] Phrase
+ | Spelled [Char] Phrase
+ | Letter  Char Phrase
+ | Cap     Char Phrase
 
--- -- |
--- -- whitespace or punctuation. un-parsable. Unless I prioritize it?
--- -- no left recursion in parsec, causes bottom. Perform this static check On grammar.
--- -- unless I consume a Word, and then recur? [Separated   Word Phrase Separator Phrase ]
--- -- maybe I can encode the grouping in the right-recursive "modifying" nodes: [Case   Casing Phrase (Maybe Separator)] or both [Case   Casing Phrase] and [CaseSep   Casing Phrase Separator]
--- Separated  Phrase Separator Phrase  --e.g. Space Phrase "space" Phrase
--- --
--- Case     Casing   Phrase
--- Join     Joiner   Phrase
--- Surround Brackets Phrase
--- --
--- Dictated Words  -- ^ the default
+ | Case     Casing   Phrase
+ | Join     Joiner   Phrase
+ | Surround Brackets Phrase
+
+ | Dictated Dictation
+ deriving (Show,Eq,Ord)
+
+phrase = 'phrase
+
+ <=> Verbatim # "say" & dictation
+ <|> Escaped  # "lit" & keyword & phrase
+ <|> Quoted   # "quote" & dictation & "unquote" & phrase
+
+ <|> Pressed  # "press" & many key & phrase
+ <|> Spelled  # "spell" & many character & phrase
+ <|> Letter   # character & phrase
+ <|> Cap      # "cap" & character & phrase
+
+ <|> Case     # casing   & phrase
+ <|> Join     # joiner   & phrase
+ <|> Surround # brackets & phrase
+
+ <|> Dictated # dictation
+
 
 data Joiner = Camel | Class | Snake | Dash | File | Squeeze deriving (Show,Eq,Ord,Enum,Typeable)
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
--- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
+joiner = enumCommand
 
+data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
+casing = enumCommand
+
+-- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
 data Brackets = Brackets String String | Bracket Char deriving (Show,Eq,Ord,Typeable)
 brackets = 'brackets
- <=> Bracket # "round" & character
+ <=> Bracket          # "round" & character
  <|> Brackets "(" ")" # "par"
  <|> Brackets "[" "]" # "square"
  <|> Brackets "{" "}" # "curl"
  <|> Brackets "<" ">" # "angles"
- <|> Bracket '"' # "string"
- <|> Bracket '|' # "norm"
+ <|> Bracket '"'      # "string"
+ <|> Bracket '|'      # "norm"
 
 character :: Command Char
 character = 'character <=> empty
+
+type Key = Char
+key :: Command Key
+key = 'key <=> empty
+
+type Keyword = Word
+keyword :: Command Keyword
+keyword = 'keyword <=> empty
+
+type Separator = String
+
 
 
 data Click = Click Times Button deriving (Show,Eq)
@@ -140,16 +142,15 @@ data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
 times = enumCommand :: Command Times
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
-button :: Command Button
 button = qualifiedCommand
 
 newtype Positive = Positive Int deriving (Show,Eq)
-positive :: Command Positive
 positive = 'positive
  <=> Positive # (asum . fmap int) [1..9]
 
-newtype Dictation = Dictation [String] deriving (Show,Eq)
-dictation :: Command Dictation
+
+
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = specialCommand 'dictation
  (DNSGrammar (DNSProduction (DNSRule name)
                             (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)) :| [])) [] [])
@@ -157,9 +158,14 @@ dictation = specialCommand 'dictation
  where
  name = set (dnsMetaInfo.dnsInline) True $ defaultDNSMetaName (unsafeLHSFromName 'dictation)
 
+
+
+
+
+
+
 -- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
 data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
-directions :: Command Directions
 directions = 'directions <=> "directions" &> (runPerms $ Directions
  <$> atom ("from" &> dictation)
  <*> atom ("to"   &> dictation)
@@ -167,7 +173,6 @@ directions = 'directions <=> "directions" &> (runPerms $ Directions
 
 -- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtomR'
 data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions_ :: Command Directions_
 directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
  <$> maybeAtomR ("from" &> place)
  <*> maybeAtomR ("to"   &> place)
@@ -196,96 +201,34 @@ exampleDirections = fmap (unwords . words)
  , "directions by bike   to there  from here"
  ]
 
--- goodDirections  = Directions  (Dictation ["here"])  (Dictation ["there"])  (Dictation ["bike"])
--- goodDirections_ = Directions_ (Just (Place "here")) (Just (Place "there")) (Just Bike)
-
--- powerset :: [a] -> [[a]]
--- powerset [] = [[]]
--- powerset (x:xs) = xss <> fmap (x:) xss
---  where xss = powerset xs
-
--- inputDirections_  = fmap (intercalate " ") . fmap ("directions":) . powerset $ ["by bike","to there","from here"]
--- outputDirections_ =
---  [ Directions_ Nothing               Nothing                Nothing
---  , Directions_ (Just (Place "here")) Nothing                Nothing
---  , Directions_ Nothing               (Just (Place "there")) Nothing
---  , Directions_ (Just (Place "here")) (Just (Place "there")) Nothing
---  , Directions_ Nothing               Nothing                (Just Bike)
---  , Directions_ (Just (Place "here")) Nothing                (Just Bike)
---  , Directions_ Nothing               (Just (Place "there")) (Just Bike)
---  , Directions_ (Just (Place "here")) (Just (Place "there")) (Just Bike)
---  ]
 
 
-oneSecond = round (1e6 :: Double) :: Int
 
-attemptAsynchronously action = do
- (timeout oneSecond action) `withAsync` (waitCatch >=> \case
+
+-- it seems to be synchronous, even with threaded I guess?
+attemptAsynchronously :: Int -> IO () -> IO ()
+attemptAsynchronously seconds action = do
+ (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
    Left error     -> print error
    Right Nothing  -> putStrLn "..."
    Right (Just _) -> return ()
   )
 
-attempt = attemptAsynchronously
+attempt = attemptAsynchronously 1
 
 attemptParse command = attempt . handleParse command
 
--- attemptSerialize (Command _ g _) = attempt $ either print print $ (serializeProduction (renderProduction g))
-attemptSerialize command = attempt $ either print T.putStrLn $ serialized command
+attemptSerialize command = attemptAsynchronously 2 $ either print T.putStrLn $ serialized command
 
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 
 
 main = do
- -- let Right escaped = escapeDNSGrammar grammar
- -- let serializedRules = vsep ["'''", serializeRules escaped, "'''"]
- -- let serializedLists = serializeVocabularies (dnsProductions escaped)
- -- let serializedGrammar = vsep $ punctuate "\n" [ "_commands_rules_ =" <+> serializedRules, "_commands_lists_ =" <+> serializedLists]
- -- print serializedGrammar
-
- -- putStrLn ""
- -- putStr "words: "
- -- print $ getWords grammar
- -- putStr "names: "
- -- print $ getNames grammar
-
- -- putStrLn ""
- -- putStrLn . take 100 . show $ parseExpr (show serializedRules) ""
- -- putStrLn ""
- -- putStrLn . take 100 . show $ parseExpr (show serializedLists) ""
- -- putStrLn ""
- -- putStrLn . take 100 . show $ parseModule (show serializedGrammar) ""
-
- -- putStrLn ""
- -- print $ (isPythonString . show) serializedRules
- -- print $ (isPythonDict . show) serializedLists
- -- print $ (isPythonModule . show) serializedGrammar
-
- -- putStrLn ""
- -- _ <- bitraverse print T.putStrLn $ serialize grammar
- -- putStrLn ""
- -- _ <- bitraverse print T.putStrLn $ serialize badGrammar
- -- putStrLn ""
-
- -- print escaped
-
- -- putStrLn ""
- -- attempt . print . renders $ root
-
-
-
-
-
-
-
-
-
 
  putStrLn ""
  attemptSerialize root -- timed out. fast after Commands.Commands.Sugar, I think. Theory: may be left associated tree is efficient, wall arbitrarily associated free alternatives is obscenely polynomial inefficient. But even for such a small grammar? May be non-left association causes non-termination?
  -- I don't think so: {<|> Repeat     <$> liftCommand positive <*> liftCommand root} still terminates in both the serialization in the parsing. Maybe because all the alternatives (or their children) were not left associated? I don't know
  -- See also: attemptParse (multipleC root) "no 1 replace this and that with that and this"
-
 
 
  putStrLn ""
@@ -332,12 +275,6 @@ main = do
  putStrLn ""
  traverse_ (attemptParse directions_) exampleDirections
 
- -- putStrLn ""
- -- attemptSerialize directions__
- -- putStrLn ""
- -- traverse_ (attemptParse directions__) exampleDirections
- -- attemptParse directions__ "directions to San Francisco by public transit from Redwood City"
-
  putStrLn ""
  print (getWords . _grammar $ button)
 
@@ -363,3 +300,8 @@ main = do
    r -> r)
   rhs
 
+ putStrLn ""
+ attemptParse phrase "parens snake upper some words" -- lol "ens":  Surround (Brackets "(" ")") (Dictated (Dictation ["ens","snake","upper","some","words"]))
+ attemptParse phrase "par snake upper some words"
+ attemptParse phrase "say some words"
+ attemptParse phrase "par quote par snake unquote snake some words"

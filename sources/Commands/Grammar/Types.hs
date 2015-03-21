@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, PackageImports #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                         #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell, NamedFieldPuns                        #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
@@ -13,6 +13,7 @@ import "transformers-compat" Data.Functor.Sum
 import Data.Hashable                     (Hashable)
 import GHC.Generics                      (Generic)
 import Numeric.Natural                   (Natural)
+import Data.Function ( on)
 
 
 -- |
@@ -131,5 +132,26 @@ defaultDNSInfo = DNSInfo 0 False
 
 
 makeLenses ''DNSMetaName
-
 makeLenses ''DNSInfo
+makeLenses ''Command
+
+
+type DNSMetaName_ n = (Maybe Natural, n)
+
+-- |
+--
+-- e.g. 
+--
+-- >>> set dnsMetaNameEq (Just 666, "XXX") (defaultDNSMetaName "")
+-- DNSMetaName {_dnsMetaInfo = DNSInfo {_dnsExpand = 0, _dnsInline = False}, _dnsMetaExpansion = Just 666, _dnsMetaName = "XXX"}
+--
+dnsMetaNameEq :: Lens' (DNSMetaName n) (DNSMetaName_ n)
+dnsMetaNameEq = lens
+ (\DNSMetaName{_dnsMetaExpansion,_dnsMetaName} -> (_dnsMetaExpansion,_dnsMetaName))
+ (\whole (_dnsMetaExpansion,_dnsMetaName) -> whole{_dnsMetaExpansion,_dnsMetaName})
+-- TODO  dnsMetaNameEq = alongside dnsMetaExpansion dnsMetaName
+
+-- | equality projected 'on' 'dnsMetaNameEq'
+equalDNSMetaName :: (Eq n) => DNSMetaName n -> DNSMetaName n -> Bool
+equalDNSMetaName = (==) `on` view dnsMetaNameEq
+

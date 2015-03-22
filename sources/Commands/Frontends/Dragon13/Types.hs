@@ -170,7 +170,7 @@ instance Plated (DNSRHS n t) where
 -- @
 --
 -- rather than the simple but non-@n@-polymorphic:
--- 
+--
 --
 -- @
 -- zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t

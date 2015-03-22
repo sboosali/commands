@@ -4,10 +4,10 @@ it conflicts with the @lens@ and @parsec@ and @base@ I use, but only a bit:
 
 @
 import Control.Lens hiding ((#), (&))
-import Control.Applicative hiding (many)
+import Control.Applicative hiding (many, optional)
 @
 
-you can import it to your "configuration" module, which should just define several 'Command's anyway.
+you can import this module to your "configuration" module, which should just define several 'Command's anyway.
 
 
 

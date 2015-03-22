@@ -6,7 +6,7 @@
 module Commands.Plugins.Example where
 import           Commands
 
-import           Control.Applicative             hiding (many)
+import           Control.Applicative             hiding (many, optional)
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
@@ -66,17 +66,16 @@ data Phrase
  | Escaped    Keyword Phrase
  | Quoted     Dictation Phrase
 
- | Pressed [Key] Phrase
- | Spelled [Char] Phrase
- | Letter  Char Phrase
- | Cap     Char Phrase
+ | Pressed [Key] (Maybe Phrase)
+ | Spelled [Char] (Maybe Phrase)
+ | Letter  Char (Maybe Phrase)
+ | Cap     Char (Maybe Phrase)
 
  | Case     Casing   Phrase
  | Join     Joiner   Phrase
  | Surround Brackets Phrase
 
  | Dictated Dictation
- | Epsilon
  deriving (Show,Eq,Ord)
 
 phrase = 'phrase
@@ -85,11 +84,11 @@ phrase = 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- <|> Pressed  # "press" & many key & option Epsilon phrase
- <|> Spelled  # "spell" & many character & option Epsilon phrase
- <|> Spelled  # many character & option Epsilon phrase
- <|> Letter   # character & phrase
- <|> Cap      # "cap" & character & option Epsilon phrase
+ <|> Pressed  # "press" & many key & optional phrase
+ <|> Spelled  # "spell" & many character & optional phrase
+ <|> Spelled  # many character & optional phrase
+ <|> Letter   # character & optional phrase
+ <|> Cap      # "cap" & character & optional phrase
 
  <|> Case     # casing   & phrase
  <|> Join     # joiner   & phrase
@@ -195,15 +194,22 @@ character = 'character <=> empty
  <|> 'y' # "why"
  <|> 'z' # "zee"
 
-type Key = Char
+-- | 'Key's and 'Char'acters are "incomparable":
+--
+-- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
+-- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
+--
+-- so we can't embed the one into the other, but we'll just keep things simple with duplication.
+--
+type Key = Char -- TODO
 key :: Command Key
 key = 'key <=> empty
 
-type Keyword = Word
+type Keyword = Word -- TODO
 keyword :: Command Keyword
 keyword = 'keyword <=> empty
 
-type Separator = String
+type Separator = String -- TODO
 
 
 

@@ -21,14 +21,6 @@ import Prelude             hiding (mapM)
 
 -- ================================================================ --
 
--- |
---
--- in relation to NatLink's concrete syntax:
---
--- * @"\<rule> imported;"@ is a 'DNSImport'
---
-type DNSImport n = DNSLHS LHSRule n
-
 -- | a Dragon NaturallySpeaking (\"DNS") grammar has
 -- one or more 'DNSProduction's, exactly one of which is an export.
 -- (the "exactly one" constraint should really be "at least one", but
@@ -46,10 +38,12 @@ type DNSImport n = DNSLHS LHSRule n
 --
 data DNSGrammar n t = DNSGrammar
  { _dnsExport      :: DNSProduction True n t
- , _dnsImports     :: [DNSImport n]
+ , _dnsImports     :: [DNSImport n] -- TODO  a Set, or remove duplicates later
  , _dnsProductions :: [DNSProduction False n t]
  }
  deriving (Show, Eq)
+
+-- TODO instance Semigroup (DNSGrammar n t) where <>
 
 instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
 instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
@@ -68,6 +62,14 @@ partitionDNSGrammar DNSGrammar{_dnsExport,_dnsProductions}
  = partitionEithers
  . fmap downcastDNSProduction
  $ upcastDNSProduction _dnsExport : _dnsProductions
+
+-- |
+--
+-- in relation to NatLink's concrete syntax:
+--
+-- * @"\<rule> imported;"@ is a 'DNSImport'
+--
+type DNSImport n = DNSLHS LHSRule n
 
 
 -- ================================================================ --
@@ -97,6 +99,8 @@ partitionDNSGrammar DNSGrammar{_dnsExport,_dnsProductions}
 data DNSProduction (e :: Bool) n t where
  DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
+
+-- TODO don't inline NonEmpty, but preserve specially-serialized top-level DNSAlternatives
 
 deriving instance (Show n, Show t) => Show (DNSProduction e n t)
 deriving instance (Eq   n, Eq   t) => Eq   (DNSProduction e n t)
@@ -147,9 +151,7 @@ instance Plated (DNSRHS n t) where
  plate f (DNSAlternatives rs) = DNSAlternatives <$> traverse f rs
  plate _ r = pure r
 
--- | @emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList'))@
---
--- can be used as:
+-- | the "additive identity" i.e.:
 --
 -- * identity to 'DNSAlternatives'
 -- * annihilator to 'DNSSequence'
@@ -161,16 +163,63 @@ instance Plated (DNSRHS n t) where
 -- "Commands.Frontends.Dragon13.Optimize"). these stages use different
 -- name types (i.e. the @n@ in @DNSRHS n t@): not the same one, and
 -- not just Strings. Thus, we need a parametrically polymorphic
--- 'emptyDNSRHS', rather than the simple but non-@n@-polymorphic:
+-- 'zeroDNSRHS':
 --
 -- @
--- emptyDNSRHS :: DNSRHS String t
--- emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSList "emptyList"))
+-- zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS n t
+-- @
+--
+-- rather than the simple but non-@n@-polymorphic:
+-- 
+--
+-- @
+-- zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t
 -- @
 --
 --
-emptyDNSRHS :: DNSRHS n t
-emptyDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
+zeroDNSRHS :: DNSRHS n t
+zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
+
+-- | the "multiplicative identity":
+--
+-- * identity to 'DNSSequence'
+--
+-- ("verified" by experimenting with Dragon NaturallySpeaking)
+--
+--  Dragon NaturallySpeaking's grammatical format is EBNF-like, but there's no "epsilon production" (i.e. the production that matches the empty string, always succeeding). I tried @'DNSToken' ""@, but that raised an error. with a "epsilon" primitive, it seems to me easy to implement the Multiple:
+--
+-- @<multiple_x> = <eps> | x <multiple_x>@
+--
+-- and Optional:
+--
+-- @<optional_x> = <eps> | x@
+--
+-- productions. abusing notation, let's rewrite the higher-order
+-- 'DNSOptional' production as:
+--
+-- @optional(x) = 1 + x@
+--
+-- and the 'zeroDNSRHS' as:
+--
+-- @0@
+--
+-- we want @1@, we only have @0@ and @optional(x)@. so:
+--
+-- @1 = 1 + 0 = optional(0)@
+--
+-- by:
+--
+-- * additive identity of @0@ and
+-- * the definition of @optional(x)@.
+--
+-- thus:
+--
+-- @epsilonDNSRHS = 'DNSOptional' 'zeroDNSRHS'@
+--
+-- which somehow actually works in the speech recognition engine.
+--
+oneDNSRHS :: DNSRHS n t
+oneDNSRHS = DNSOptional zeroDNSRHS
 
 
 -- ================================================================ --

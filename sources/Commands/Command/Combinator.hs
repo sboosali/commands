@@ -12,8 +12,8 @@ module Commands.Command.Combinator where
 import           Commands.Command
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Lens  ()
 import           Commands.Frontends.Dragon13.Types
-import           Commands.Frontends.Dragon13.Lens ()
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
@@ -30,6 +30,10 @@ multiple = multipleC
 -- | @= 'manyC'@
 many :: Command a -> Command [a]
 many = manyC
+
+-- | @= 'many0C'@
+many0 :: Command a -> Command [a]
+many0 = many0C
 
 -- |
 multipleC :: Command a -> Command [a]
@@ -52,19 +56,42 @@ manyC Command{_lhs,_grammar,_parser} = Command
  lhs    = l `LHSApp` [_lhs]
  Just l = lhsFromName 'manyC
 
+-- |
+many0C :: Command a -> Command [a]
+many0C Command{_lhs,_grammar,_parser} = Command
+ lhs
+ (zeroOrMoreDNSGrammar (combinatorDNSCommandName lhs) _grammar)
+ (\context -> Parsec.many (_parser context))
+ where
+ lhs    = l `LHSApp` [_lhs]
+ Just l = lhsFromName 'many0C
 
 -- |
 multipleDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
 multipleDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
- (DNSProduction (DNSRule name) (hoistDNSRHS DNSMultiple _dnsExport))
+ (DNSProduction (DNSRule name) $ hoistDNSRHS DNSMultiple _dnsExport)
  _dnsImports
  (upcastDNSProduction _dnsExport : _dnsProductions)
+
+-- | 'DNSMultiple' recognizes one or more, @('DNSOptional' . 'DNSMultiple') recognizes zero or more.
+zeroOrMoreDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
+zeroOrMoreDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
+ -- (DNSProduction (DNSRule name) $ DNSSequence (hoistDNSRHS DNSOptional _dnsExport) :| [hoistDNSRHS DNSMultiple _dnsExport])
+ (DNSProduction (DNSRule name) $ (DNSOptional . DNSMultiple) `hoistDNSRHS` _dnsExport)
+ _dnsImports
+ (upcastDNSProduction _dnsExport : _dnsProductions)
+
+
 
 
 
 -- | @= 'optionalC'@
 optional :: Command a -> Command (Maybe a)
 optional = optionalC
+
+-- | @= 'optionC'@
+option :: a -> Command a -> Command a
+option = optionC
 
 -- | @= 'optionC' 'enumDefault'@
 optionalEnum :: (Enum a) => Command a -> Command a
@@ -91,7 +118,7 @@ optionalC Command{_lhs,_grammar,_parser} = Command lhs
 -- |
 optionalDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
 optionalDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
- (DNSProduction (DNSRule name) (hoistDNSRHS DNSOptional _dnsExport))
+ (DNSProduction (DNSRule name) $ hoistDNSRHS DNSOptional _dnsExport)
  _dnsImports
  (upcastDNSProduction _dnsExport : _dnsProductions)
 

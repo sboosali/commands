@@ -38,7 +38,7 @@ renderLHS = DNSRule . defaultDNSMetaName
 
 -- |
 renderRHS :: RHS x -> NonEmpty (DNSRHS DNSCommandName DNSCommandToken)
-renderRHS r = case fromMaybe emptyDNSRHS . renderRHS_ $ r of
+renderRHS r = case fromMaybe zeroDNSRHS . renderRHS_ $ r of
  DNSAlternatives rs -> rs
  r -> r :| []
 

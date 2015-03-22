@@ -105,7 +105,7 @@ expandProductionCycleTo :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction
 expandProductionCycleTo ls d p@(DNSProduction l r)
   = [DNSProduction l $ fmap (expandRHSAt ls d) r] -- TODO this guarantees the irrefutable pattern match above i.e. ([e], ps)
  <> fmap (\k -> expandProductionAt ls k p) [1..d]
- <> [DNSProduction (expandLHSAt 0 l) $ first defaultDNSMetaName emptyDNSRHS :| []]
+ <> [DNSProduction (expandLHSAt 0 l) $ first defaultDNSMetaName zeroDNSRHS :| []]
 
 expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction True (DNSMetaName n) t -> DNSProduction True (DNSMetaName n) t
 expandProductionAt ls d (DNSProduction l r) = DNSProduction (expandLHSAt d l) $ fmap (expandRHSAt ls (d-1)) r

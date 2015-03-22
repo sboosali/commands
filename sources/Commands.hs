@@ -60,5 +60,6 @@ import Commands.Graph
 import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
-import Commands.Parsec                      hiding (lower, option, optional, runParser)
+import Commands.Parsec                      hiding (lower, option, optional,
+                                             runParser)
 import Control.Alternative.Free.Tree        hiding (Empty)

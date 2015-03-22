@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, PackageImports #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell, NamedFieldPuns                        #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, NamedFieldPuns #-}
+{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell         #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
@@ -8,12 +8,12 @@ import Commands.Parse.Types
 import Control.Alternative.Free.Tree
 
 import Control.Lens
+import Data.Function                     (on)
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
 import Data.Hashable                     (Hashable)
 import GHC.Generics                      (Generic)
 import Numeric.Natural                   (Natural)
-import Data.Function ( on)
 
 
 -- |
@@ -140,7 +140,7 @@ type DNSMetaName_ n = (Maybe Natural, n)
 
 -- |
 --
--- e.g. 
+-- e.g.
 --
 -- >>> set dnsMetaNameEq (Just 666, "XXX") (defaultDNSMetaName "")
 -- DNSMetaName {_dnsMetaInfo = DNSInfo {_dnsExpand = 0, _dnsInline = False}, _dnsMetaExpansion = Just 666, _dnsMetaName = "XXX"}

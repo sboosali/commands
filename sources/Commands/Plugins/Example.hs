@@ -6,11 +6,11 @@
 module Commands.Plugins.Example where
 import           Commands
 
-import           Control.Applicative hiding  (many) 
+import           Control.Applicative             hiding (many)
 import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding ((#), (&))
+import           Control.Lens                    hiding (( # ), (&))
 import           Control.Monad                   (void, (<=<), (>=>))
 import           Control.Monad.Catch             (catches)
 import           Control.Parallel
@@ -62,7 +62,7 @@ region = enumCommand
 
 
 data Phrase
- = Verbatim   Dictation 
+ = Verbatim   Dictation
  | Escaped    Keyword Phrase
  | Quoted     Dictation Phrase
 
@@ -76,6 +76,7 @@ data Phrase
  | Surround Brackets Phrase
 
  | Dictated Dictation
+ | Epsilon
  deriving (Show,Eq,Ord)
 
 phrase = 'phrase
@@ -84,10 +85,11 @@ phrase = 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- <|> Pressed  # "press" & many key & phrase
- <|> Spelled  # "spell" & many character & phrase
+ <|> Pressed  # "press" & many key & option Epsilon phrase
+ <|> Spelled  # "spell" & many character & option Epsilon phrase
+ <|> Spelled  # many character & option Epsilon phrase
  <|> Letter   # character & phrase
- <|> Cap      # "cap" & character & phrase
+ <|> Cap      # "cap" & character & option Epsilon phrase
 
  <|> Case     # casing   & phrase
  <|> Join     # joiner   & phrase
@@ -95,6 +97,7 @@ phrase = 'phrase
 
  <|> Dictated # dictation
 
+speech = phrase -- TODO
 
 data Joiner = Camel | Class | Snake | Dash | File | Squeeze deriving (Show,Eq,Ord,Enum,Typeable)
 joiner = enumCommand
@@ -105,16 +108,92 @@ casing = enumCommand
 -- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
 data Brackets = Brackets String String | Bracket Char deriving (Show,Eq,Ord,Typeable)
 brackets = 'brackets
- <=> Bracket          # "round" & character
+ <=> bracket          # "round" & character
  <|> Brackets "(" ")" # "par"
  <|> Brackets "[" "]" # "square"
  <|> Brackets "{" "}" # "curl"
  <|> Brackets "<" ">" # "angles"
- <|> Bracket '"'      # "string"
- <|> Bracket '|'      # "norm"
+ <|> bracket '"'      # "string"
+ <|> bracket '|'      # "norm"
+
+bracket c = Brackets [c] [c]
 
 character :: Command Char
 character = 'character <=> empty
+
+ <|> '`' # "grave"
+ <|> '~' # "till"
+ <|> '!' # "bang"
+ <|> '@' # "axe"
+ <|> '#' # "pound"
+ <|> '$' # "doll"
+ <|> '%' # "purse"
+ <|> '^' # "care"
+ <|> '&' # "amp"
+ <|> '*' # "star"
+ <|> '(' # "lore"
+ <|> ')' # "roar"
+ <|> '-' # "dash"
+ <|> '_' # "score"
+ <|> '=' # "eek"
+ <|> '+' # "plus"
+ <|> '[' # "lack"
+ <|> '{' # "lace"
+ <|> ']' # "rack"
+ <|> '}' # "race"
+ <|> '\\' # "stroke"
+ <|> '|' # "pipe"
+ <|> ';' # "sem"
+ <|> ':' # "colon"
+ <|> '\'' # "tick"
+ <|> '"' # "quote"
+ <|> ',' # "com"
+ <|> '<' # "less"
+ <|> '.' # "dot"
+ <|> '>' # "great"
+ <|> '/' # "slash"
+ <|> '?' # "quest"
+ <|> ' ' # "ace"
+ <|> '\t' # "tab"
+ <|> '\n' # "line"
+
+ <|> '0' # "zero"
+ <|> '1' # "one"
+ <|> '2' # "two"
+ <|> '3' # "three"
+ <|> '4' # "four"
+ <|> '5' # "five"
+ <|> '6' # "six"
+ <|> '7' # "seven"
+ <|> '8' # "eight"
+ <|> '9' # "nine"
+
+ <|> 'a' # "ay"
+ <|> 'b' # "bee"
+ <|> 'c' # "sea"
+ <|> 'd' # "dee"
+ <|> 'e' # "eek"
+ <|> 'f' # "eff"
+ <|> 'g' # "gee"
+ <|> 'h' # "aych"
+ <|> 'i' # "eye"
+ <|> 'j' # "jay"
+ <|> 'k' # "kay"
+ <|> 'l' # "el"
+ <|> 'm' # "em"
+ <|> 'n' # "en"
+ <|> 'o' # "oh"
+ <|> 'p' # "pea"
+ <|> 'q' # "queue"
+ <|> 'r' # "are"
+ <|> 's' # "ess"
+ <|> 't' # "tea"
+ <|> 'u' # "you"
+ <|> 'v' # "vee"
+ <|> 'w' # "dub"
+ <|> 'x' # "ex"
+ <|> 'y' # "why"
+ <|> 'z' # "zee"
 
 type Key = Char
 key :: Command Key
@@ -301,7 +380,13 @@ main = do
   rhs
 
  putStrLn ""
- attemptParse phrase "parens snake upper some words" -- lol "ens":  Surround (Brackets "(" ")") (Dictated (Dictation ["ens","snake","upper","some","words"]))
+ attemptParse phrase "parens snake upper some words" -- lol "ens"
  attemptParse phrase "par snake upper some words"
  attemptParse phrase "say some words"
  attemptParse phrase "par quote par snake unquote snake some words"
+ attemptParse phrase "spell grave zero ay bee sea some words"
+ attemptParse phrase "spell grave zero ay bee sea"
+ attemptParse phrase "string some words"
+
+ -- putStrLn ""
+ -- attemptParse speech "lore some words roar"

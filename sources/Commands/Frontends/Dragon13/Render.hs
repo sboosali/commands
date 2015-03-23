@@ -11,7 +11,7 @@ import Control.Applicative
 -- import Data.Foldable                     (foldMap)
 -- import Data.Function                     (on)
 -- import Data.List                         (nub, nubBy)
-import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
+import Data.List.NonEmpty                (nonEmpty)
 import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 
 
@@ -31,10 +31,8 @@ renderLHS :: LHS -> DNSLHS LHSRule DNSCommandName
 renderLHS = DNSRule . defaultDNSMetaName
 
 -- |
-renderRHS :: RHS x -> NonEmpty (DNSRHS DNSCommandName DNSCommandToken)
-renderRHS r = case fromMaybe zeroDNSRHS . renderRHS_ $ r of
- DNSAlternatives rs -> rs
- r -> r :| []
+renderRHS :: RHS x -> DNSRHS DNSCommandName DNSCommandToken
+renderRHS = fromMaybe zeroDNSRHS . renderRHS_
 
 -- |
 renderRHS_ :: RHS x -> Maybe (DNSRHS DNSCommandName DNSCommandToken)

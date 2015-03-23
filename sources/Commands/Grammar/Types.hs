@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, NamedFieldPuns #-}
-{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell, DataKinds        #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DeriveGeneric, GADTs, NamedFieldPuns #-}
+{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell                    #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc

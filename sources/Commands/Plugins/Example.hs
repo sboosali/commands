@@ -237,7 +237,7 @@ positive = 'positive
 
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = specialCommand 'dictation empty
- (DNSProduction (DNSRule name) (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)) :| []))                           
+ (DNSProduction (DNSRule name) (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))))
  (\context -> Dictation <$> anyBlack `manyUntil` context)
  where
  name = set (dnsMetaInfo.dnsInline) True $ defaultDNSMetaName (unsafeLHSFromName 'dictation)
@@ -398,7 +398,7 @@ main = do
 
  putStrLn ""
  attemptParse even_ "even odd even "
- attemptSerialize even_ -- mutually recursive grammars can't be serialized 
+ attemptSerialize even_ -- mutually recursive grammars can't be serialized
 
 data Even = Even (Maybe Odd) deriving Show
 even_ = 'even_ <=> Even # "even" & optional odd_

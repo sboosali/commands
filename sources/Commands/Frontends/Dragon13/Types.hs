@@ -100,7 +100,7 @@ dnsHeader = DNSBuiltinRule <$> constructors
 -- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
 --
 data DNSProduction (e :: Bool) n t where
- DNSProduction :: DNSLHS LHSRule n -> NonEmpty (DNSRHS n t) -> DNSProduction e     n t
+ DNSProduction :: DNSLHS LHSRule n -> DNSRHS n t -> DNSProduction e     n t
  DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
 
 -- TODO don't inline NonEmpty, but preserve specially-serialized top-level DNSAlternatives
@@ -111,7 +111,7 @@ deriving instance (Eq   n, Eq   t) => Eq   (DNSProduction e n t)
 instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSProduction e) where
- bitraverse f g (DNSProduction l rs) = DNSProduction <$> traverse f l <*> traverse (bitraverse f g) rs
+ bitraverse f g (DNSProduction l rs) = DNSProduction <$> traverse f l <*> bitraverse f g rs
  bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
 
 upcastDNSProduction :: DNSProduction True n t -> DNSProduction e n t
@@ -224,6 +224,10 @@ zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 --
 unitDNSRHS :: DNSRHS n t
 unitDNSRHS = DNSOptional zeroDNSRHS
+
+nonemptyDNSRHS :: DNSRHS n t -> NonEmpty (DNSRHS n t)
+nonemptyDNSRHS (DNSAlternatives rs) = rs
+nonemptyDNSRHS r = r :| []
 
 
 -- ================================================================ --

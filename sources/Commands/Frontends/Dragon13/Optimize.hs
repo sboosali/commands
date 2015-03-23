@@ -14,7 +14,6 @@ import           Data.Either                       (partitionEithers)
 import           Data.Graph
 import           Data.List
 import qualified Data.List                         as List
-import           Data.List.NonEmpty                (NonEmpty (..))
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Monoid                       ((<>))
@@ -103,12 +102,12 @@ expandProductionCycle ps = concatMap (expandProductionCycleTo ls (expandProducti
 --
 expandProductionCycleTo :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction True (DNSMetaName n) t -> [DNSProduction True (DNSMetaName n) t]
 expandProductionCycleTo ls d p@(DNSProduction l r)
-  = [DNSProduction l $ fmap (expandRHSAt ls d) r] -- TODO this guarantees the irrefutable pattern match above i.e. ([e], ps)
+  = [DNSProduction l $ expandRHSAt ls d r] -- TODO this guarantees the irrefutable pattern match above i.e. ([e], ps)
  <> fmap (\k -> expandProductionAt ls k p) [1..d]
- <> [DNSProduction (expandLHSAt 0 l) $ first defaultDNSMetaName zeroDNSRHS :| []]
+ <> [DNSProduction (expandLHSAt 0 l) $ first defaultDNSMetaName zeroDNSRHS]
 
 expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction True (DNSMetaName n) t -> DNSProduction True (DNSMetaName n) t
-expandProductionAt ls d (DNSProduction l r) = DNSProduction (expandLHSAt d l) $ fmap (expandRHSAt ls (d-1)) r
+expandProductionAt ls d (DNSProduction l r) = DNSProduction (expandLHSAt d l) $ expandRHSAt ls (d-1) r
 
 expandRHSAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSRHS (DNSMetaName n) t -> DNSRHS (DNSMetaName n) t
 expandRHSAt ls d = transform $ \case
@@ -193,7 +192,7 @@ toBeInlined p = case p ^? (dnsProductionName.dnsMetaInfo.dnsInline) of
 partitionInlined :: (Ord n) => [DNSProduction True (DNSMetaName n) t] -> ([DNSProduction True (DNSMetaName n) t], DNSInlined n t)
 partitionInlined ps = (notInlined, theInlined)
  where
- theInlined = Map.fromList . fmap (\(DNSProduction l rs) -> (SomeDNSLHS l, DNSAlternatives rs)) $ yesInlined
+ theInlined = Map.fromList . fmap (\(DNSProduction l r) -> (SomeDNSLHS l, r)) $ yesInlined
  (notInlined, yesInlined) = partitionEithers . fmap toBeInlined $ ps
 
 

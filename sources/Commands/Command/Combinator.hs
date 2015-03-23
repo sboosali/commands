@@ -18,10 +18,10 @@ import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
 
+import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Lens
 import qualified Text.Parsec                       as Parsec
-import           Control.Applicative
 
 
 -- ================================================================ --
@@ -41,7 +41,7 @@ many0 = many0C
 -- |
 multipleC :: Command a -> Command [a]
 multipleC command = Command
- (bimapRule (appLHS lhs) multipleRHS (command ^. comRule)) 
+ (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
  (multipleDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
  (\context -> (command ^. comParser) context `manyUntil` context)
  where

@@ -5,14 +5,13 @@ import Commands.Frontends.Dragon13.Types
 import Control.Applicative
 import Control.Lens
 import Data.Function                     (on)
-import Data.List.NonEmpty                (NonEmpty (..))
 import Data.Maybe                        (mapMaybe)
 
 
 -- dnsAllProductions :: Traversal' (DNSGrammar n t) (DNSProduction True n t)
 -- dnsAllProductions = DNSGrammar <$> f . downcastDNSProduction <*> pure <*> fmap f
 
-_DNSProduction :: Prism' (DNSProduction e n t) (DNSLHS LHSRule n, NonEmpty (DNSRHS n t))
+_DNSProduction :: Prism' (DNSProduction e n t) (DNSLHS LHSRule n, DNSRHS n t)
 _DNSProduction = prism' (uncurry DNSProduction) $ \case
  DNSProduction l rs -> Just (l, rs)
  _ -> Nothing
@@ -22,7 +21,7 @@ _DNSProduction = prism' (uncurry DNSProduction) $ \case
 -- not a Prism, RHS (without LHS) is not enough to inject.
 -- yes a Traversal, it can have zero-or-more targets and set them all (what are its laws?).
 dnsProductionRHS :: Traversal' (DNSProduction e n t) (DNSRHS n t)
-dnsProductionRHS = _DNSProduction._2.traversed
+dnsProductionRHS = _DNSProduction._2
 
 -- |
 getNonTerminals :: DNSProduction e n t -> [SomeDNSLHS n]

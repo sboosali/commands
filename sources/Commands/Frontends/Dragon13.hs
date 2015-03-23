@@ -22,7 +22,6 @@ import           Data.Either.Validation            (Validation,
                                                     validationToEither)
 import           Data.Foldable                     (toList)
 import           Data.List                         (nub)
-import           Data.List.NonEmpty                (NonEmpty (..))
 import           Data.Maybe                        (mapMaybe)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
@@ -34,7 +33,7 @@ import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 
 >>> :set -XOverloadedLists -XOverloadedStrings
 >>> :{
-let root = DNSProduction (DNSRule "root")
+let root = DNSProduction (DNSRule "root") $ DNSAlternatives
             [ DNSSequence
               [                           DNSNonTerminal (SomeDNSLHS (DNSList "command"))
               ,                           DNSNonTerminal (SomeDNSLHS (DNSRule "subcommand"))
@@ -52,11 +51,11 @@ let root = DNSProduction (DNSRule "root")
                       [ DNSToken "git"
                       , DNSToken "rm"
                       ]
-    subcommand = DNSProduction (DNSRule "subcommand")
+    subcommand = DNSProduction (DNSRule "subcommand") $ DNSAlternatives
                        [ DNSTerminal    (DNSToken "status")
                        , DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))
                        ]
-    Right grammar = escapeDNSGrammar (DNSGrammar root [] [command, subcommand, flag])
+    Right grammar = escapeDNSGrammar (DNSGrammar root dnsHeader [command, subcommand, flag])
 :}
 
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
@@ -115,7 +114,7 @@ serializeGrammar grammar = grammar_
   , "'''"
   , "_commands_lists_ =" <+> lists_
   ]
- imports_ = serializeImports (dnsHeader <> grammar ^. dnsImports)
+ imports_ = serializeImports (grammar ^. dnsImports)
  rules_ = serializeRules grammar
  lists_ = serializeLists grammar
 
@@ -146,16 +145,16 @@ serializeImports = vsep . fmap (\l ->serializeLHS l <+> "imported" <> ";")
 -- | like @'serializeProduction' ('DNSProduction' ...)@, only
 -- it inserts @"exported"@.
 --
--- >>> serializeExport $ DNSProduction (DNSRule (DNSName "rule")) [DNSTerminal (DNSToken (DNSText "hello"))]
+-- >>> serializeExport $ DNSProduction (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "hello")))
 -- <rule> exported  = "hello";
 --
 serializeExport :: DNSProduction True DNSName DNSText -> Doc
-serializeExport (DNSProduction l (toList -> rs)) =
+serializeExport (DNSProduction l (nonemptyDNSRHS -> toList -> rs)) =
  serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 -- |
 --
--- >>> serializeProduction $ DNSProduction (DNSRule (DNSName "rule")) [DNSTerminal (DNSToken (DNSText "hello"))]
+-- >>> serializeProduction $ DNSProduction (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "hello")))
 -- <rule>  = "hello";
 -- >>> serializeProduction $ DNSVocabulary undefined undefined :: Maybe Doc
 -- Nothing
@@ -163,7 +162,7 @@ serializeExport (DNSProduction l (toList -> rs)) =
 -- see 'serializeVocabulary' for the 'DNSVocabulary' case.
 --
 serializeProduction :: DNSProduction False DNSName DNSText -> Possibly Doc
-serializeProduction (DNSProduction l (toList -> rs)) = return $
+serializeProduction (DNSProduction l (nonemptyDNSRHS -> toList -> rs)) = return $
  serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 serializeProduction DNSVocabulary{} = failed "serializeProduction"
 -- serializeProduction DNSVocabulary{} = mempty -- not identity to vertical alignment
@@ -345,8 +344,8 @@ getWords = nub . bifoldMap (const []) (:[])
 
 -- | pushes a 'DNSProduction' into a 'DNSRHS',
 -- and makes a new transformed 'DNSProduction'
--- 
+--
 -- a helper function for defining higher-order productions.
 pushDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction True n t -> DNSProduction True n t
-pushDNSProduction f n (DNSProduction l _) = DNSProduction (DNSRule n) (f (DNSNonTerminal (SomeDNSLHS l)) :| [])
+pushDNSProduction f n (DNSProduction l _) = DNSProduction (DNSRule n) (f (DNSNonTerminal (SomeDNSLHS l)))
 

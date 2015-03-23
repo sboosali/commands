@@ -1,4 +1,5 @@
-{-# LANGUAGE NamedFieldPuns, RankNTypes, ScopedTypeVariables, TemplateHaskell, DataKinds #-}
+{-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Command where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
@@ -9,21 +10,20 @@ import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parse
 import           Commands.Parse.Types
-import           Commands.Parsec (parserUnit)
+import           Commands.Parsec                      (parserUnit)
 
+import           Control.Applicative
+import           Control.Lens
 import           Control.Monad.Catch                  (SomeException (..),
                                                        catches)
 import           Data.Bifunctor                       (second)
 import           Data.Foldable                        (asum)
+import qualified Data.Map                             as Map
 import           Data.Proxy
 import qualified Data.Text.Lazy                       as T
 import           Data.Typeable                        (Typeable)
 import           GHC.Generics                         (Generic)
 import           Language.Haskell.TH.Syntax           (Name)
-import Data.List.NonEmpty  (NonEmpty (..))
-import Control.Lens
-import Control.Applicative
-import qualified Data.Map as Map
 
 
 -- |
@@ -64,9 +64,9 @@ import qualified Data.Map as Map
 -- if that makes things better and not worse, that would be cool.
 --
 serialized :: Command x -> Either [SomeException] T.Text
-serialized command = serialize . second T.pack . optimizeGrammar $ grammar
- where
- grammar = DNSGrammar (command ^. comGrammar) []
+serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
+  (command ^. comGrammar)
+  dnsHeader
   (upcastDNSProduction . (\(Some command) -> command ^. comGrammar) <$> Map.elems (reifyCommand command))
 
 parses :: Command a -> String -> Possibly a
@@ -152,5 +152,5 @@ epsilon = Command (Rule l r) g p
  where
  Just l = lhsFromName 'epsilon
  r = empty
- g = DNSProduction (DNSRule (defaultDNSMetaName l)) (unitDNSRHS :| [])
+ g = DNSProduction (DNSRule (defaultDNSMetaName l)) unitDNSRHS
  p = \_ -> parserUnit

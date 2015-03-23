@@ -3,28 +3,28 @@
 {-# LANGUAGE FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving      #-}
 {-# LANGUAGE LambdaCase, NamedFieldPuns, RankNTypes, ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving, TemplateHaskell, TypeFamilies              #-}
-{-# LANGUAGE TypeOperators, ViewPatterns                                                 #-}
+{-# LANGUAGE TypeOperators                                                  #-}
 -- |
 module Commands.Grammar where
-import Commands.Command.Types        ()
-import Commands.Etc
-import Commands.Grammar.Types
-import Commands.Munging
-import Control.Alternative.Free.Tree
+import           Commands.Command.Types        ()
+import           Commands.Etc
+import           Commands.Grammar.Types
+import           Commands.Munging
+import           Control.Alternative.Free.Tree
 
-import Control.Applicative
-import Data.Char
-import Data.Foldable                 (asum,traverse_)
-import Data.Hashable
-import Data.List                     (intercalate)
-import Data.Maybe                    (fromJust)
-import Data.Monoid                   ((<>))
-import Data.Typeable                 (Typeable)
-import Language.Haskell.TH.Syntax    (Name)
-import Control.Lens
-import Control.Monad.State
-import Data.Map (Map)
-import qualified Data.Map as Map
+import           Control.Applicative
+import           Control.Lens
+import           Control.Monad.State
+import           Data.Char
+import           Data.Foldable                 (asum, traverse_)
+import           Data.Hashable
+import           Data.List                     (intercalate)
+import           Data.Map                      (Map)
+import qualified Data.Map                      as Map
+import           Data.Maybe                    (fromJust)
+import           Data.Monoid                   ((<>))
+import           Data.Typeable                 (Typeable)
+import           Language.Haskell.TH.Syntax    (Name)
 
 
 vocabulary :: [String] -> RHS String

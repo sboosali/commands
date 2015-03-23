@@ -21,7 +21,10 @@ import           Commands.Parsec
 import           Control.Applicative.Permutation
 import           Control.Lens
 import qualified Text.Parsec                       as Parsec
+import           Control.Applicative
 
+
+-- ================================================================ --
 
 -- | @= 'multipleC'@
 multiple :: Command a -> Command [a]
@@ -37,52 +40,45 @@ many0 = many0C
 
 -- |
 multipleC :: Command a -> Command [a]
-multipleC Command{_comLHS,_comGrammar,_comParser} = Command
- lhs
- (multipleDNSGrammar (combinatorDNSCommandName lhs) _comGrammar)
- (\context -> _comParser context `manyUntil` context)
+multipleC command = Command
+ (bimapRule (appLHS lhs) multipleRHS (command ^. comRule)) 
+ (multipleDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (\context -> (command ^. comParser) context `manyUntil` context)
  where
- lhs    = l `LHSApp` [_comLHS]
- Just l = lhsFromName 'multipleC
+ Just lhs = lhsFromName 'multipleC
 
 -- |
 manyC :: Command a -> Command [a]
-manyC Command{_comLHS,_comGrammar,_comParser} = Command
- lhs
- (multipleDNSGrammar (combinatorDNSCommandName lhs) _comGrammar)
- (\context -> Parsec.many1 (_comParser context))
+manyC command = Command
+ (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
+ (multipleDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (\context -> Parsec.many1 $ (command ^. comParser) context)
  where
- lhs    = l `LHSApp` [_comLHS]
- Just l = lhsFromName 'manyC
+ Just lhs = lhsFromName 'manyC
 
 -- |
 many0C :: Command a -> Command [a]
-many0C Command{_comLHS,_comGrammar,_comParser} = Command
- lhs
- (zeroOrMoreDNSGrammar (combinatorDNSCommandName lhs) _comGrammar)
- (\context -> Parsec.many (_comParser context))
+many0C command = Command
+ (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
+ (zeroOrMoreDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (\context -> Parsec.many $ (command ^. comParser) context)
  where
- lhs    = l `LHSApp` [_comLHS]
- Just l = lhsFromName 'many0C
+ Just lhs = lhsFromName 'many0C
 
 -- |
-multipleDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
-multipleDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
- (DNSProduction (DNSRule name) $ hoistDNSRHS DNSMultiple _dnsExport)
- _dnsImports
- (upcastDNSProduction _dnsExport : _dnsProductions)
+multipleRHS :: RHS a -> RHS [a]
+multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
+
+-- |
+multipleDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
+multipleDNSProduction = pushDNSProduction DNSMultiple
 
 -- | 'DNSMultiple' recognizes one or more, @('DNSOptional' . 'DNSMultiple') recognizes zero or more.
-zeroOrMoreDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
-zeroOrMoreDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
- -- (DNSProduction (DNSRule name) $ DNSSequence (hoistDNSRHS DNSOptional _dnsExport) :| [hoistDNSRHS DNSMultiple _dnsExport])
- (DNSProduction (DNSRule name) $ (DNSOptional . DNSMultiple) `hoistDNSRHS` _dnsExport)
- _dnsImports
- (upcastDNSProduction _dnsExport : _dnsProductions)
+zeroOrMoreDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
+zeroOrMoreDNSProduction = pushDNSProduction (DNSOptional . DNSMultiple)
 
 
-
-
+-- ================================================================ --
 
 -- | @= 'optionalC'@
 optional :: Command a -> Command (Maybe a)
@@ -98,30 +94,36 @@ optionalEnum = optionC enumDefault
 
 -- |
 optionC :: a -> Command a -> Command a
-optionC theDefault Command{_comLHS,_comGrammar,_comParser} = Command lhs
- (optionalDNSGrammar (combinatorDNSCommandName lhs) _comGrammar)
- (\context -> Parsec.option theDefault $ _comParser context)
+optionC theDefault command = Command
+ (bimapRule (appLHS lhs) (optionRHS theDefault) (command ^. comRule))
+ (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (\context -> Parsec.option theDefault $ (command ^. comParser) context)
  where
- lhs    = l `LHSApp` [_comLHS]
- Just l = lhsFromName 'optionC
+ Just lhs = lhsFromName 'optionC
 
 -- |
 optionalC :: Command a -> Command (Maybe a)
-optionalC Command{_comLHS,_comGrammar,_comParser} = Command lhs
- (optionalDNSGrammar (combinatorDNSCommandName lhs) _comGrammar)
- (\context -> Parsec.optionMaybe $ _comParser context)
+optionalC command = Command
+ (bimapRule (appLHS lhs) optionalRHS (command ^. comRule))
+ (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (\context -> Parsec.optionMaybe $ (command ^. comParser) context)
  where
- lhs    = l `LHSApp` [_comLHS]
- Just l = lhsFromName 'optionalC
+ Just lhs = lhsFromName 'optionalC
 
 -- |
-optionalDNSGrammar :: DNSCommandName -> DNSGrammar DNSCommandName t -> DNSGrammar DNSCommandName t
-optionalDNSGrammar name (DNSGrammar{_dnsExport,_dnsImports,_dnsProductions}) = DNSGrammar
- (DNSProduction (DNSRule name) $ hoistDNSRHS DNSOptional _dnsExport)
- _dnsImports
- (upcastDNSProduction _dnsExport : _dnsProductions)
+optionalRHS :: RHS a -> RHS (Maybe a)
+optionalRHS r = pure Nothing <|> Just <$> r
+
+-- |
+optionRHS :: a -> RHS a -> RHS a
+optionRHS x r = pure x <|> r
+
+-- |
+optionalDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
+optionalDNSProduction = pushDNSProduction DNSOptional
 
 
+-- ================================================================ --
 
 -- |
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
@@ -144,12 +146,12 @@ unsafeFellRHS rhs = genericCommand (unsafeLHSFromRHS rhs) rhs
 --
 --
 maybeAtomC :: Command a -> Perms RHS (Maybe a)
-maybeAtomC Command{_comLHS,_comGrammar,_comParser} = (maybeAtom . liftCommand) $ Command lhs grammar parser
+maybeAtomC command = (maybeAtom . liftCommand) $ Command
+ (bimapRule (appLHS lhs) id (command ^. comRule))
+ (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (command ^. comParser)
  where
- lhs     = l `LHSApp` [_comLHS]
- Just l  = lhsFromName 'maybeAtomC
- grammar = optionalDNSGrammar (combinatorDNSCommandName lhs) _comGrammar
- parser  = _comParser
+ Just lhs  = lhsFromName 'maybeAtomC
 
 
 combinatorDNSCommandName :: LHS -> DNSCommandName

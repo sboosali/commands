@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor, DeriveGeneric, GADTs, NamedFieldPuns #-}
-{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell         #-}
+{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell, DataKinds        #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
@@ -23,9 +23,8 @@ import Numeric.Natural                   (Natural)
 -- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
 --
 data Command a = Command
- { _comLHS     :: !LHS
- -- , _rule     :: Rule a
- , _comGrammar :: DNSGrammar DNSCommandName DNSCommandToken
+ { _comRule    :: Rule a
+ , _comGrammar :: DNSProduction True DNSCommandName DNSCommandToken
  , _comParser  :: Parser a
  }
  deriving (Functor)
@@ -44,16 +43,27 @@ type DNSCommandToken = String
 
 
 -- |
-data Rule a = Rule !LHS (RHS a)
+data Rule a = Rule
+ { _ruleLHS :: !LHS
+ , _ruleRHS :: RHS a
+ }
  deriving (Functor)
+
+-- | mono in the first, poly in the second.
+bimapRule :: (LHS -> LHS) -> (RHS a -> RHS b) -> Rule a -> Rule b
+bimapRule f g (Rule l r) = Rule (f l) (g r)
 
 -- |
 data LHS
  = LHS    !GUI                  -- ^ for tokens guaranteed unique by Haskell's name resolution modulo package
  | LHSInt !Int                  -- ^ for tokens guaranteed unique by safe/monadic generation
- | LHSApp !LHS [LHS]           -- ^ for reifying @app@lication of higher-order 'Rule's like @multiple@
+ | LHSApp !LHS [LHS]            -- ^ for reifying @app@lication of higher-order 'Rule's like @multiple@
  deriving (Show, Eq, Ord, Generic)
 instance Hashable LHS
+
+-- | specialized 'LHSApp', for convenience.
+appLHS :: LHS -> LHS -> LHS
+appLHS lhs = (lhs `LHSApp`) . (:[])
 
 -- |
 --
@@ -149,7 +159,13 @@ dnsMetaNameEq = lens
 equalDNSMetaName :: (Eq n) => DNSMetaName n -> DNSMetaName n -> Bool
 equalDNSMetaName = (==) `on` view dnsMetaNameEq
 
+makeLenses ''Command
+makeLenses ''Rule
 makeLenses ''DNSMetaName
 makeLenses ''DNSInfo
-makeLenses ''Command
 
+comLHS :: Lens' (Command a) LHS
+comLHS = comRule . ruleLHS
+
+comRHS :: Lens' (Command a) (RHS a)
+comRHS = comRule . ruleRHS

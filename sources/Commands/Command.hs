@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE NamedFieldPuns, RankNTypes, ScopedTypeVariables, TemplateHaskell, DataKinds #-}
 module Commands.Command where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
@@ -21,13 +21,56 @@ import           Data.Typeable                        (Typeable)
 import           GHC.Generics                         (Generic)
 import           Language.Haskell.TH.Syntax           (Name)
 import Data.List.NonEmpty  (NonEmpty (..))
+import Control.Lens
+import Control.Applicative
+import qualified Data.Map as Map
 
 
+-- |
+-- = INTERNALS
+--
+-- this function doesn't simply project the 'Command'
+-- onto its 'DNSProduction' with '_comGrammar',
+-- the way 'parses' simply extracts what it needs with '_comParser'.
+-- instead, this function expects the '_comRule' to be correct, from
+-- which it extracts the descendents the root production depends on.
+--
+-- one problem is that this implicit dependency between '_comGrammar'
+-- and '_comRule' forces library authors to maintain consistency
+-- between '_comGrammar' and '_comRule' within every 'Command'.
+--
+-- however,
+-- this shouldn't be a problem for library users, given that
+-- consistency is guaranteed by the library author.
+-- this is because the "higher level" 'genericCommand' API derives
+-- '_comGrammar' from '_comRule'.
+-- if a library user uses the "lower-level" 'specialCommand', then
+-- they will need __want__ to learn some internals anyway.
+--
+-- a previous alternative to had been for '_comGrammar' to be a 'Lens'
+-- onto a 'DNSGrammar', not a 'DNSProduction'. naïvely storing your
+-- descendents in a linear structure (i.e. the list of 'DNSProduction'
+-- in a 'DNSGrammar') caused non-termination when serializing
+-- mutually-recursive 'Command's.
+--
+-- a possible future alternative might
+-- be for a production to store it's transitive productions
+-- intelligently. But then, why not reuse the power of 'RHS'?
+--
+-- an even more complex future alternative might be to represent
+-- the DNSGrammar with higher-order syntax.
+-- then, the mutually recursive references recursion would be direct
+-- (not indirect as now), just like Parsec.
+-- if that makes things better and not worse, that would be cool.
+--
 serialized :: Command x -> Either [SomeException] T.Text
-serialized Command{_comGrammar} = serialize $ second T.pack $ optimizeGrammar $ _comGrammar
+serialized command = serialize . second T.pack . optimizeGrammar $ grammar
+ where
+ grammar = DNSGrammar (command ^. comGrammar) []
+  (upcastDNSProduction . (\(Some command) -> command ^. comGrammar) <$> Map.elems (reifyCommand command))
 
 parses :: Command a -> String -> Possibly a
-parses Command{_comParser} = parsing _comParser
+parses command = parsing (command ^. comParser)
 
 handleParse :: Show a => Command a -> String -> IO ()
 handleParse command s = do
@@ -36,7 +79,7 @@ handleParse command s = do
 
 -- |
 genericCommand :: LHS -> RHS a -> Command a
-genericCommand l r = Command l g p
+genericCommand l r = Command (Rule l r) g p
  where
  -- g = bimap T.pack T.pack $ renderRHS r
  g = renderRule (Rule l r)
@@ -47,8 +90,8 @@ genericCommand l r = Command l g p
 -- warning: partial function:
 --
 -- * match fails on non-global 'Name's
-specialCommand :: Name -> DNSGrammar DNSCommandName DNSCommandToken -> Parser a -> Command a
-specialCommand name g p = Command l g p
+specialCommand :: Name -> RHS a -> DNSProduction True DNSCommandName DNSCommandToken -> Parser a -> Command a
+specialCommand name r g p = Command (Rule l r) g p
  where
  Just l = lhsFromName name
 
@@ -76,7 +119,7 @@ enumCommand = genericCommand
 -- >>> :set -XDeriveDataTypeable
 -- >>> data Button = LeftButton | ButtonMiddleButton | ButtonRight deriving (Show,Eq,Enum,Typeable)
 -- >>> let button = qualifiedCommand :: Command Button
--- >>> getWords . _grammar $ button
+-- >>> getWords . view comGrammar $ button
 -- ["left","middle","right"]
 --
 -- (the qualification is exaggerated to show the filtering behavior:
@@ -105,8 +148,9 @@ vocabularyCommand = undefined vocabulary
 
 -- | the empty grammar. See 'unitDNSRHS'.
 epsilon :: Command ()
-epsilon = Command l g p
+epsilon = Command (Rule l r) g p
  where
  Just l = lhsFromName 'epsilon
- g = DNSGrammar (DNSProduction (DNSRule (defaultDNSMetaName l)) (unitDNSRHS :| [])) [] []
+ r = empty
+ g = DNSProduction (DNSRule (defaultDNSMetaName l)) (unitDNSRHS :| [])
  p = \_ -> parserUnit

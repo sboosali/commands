@@ -3,8 +3,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, RankNTypes      #-}
 {-# LANGUAGE StandaloneDeriving, ViewPatterns                            #-}
 module Commands.Frontends.Dragon13.Types where
-import Commands.Etc        ()
-import Commands.Instances  ()
+import Commands.Etc
 
 import Control.Applicative
 import Control.Lens.Plated (Plated (..))
@@ -71,6 +70,10 @@ partitionDNSGrammar DNSGrammar{_dnsExport,_dnsProductions}
 --
 type DNSImport n = DNSLHS LHSRule n
 
+-- | import every 'DNSBuiltinRule'
+--
+dnsHeader :: [DNSImport n]
+dnsHeader = DNSBuiltinRule <$> constructors
 
 -- ================================================================ --
 
@@ -117,6 +120,7 @@ upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
 downcastDNSProduction :: DNSProduction e n t -> Either (DNSProduction e n t) (DNSProduction True n t)
 downcastDNSProduction (DNSProduction l rs) = Right (DNSProduction l rs)
 downcastDNSProduction p = Left p
+
 
 -- ================================================================ --
 

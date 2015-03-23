@@ -3,7 +3,7 @@
 {-# LANGUAGE FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving      #-}
 {-# LANGUAGE LambdaCase, NamedFieldPuns, RankNTypes, ScopedTypeVariables    #-}
 {-# LANGUAGE StandaloneDeriving, TemplateHaskell, TypeFamilies              #-}
-{-# LANGUAGE TypeOperators                                                  #-}
+{-# LANGUAGE TypeOperators, ViewPatterns                                                 #-}
 -- |
 module Commands.Grammar where
 import Commands.Command.Types        ()
@@ -14,13 +14,17 @@ import Control.Alternative.Free.Tree
 
 import Control.Applicative
 import Data.Char
-import Data.Foldable                 (asum, foldMap)
+import Data.Foldable                 (asum,traverse_)
 import Data.Hashable
 import Data.List                     (intercalate)
 import Data.Maybe                    (fromJust)
 import Data.Monoid                   ((<>))
 import Data.Typeable                 (Typeable)
 import Language.Haskell.TH.Syntax    (Name)
+import Control.Lens
+import Control.Monad.State
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 
 vocabulary :: [String] -> RHS String
@@ -79,7 +83,7 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: Symbol x -> Int
- hashSymbol = symbol (hash . unWord) (hash . _comLHS)
+ hashSymbol = symbol (hash . unWord) (hash . view comLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -96,26 +100,38 @@ showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
 showLHS (LHSInt i) = "i_" <> hashAlphanumeric i
 showLHS (l `LHSApp` ls) = intercalate "____" (showLHS l : fmap showLHS ls)
 
--- nameOfLHS :: LHS -> String
--- nameOfLHS (LHS (GUI _ _ (Identifier occ))) = occ
--- nameOfLHS (LHSInt i)
--- nameOfLHS (LHSApp f _)
 
--- |
+-- | transforms a possibly-infinite structure with direct references (i.e. a recursively-defined 'Command') into a certainly-finite structure (i.e. a 'Map') with indirect references (i.e. its keys).
 --
--- removes duplicates with 'nubBy', which takes time quadratic in the length of the list.
+-- returns all a 'Command' 's transitive descendents (children, children's children, etc.).
 --
--- includes the input "parent" in the output, if it's its own "child".
-getChildren :: Rule x -> [Some Command]
-getChildren (Rule l r)
- = filter ((l /=) . theLHS)
- $ getChildren_ r
- where
- theLHS = (\(Some (Command{_comLHS})) -> _comLHS)
+-- even without their types, you can still extract their untyped 'LHS', count them, etc.
+--
+-- a parent can be its own descendent, i.e.
+--
+-- @Some command `elem` comDescendents command@
+--
+-- is @True@.
+-- this means the command is (self- / mutually-) recursive.
+--
+-- Note on Naming: the "reify" means "reifying the references between rules".
+--
+reifyCommand :: Command x -> ReifiedCommand
+reifyCommand command = execState (reifyCommand_ command) Map.empty
+
+reifyCommand_ :: Command x -> State ReifiedCommand ()
+reifyCommand_ command = do
+ let Rule l rs = command ^. comRule
+ visited <- gets $ Map.member l
+ unless visited $ do
+  modify $ Map.insert l (Some command)
+  reifyRHS_ rs
 
 -- TODO is this a traversal or something? over the functor
-getChildren_ :: RHS x -> [Some Command]
-getChildren_ (Pure _)     = []
-getChildren_ (Many rs)    = getChildren_ `foldMap` rs
-getChildren_ (fs `App` x) = getChildren_ fs <> symbol (const []) ((:[]) . Some) x
-getChildren_ (fs :<*> xs) = getChildren_ fs <> getChildren_ xs
+reifyRHS_ :: RHS x -> State ReifiedCommand ()
+reifyRHS_ (Pure _)     = return ()
+reifyRHS_ (Many rs)    = traverse_ reifyRHS_ rs
+reifyRHS_ (fs `App` x) = reifyRHS_ fs >> symbol (\_ -> return ()) reifyCommand_ x
+reifyRHS_ (fs :<*> xs) = reifyRHS_ fs >> reifyRHS_ xs
+
+type ReifiedCommand = Map LHS (Some Command)

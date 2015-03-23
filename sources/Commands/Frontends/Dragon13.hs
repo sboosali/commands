@@ -222,9 +222,6 @@ serializeToken :: DNSToken DNSText -> Doc
 serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
-dnsHeader :: [DNSImport n]
-dnsHeader = fmap DNSBuiltinRule constructors
-
 -- | serialize the 'DNSList's that were ignored by 'serializeRules'.
 --
 serializeLists :: DNSGrammar DNSName DNSText -> Doc
@@ -346,6 +343,10 @@ getNames = nub . bifoldMap (:[]) (const [])
 getWords :: (Eq t, Bifoldable p) => p n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
 
-hoistDNSRHS :: (DNSRHS n t -> DNSRHS n t) -> DNSProduction True n t -> NonEmpty (DNSRHS n t)
-hoistDNSRHS f (DNSProduction l _) = f (DNSNonTerminal (SomeDNSLHS l)) :| []
+-- | pushes a 'DNSProduction' into a 'DNSRHS',
+-- and makes a new transformed 'DNSProduction'
+-- 
+-- a helper function for defining higher-order productions.
+pushDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction True n t -> DNSProduction True n t
+pushDNSProduction f n (DNSProduction l _) = DNSProduction (DNSRule n) (f (DNSNonTerminal (SomeDNSLHS l)) :| [])
 

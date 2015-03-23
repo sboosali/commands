@@ -24,7 +24,7 @@ wparser :: Word -> Parser a
 wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 
 cparser :: Command a -> Parser a
-cparser Command {_comLHS, _comParser} context = _comParser context <?> showLHS _comLHS
+cparser command context = (command ^. comParser) context <?> showLHS (command ^. comLHS)
 -- gparser (Rule _ rs) context = rparser rs context
 
 -- | build a parser from a right-hand side.

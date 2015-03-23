@@ -53,7 +53,7 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 renderSymbol :: Symbol x -> DNSRHS DNSCommandName DNSCommandToken
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal $ DNSToken t)
- (\(Command {_grammar = DNSGrammar {_dnsExport = DNSProduction lhs _}}) -> DNSNonTerminal (SomeDNSLHS lhs))
+ (\(Command {_comGrammar = DNSGrammar {_dnsExport = DNSProduction lhs _}}) -> DNSNonTerminal (SomeDNSLHS lhs))
 
 -- emptyList :: DNSProduction False DNSCommandName DNSCommandToken
 -- emptyList = DNSVocabulary (DNSNonTerminal $ DNSList "emptyList") []
@@ -64,8 +64,8 @@ renderSymbol = symbol
 renderChildren :: Rule x -> [DNSProduction False DNSCommandName DNSCommandToken]
 renderChildren
  = nub
- . foldMap (\(Some (Command {_grammar = DNSGrammar p _ ps})) -> upcastDNSProduction p : ps)
+ . foldMap (\(Some (Command {_comGrammar = DNSGrammar p _ ps})) -> upcastDNSProduction p : ps)
  . nubBy ((==) `on` theLHS)
  . getChildren
  where
- theLHS = (\(Some (Command{_lhs})) -> _lhs)
+ theLHS = (\(Some (Command{_comLHS})) -> _comLHS)

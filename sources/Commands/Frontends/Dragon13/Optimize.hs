@@ -51,7 +51,7 @@ optimizeGrammar
  = first renderDNSMetaName
  . compactGrammar
  . vocabulariseGrammar
- . inlineGrammar
+ -- . inlineGrammar -- TODO
  -- . expandGrammar -- TODO
 
 

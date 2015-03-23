@@ -84,11 +84,11 @@ phrase = 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- <|> Pressed  # "press" & many key & optional phrase
- <|> Spelled  # "spell" & many character & optional phrase
- <|> Spelled  # many character & optional phrase
- <|> Letter   # character & optional phrase
- <|> Cap      # "cap" & character & optional phrase
+ -- <|> Pressed  # "press" & many key & optional phrase
+ -- <|> Spelled  # "spell" & many character & optional phrase
+ -- <|> Spelled  # many character & optional phrase
+ -- <|> Letter   # character & optional phrase
+ -- <|> Cap      # "cap" & character & optional phrase
 
  <|> Case     # casing   & phrase
  <|> Join     # joiner   & phrase
@@ -361,7 +361,7 @@ main = do
  traverse_ (attemptParse directions_) exampleDirections
 
  putStrLn ""
- print (getWords . _grammar $ button)
+ print (getWords . _comGrammar $ button)
 
  putStrLn ""
  print $ cycles $
@@ -396,3 +396,13 @@ main = do
 
  -- putStrLn ""
  -- attemptParse speech "lore some words roar"
+
+ putStrLn ""
+ attemptParse even_ "even odd even "
+ attemptSerialize even_ -- mutually recursive grammars can't be serialized 
+
+data Even = Even (Maybe Odd) deriving Show
+even_ = 'even_ <=> Even # "even" & optional odd_
+data Odd = Odd (Maybe Even) deriving Show
+odd_ = 'odd_ <=> Odd # "odd" & optional even_
+

@@ -23,10 +23,10 @@ import Numeric.Natural                   (Natural)
 -- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
 --
 data Command a = Command
- { _lhs     :: !LHS
+ { _comLHS     :: !LHS
  -- , _rule     :: Rule a
- , _grammar :: DNSGrammar DNSCommandName DNSCommandToken
- , _parser  :: Parser a
+ , _comGrammar :: DNSGrammar DNSCommandName DNSCommandToken
+ , _comParser  :: Parser a
  }
  deriving (Functor)
 
@@ -130,12 +130,6 @@ data DNSInfo = DNSInfo
 defaultDNSInfo :: DNSInfo
 defaultDNSInfo = DNSInfo 0 False
 
-
-makeLenses ''DNSMetaName
-makeLenses ''DNSInfo
-makeLenses ''Command
-
-
 type DNSMetaName_ n = (Maybe Natural, n)
 
 -- |
@@ -154,4 +148,8 @@ dnsMetaNameEq = lens
 -- | equality projected 'on' 'dnsMetaNameEq'
 equalDNSMetaName :: (Eq n) => DNSMetaName n -> DNSMetaName n -> Bool
 equalDNSMetaName = (==) `on` view dnsMetaNameEq
+
+makeLenses ''DNSMetaName
+makeLenses ''DNSInfo
+makeLenses ''Command
 

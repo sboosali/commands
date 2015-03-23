@@ -79,7 +79,7 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: Symbol x -> Int
- hashSymbol = symbol (hash . unWord) (hash . _lhs)
+ hashSymbol = symbol (hash . unWord) (hash . _comLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -111,7 +111,7 @@ getChildren (Rule l r)
  = filter ((l /=) . theLHS)
  $ getChildren_ r
  where
- theLHS = (\(Some (Command{_lhs})) -> _lhs)
+ theLHS = (\(Some (Command{_comLHS})) -> _comLHS)
 
 -- TODO is this a traversal or something? over the functor
 getChildren_ :: RHS x -> [Some Command]

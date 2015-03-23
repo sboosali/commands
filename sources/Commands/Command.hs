@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE NamedFieldPuns, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
 module Commands.Command where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
@@ -9,10 +9,8 @@ import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parse
 import           Commands.Parse.Types
--- import           Commands.Frontends.Dragon13.Text
--- import           Control.Alternative.Free.Tree
+import           Commands.Parsec (parserUnit)
 
--- import           Control.Applicative
 import           Control.Monad.Catch                  (SomeException (..),
                                                        catches)
 import           Data.Bifunctor                       (second)
@@ -22,13 +20,14 @@ import qualified Data.Text.Lazy                       as T
 import           Data.Typeable                        (Typeable)
 import           GHC.Generics                         (Generic)
 import           Language.Haskell.TH.Syntax           (Name)
+import Data.List.NonEmpty  (NonEmpty (..))
 
 
 serialized :: Command x -> Either [SomeException] T.Text
-serialized Command{_grammar} = serialize $ second T.pack $ optimizeGrammar $ _grammar
+serialized Command{_comGrammar} = serialize $ second T.pack $ optimizeGrammar $ _comGrammar
 
 parses :: Command a -> String -> Possibly a
-parses Command{_parser} = parsing _parser
+parses Command{_comParser} = parsing _comParser
 
 handleParse :: Show a => Command a -> String -> IO ()
 handleParse command s = do
@@ -104,3 +103,10 @@ vocabularyCommand :: (Generic a) => [String] -> RHS a
 vocabularyCommand = undefined vocabulary
 -- (Newtype a String) => [String] -> RHS a
 
+-- | the empty grammar. See 'unitDNSRHS'.
+epsilon :: Command ()
+epsilon = Command l g p
+ where
+ Just l = lhsFromName 'epsilon
+ g = DNSGrammar (DNSProduction (DNSRule (defaultDNSMetaName l)) (unitDNSRHS :| [])) [] []
+ p = \_ -> parserUnit

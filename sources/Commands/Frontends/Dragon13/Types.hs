@@ -214,12 +214,12 @@ zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 --
 -- thus:
 --
--- @epsilonDNSRHS = 'DNSOptional' 'zeroDNSRHS'@
+-- @unitDNSRHS = 'DNSOptional' 'zeroDNSRHS'@
 --
 -- which somehow actually works in the speech recognition engine.
 --
-oneDNSRHS :: DNSRHS n t
-oneDNSRHS = DNSOptional zeroDNSRHS
+unitDNSRHS :: DNSRHS n t
+unitDNSRHS = DNSOptional zeroDNSRHS
 
 
 -- ================================================================ --

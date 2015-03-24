@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, DeriveGeneric, GADTs, NamedFieldPuns #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns #-}
 {-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell                    #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
@@ -8,7 +8,6 @@ import Commands.Parse.Types
 import Control.Alternative.Free.Tree
 
 import Control.Lens
-import Data.Function                     (on)
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
 import Data.Hashable                     (Hashable)
@@ -24,14 +23,14 @@ import Numeric.Natural                   (Natural)
 --
 data Command a = Command
  { _comRule    :: Rule a
- , _comGrammar :: DNSProduction True DNSCommandName DNSCommandToken
+ , _comGrammar :: DNSCommandGrammar
  , _comParser  :: Parser a
  }
  deriving (Functor)
 
--- |
---
-type DNSCommandName = DNSMetaName LHS
+type DNSCommandGrammar = DNSProduction DNSInfo DNSCommandName DNSCommandToken
+
+type DNSCommandName = DNSExpandedName LHS
 
 -- | not 'Text' because user-facing "config" modules (e.g.
 -- "Commands.Plugins.Example") can't use:
@@ -109,23 +108,24 @@ liftString :: String -> RHS a
 liftString = lift . fromWord . Word
 
 
--- | a name, with metadata:
+-- | a name, with the level of its expansion.
 --
--- * the 'Natural' tracks which expansion (of the expanded recursive
--- one) its 'DNSProduction' is.
+-- '_dnsExpansion' tracks which level a recursive 'DNSProduction' has been expanded to.
 --
+-- when the '_dnsExpansion' is @Nothing@, the 'DNSProduction' will not be expanded.
 --
--- TODO lenses
-data DNSMetaName n = DNSMetaName
- { _dnsMetaInfo      :: !DNSInfo
- , _dnsMetaExpansion :: Maybe Natural
- , _dnsMetaName      :: n
+-- when the '_dnsExpansion' is @Just 0@, the 'DNSProduction' will only
+-- hold base case 'DNSAlternative's, not the recursive 'DNSAlternative's.
+--
+data DNSExpandedName n = DNSExpandedName
+ { _dnsExpansion    :: Maybe Natural
+ , _dnsExpandedName :: n
  }
  deriving (Show,Eq,Ord,Functor)
 
 -- | yet un-expanded
-defaultDNSMetaName :: n -> DNSMetaName n
-defaultDNSMetaName = DNSMetaName defaultDNSInfo Nothing
+defaultDNSExpandedName :: n -> DNSExpandedName n
+defaultDNSExpandedName = DNSExpandedName Nothing
 
 -- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
 --
@@ -140,28 +140,12 @@ data DNSInfo = DNSInfo
 defaultDNSInfo :: DNSInfo
 defaultDNSInfo = DNSInfo 0 False
 
-type DNSMetaName_ n = (Maybe Natural, n)
 
--- |
---
--- e.g.
---
--- >>> set dnsMetaNameEq (Just 666, "XXX") (defaultDNSMetaName "")
--- DNSMetaName {_dnsMetaInfo = DNSInfo {_dnsExpand = 0, _dnsInline = False}, _dnsMetaExpansion = Just 666, _dnsMetaName = "XXX"}
---
-dnsMetaNameEq :: Lens' (DNSMetaName n) (DNSMetaName_ n)
-dnsMetaNameEq = lens
- (\DNSMetaName{_dnsMetaExpansion,_dnsMetaName} -> (_dnsMetaExpansion,_dnsMetaName))
- (\whole (_dnsMetaExpansion,_dnsMetaName) -> whole{_dnsMetaExpansion,_dnsMetaName})
--- TODO  dnsMetaNameEq = alongside dnsMetaExpansion dnsMetaName
-
--- | equality projected 'on' 'dnsMetaNameEq'
-equalDNSMetaName :: (Eq n) => DNSMetaName n -> DNSMetaName n -> Bool
-equalDNSMetaName = (==) `on` view dnsMetaNameEq
 
 makeLenses ''Command
 makeLenses ''Rule
-makeLenses ''DNSMetaName
+
+makeLenses ''DNSExpandedName
 makeLenses ''DNSInfo
 
 comLHS :: Lens' (Command a) LHS

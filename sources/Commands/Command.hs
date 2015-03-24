@@ -24,9 +24,13 @@ import qualified Data.Text.Lazy                       as T
 import           Data.Typeable                        (Typeable)
 import           GHC.Generics                         (Generic)
 import           Language.Haskell.TH.Syntax           (Name)
+import Data.List.NonEmpty (NonEmpty(..))
 
 
 -- |
+--
+-- 'DNSImport's all 'DNSBuiltinRules', whether used or not.
+--
 -- = INTERNALS
 --
 -- this function doesn't simply project the 'Command'
@@ -65,9 +69,9 @@ import           Language.Haskell.TH.Syntax           (Name)
 --
 serialized :: Command x -> Either [SomeException] T.Text
 serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
-  (command ^. comGrammar)
+  ((command ^. comGrammar) :| ((\(Some command) -> command ^. comGrammar) <$> Map.elems (reifyCommand command)))
+  []  -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
   dnsHeader
-  (upcastDNSProduction . (\(Some command) -> command ^. comGrammar) <$> Map.elems (reifyCommand command))
 
 parses :: Command a -> String -> Possibly a
 parses command = parsing (command ^. comParser)
@@ -90,7 +94,7 @@ genericCommand l r = Command (Rule l r) g p
 -- warning: partial function:
 --
 -- * match fails on non-global 'Name's
-specialCommand :: Name -> RHS a -> DNSProduction True DNSCommandName DNSCommandToken -> Parser a -> Command a
+specialCommand :: Name -> RHS a -> DNSCommandGrammar -> Parser a -> Command a
 specialCommand name r g p = Command (Rule l r) g p
  where
  Just l = lhsFromName name
@@ -152,5 +156,5 @@ epsilon = Command (Rule l r) g p
  where
  Just l = lhsFromName 'epsilon
  r = empty
- g = DNSProduction (DNSRule (defaultDNSMetaName l)) unitDNSRHS
+ g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) unitDNSRHS  -- TODO def method
  p = \_ -> parserUnit

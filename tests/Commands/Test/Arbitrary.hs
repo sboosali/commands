@@ -16,16 +16,14 @@ import           GHC.Exts                          (IsList (..))
 import           Test.QuickCheck
 
 
-instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSGrammar n t) where
- arbitrary = DNSGrammar <$> arbitrary <*> pure [] <*> resized 2 arbitrary -- TODO  pure []
+instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSGrammar i n t) where
+ arbitrary = DNSGrammar <$> resized 2 arbitrary <*> resized 2 arbitrary <*> pure [] -- TODO  pure []
 
-instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction True n t) where
- arbitrary = DNSProduction <$> arbitrary <*> resized 2 arbitrary
-instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction False n t) where
- arbitrary = oneof
-  [ DNSProduction <$> arbitrary <*> resized 2 arbitrary
-  , DNSVocabulary <$> arbitrary <*> resized 2 arbitrary
-  ]
+instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction i n t) where
+ arbitrary = DNSProduction <$> arbitrary <*> arbitrary <*> resized 2 arbitrary
+
+instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSVocabulary i n t) where
+ arbitrary = DNSVocabulary <$> arbitrary <*> arbitrary <*> resized 2 arbitrary
 
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSRHS n t) where
  arbitrary = oneof
@@ -66,13 +64,6 @@ instance Arbitrary DNSBuiltinList where arbitrary = elements constructors
 instance Arbitrary Text where arbitrary = T.pack <$> arbitrary
 
 instance Arbitrary a => Arbitrary (NonEmpty a) where arbitrary = (:|) <$> arbitrary <*> arbitrary
-
--- not constrained enough: "*** Gave up! Passed only 3 tests."
-instance Arbitrary TinyText where
- arbitrary = do
-  n <- choose (0,3)
-  s <- resize n arbitrary
-  return $ TinyText s
 
 instance Arbitrary DNSText where
  arbitrary = do

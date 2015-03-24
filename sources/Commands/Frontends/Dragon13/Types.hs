@@ -11,7 +11,6 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Char           (toLower)
-import Data.Either         (partitionEithers)
 import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
@@ -25,101 +24,90 @@ import Prelude             hiding (mapM)
 -- (the "exactly one" constraint should really be "at least one", but
 -- this restriction shouldn't matter).
 --
--- in the type @DNSGrammar n t@, you can read:
+-- in the type @DNSGrammar i n t@, you can read:
 --
+-- * @i@ as @info@
 -- * @n@ as @name@ or @nonTerminal@
 -- * @t@ as @text@ or @terminal@
 --
 -- a 'Bitraversable', for easy validation
 -- (e.g. "Commands.Frontends.Dragon13.escapeDNSGrammar")
--- not a @Traversable@, because the terminals and the non-terminals
+-- not a 'Traversable', because the terminals and the non-terminals
 -- are distinct lexemes, with different criteria for being valid.
 --
-data DNSGrammar n t = DNSGrammar
- { _dnsExport      :: DNSProduction True n t
- , _dnsImports     :: [DNSImport n] -- TODO  a Set, or remove duplicates later
- , _dnsProductions :: [DNSProduction False n t]
+--
+-- in relation to NatLink's concrete syntax:
+--
+-- * @"\<rule> = ...;"@ and @"\<rule> exported = ...;"@ both declare a @'DNSProduction' ...@
+-- * @"self.setList('list', [...])"@ declares a 'DNSVocabulary'
+-- * @"\<rule> imported;"@ is a 'DNSImport'
+--
+--
+-- a 'DNSVocabulary' can be named only by 'LHSList's, as
+-- a 'DNSProduction' can be named only by 'LHSRule's.
+--
+-- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
+--
+data DNSGrammar i n t = DNSGrammar
+ { _dnsProductions  :: NonEmpty (DNSProduction i n t)
+ , _dnsVocabularies :: [DNSVocabulary i n t]
+ , _dnsImports      :: [DNSImport n] -- TODO  a Set, or remove duplicates later
  }
  deriving (Show, Eq)
 
 -- TODO instance Semigroup (DNSGrammar n t) where <>
 
-instance Bifunctor     DNSGrammar where  bimap     = bimapDefault
-instance Bifoldable    DNSGrammar where  bifoldMap = bifoldMapDefault
-instance Bitraversable DNSGrammar where -- valid Bitraversable?
- bitraverse f g (DNSGrammar export imports productions) = DNSGrammar
-  <$> bitraverse f g export
+instance Bifunctor     (DNSGrammar i) where  bimap     = bimapDefault
+instance Bifoldable    (DNSGrammar i) where  bifoldMap = bifoldMapDefault
+instance Bitraversable (DNSGrammar i) where -- valid Bitraversable?
+ bitraverse f g (DNSGrammar productions vocabularies imports) = DNSGrammar
+  <$> traverse (bitraverse f g) productions
+  <*> traverse (bitraverse f g) vocabularies
   <*> traverse (traverse f) imports
-  <*> traverse (bitraverse f g) productions
-
--- | partitions a grammar's productions into 'DNSVocabulary's and
--- 'DNSProduction's, although only the latter is certain from the
--- type.
---
-partitionDNSGrammar :: DNSGrammar n t -> ([DNSProduction False n t], [DNSProduction True n t])
-partitionDNSGrammar DNSGrammar{_dnsExport,_dnsProductions}
- = partitionEithers
- . fmap downcastDNSProduction
- $ upcastDNSProduction _dnsExport : _dnsProductions
 
 -- |
 --
--- in relation to NatLink's concrete syntax:
---
--- * @"\<rule> imported;"@ is a 'DNSImport'
---
+-- you can only import 'LHSRule's.
 type DNSImport n = DNSLHS LHSRule n
 
--- | import every 'DNSBuiltinRule'
+-- | import every 'DNSBuiltinRule'.
 --
 dnsHeader :: [DNSImport n]
 dnsHeader = DNSBuiltinRule <$> constructors
 
+
 -- ================================================================ --
 
--- | The top-level statements of a grammar.
+-- | 
 --
--- in the type @DNSProduction e n t@, you can read:
 --
--- * @e@ as @isExported@
--- * @n@ as @name@ or @nonTerminal@
--- * @t@ as @text@ or @terminal@
---
--- in relation to NatLink's concrete syntax:
---
--- * @"\<rule> = ...;"@ has type @'DNSProduction' 'False' ...@
--- * @"\<rule> exported = ...;"@ has type @'DNSProduction' 'True' ...@
--- * @"self.setList('list', [...])"@ declares a 'DNSVocabulary'
---
--- a @GADT@ to constrain the exportability and the right-hand sides of
--- its constructors.
--- you can import and export only 'DNSRule's (including 'DNSBuiltinRule's),
--- not 'DNSList's. a 'DNSVocabulary' can be named only by 'LHSList's, as
--- a 'DNSProduction' can be named only by 'LHSRule's.
---
--- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
---
-data DNSProduction (e :: Bool) n t where
- DNSProduction :: DNSLHS LHSRule n -> DNSRHS n t -> DNSProduction e     n t
- DNSVocabulary :: DNSLHS LHSList n -> [DNSToken t]          -> DNSProduction False n t
+data DNSProduction i n t = DNSProduction
+ { _dnsProductionInfo :: i
+ , _dnsProductionLHS  :: (DNSLHS LHSRule n)
+ , _dnsProductionRHS  :: (DNSRHS n t)
+ }
+ deriving (Show,Eq,Ord)
 
--- TODO don't inline NonEmpty, but preserve specially-serialized top-level DNSAlternatives
+instance Bifunctor     (DNSProduction i) where bimap     = bimapDefault
+instance Bifoldable    (DNSProduction i) where bifoldMap = bifoldMapDefault
+instance Bitraversable (DNSProduction i) where
+ bitraverse f g (DNSProduction i l rs) = DNSProduction i <$> traverse f l <*> bitraverse f g rs
 
-deriving instance (Show n, Show t) => Show (DNSProduction e n t)
-deriving instance (Eq   n, Eq   t) => Eq   (DNSProduction e n t)
+-- | 
+--
+--
+--
+data DNSVocabulary i n t = DNSVocabulary
+ { _dnsVocabularyInfo   :: i
+ , _dnsVocabularyLHS    :: (DNSLHS LHSList n)
+ , _dnsVocabularyTokens :: [DNSToken t]
+ }
+ deriving (Show,Eq,Ord)
 
-instance Bifunctor     (DNSProduction e) where bimap     = bimapDefault
-instance Bifoldable    (DNSProduction e) where bifoldMap = bifoldMapDefault
-instance Bitraversable (DNSProduction e) where
- bitraverse f g (DNSProduction l rs) = DNSProduction <$> traverse f l <*> bitraverse f g rs
- bitraverse f g (DNSVocabulary l ts) = DNSVocabulary <$> traverse f l <*> traverse (traverse g) ts
-
-upcastDNSProduction :: DNSProduction True n t -> DNSProduction e n t
-upcastDNSProduction (DNSProduction l rs) = DNSProduction l rs
-
-downcastDNSProduction :: DNSProduction e n t -> Either (DNSProduction e n t) (DNSProduction True n t)
-downcastDNSProduction (DNSProduction l rs) = Right (DNSProduction l rs)
-downcastDNSProduction p = Left p
+instance Bifunctor     (DNSVocabulary i) where bimap     = bimapDefault
+instance Bifoldable    (DNSVocabulary i) where bifoldMap = bifoldMapDefault
+instance Bitraversable (DNSVocabulary i) where
+ bitraverse f g (DNSVocabulary i l ts) = DNSVocabulary i <$> traverse f l <*> traverse (traverse g) ts
 
 
 -- ================================================================ --
@@ -136,7 +124,7 @@ data DNSRHS n t
  | DNSMultiple (DNSRHS n t) -- ^ e.g. @(multiple)+@
  | DNSSequence     (NonEmpty (DNSRHS n t)) -- ^ e.g. @first second ...@
  | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
- deriving (Show,Eq)
+ deriving (Show,Eq,Ord)
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault

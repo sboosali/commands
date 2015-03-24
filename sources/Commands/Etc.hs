@@ -13,6 +13,8 @@ import           Data.Text.Lazy               (Text)
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
                                                typeRepTyCon)
+import           Data.Either.Validation            (Validation,eitherToValidation)
+import           Data.Bifunctor                    (first )
 import qualified Debug.Trace
 import           GHC.Generics                 (Generic)
 import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
@@ -21,8 +23,8 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                PkgName (PkgName))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
--- import Data.Traversable
--- import Data.Foldable
+import Data.List.NonEmpty (NonEmpty(..))
+import Control.Lens (Lens', lens)
 
 
 -- | generalized 'Maybe':
@@ -147,28 +149,18 @@ hashAlphanumeric = flip showHex "" . abs . hash
 --
 data Some f = forall x. Some (f x)
 
-{- | existentially-quantify the first type-argument of any binary type-constructor
 
->>> :t Some2 (Right True)
-Some2 (Right True) :: Some2 Either Bool
+nonemptyHead :: Lens' (NonEmpty a) a
+nonemptyHead = lens
+ (\(x :| _)    -> x)
+ (\(_ :| xs) x -> x :| xs)
 
->>> :{
-case Some2 (Right True) of
- Some2 (Left {}) -> False
- Some2 (Right b) -> b
-:}
-True
+nonemptyTail :: Lens' (NonEmpty a) [a]
+nonemptyTail = lens
+ (\(_ :| xs)   -> xs)
+ (\(x :| _) xs -> x :| xs)
 
->>> :t Some (Some2 (Right ()))
-Some (Some2 (Right ())) :: Some (Some2 Either)
 
->>> :{
-case Some (Some2 (Right ())) of
- Some (Some2 (Left  {})) -> "Left"
- Some (Some2 (Right {})) -> "Right"
-:}
-"Right"
-
--}
-data Some2 f y = forall x. Some2 (f x y)
-
+-- | @Either@ is a @Monad@: it short-circuits. 'Validation' is an @Applicative@, but not a @Monad@: under @traverse@ (or @bitraverse@), it runs the validation (@:: a -> f b@) on every field (@:: a@) in the traversable (@:: t a@), monoidally appending together all errors, not just the first.
+eitherToValidations :: Either e a -> Validation [e] a
+eitherToValidations = eitherToValidation . first (:[])

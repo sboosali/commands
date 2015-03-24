@@ -12,7 +12,7 @@ import Test.QuickCheck.Property
 
 
 -- | if the grammar can be escaped, its serialization must be valid Python.
-prop_DNSGrammar :: DNSGrammar DNSName DNSText -> Result
+prop_DNSGrammar :: DNSGrammar () DNSName DNSText -> Result
 prop_DNSGrammar grammar = case isPythonFile . display . serializeGrammar $ grammar of
   Left _  -> failed
   Right _ -> succeeded

@@ -6,34 +6,33 @@
 module Commands.Frontends.Dragon13 where
 
 import           Commands.Etc
-import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Instances                ()
+import Commands.Grammar.Types
 
-import           Control.Lens
 import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bifoldable
-import           Data.Bifunctor                    (first, second)
+import           Data.Bifunctor                    (second)
 import           Data.Bitraversable
-import           Data.Either.Validation            (Validation,
-                                                    eitherToValidation,
-                                                    validationToEither)
+import           Data.Either.Validation            (validationToEither)
 import           Data.Foldable                     (toList)
 import           Data.List                         (nub)
-import           Data.Maybe                        (mapMaybe)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
 import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
+import Data.List.NonEmpty (NonEmpty(..))
+import Control.Lens
+import           Data.Maybe                        (mapMaybe)
 
 
 {- $setup
 
 >>> :set -XOverloadedLists -XOverloadedStrings
 >>> :{
-let root = DNSProduction (DNSRule "root") $ DNSAlternatives
+let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
             [ DNSSequence
               [                           DNSNonTerminal (SomeDNSLHS (DNSList "command"))
               ,                           DNSNonTerminal (SomeDNSLHS (DNSRule "subcommand"))
@@ -41,21 +40,21 @@ let root = DNSProduction (DNSRule "root") $ DNSAlternatives
               ]
             , DNSTerminal (DNSToken "ls")
             ]
-    flag = DNSVocabulary (DNSList "flag")
+    subcommand = DNSProduction () (DNSRule "subcommand") $ DNSAlternatives
+                       [ DNSTerminal    (DNSToken "status")
+                       , DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))
+                       ]
+    flag = DNSVocabulary () (DNSList "flag")
             [ DNSPronounced "-f" "force"
             , DNSPronounced "-r" "recursive"
             , DNSPronounced "-a" "all"
             , DNSPronounced "-i" "interactive"
             ]
-    command = DNSVocabulary (DNSList "command")
+    command = DNSVocabulary () (DNSList "command")
                       [ DNSToken "git"
                       , DNSToken "rm"
                       ]
-    subcommand = DNSProduction (DNSRule "subcommand") $ DNSAlternatives
-                       [ DNSTerminal    (DNSToken "status")
-                       , DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))
-                       ]
-    Right grammar = escapeDNSGrammar (DNSGrammar root dnsHeader [command, subcommand, flag])
+    Right grammar = escapeDNSGrammar (DNSGrammar [root, subcommand] [command, flag] dnsHeader)
 :}
 
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
@@ -69,7 +68,7 @@ let root = DNSProduction (DNSRule "root") $ DNSAlternatives
 --
 --
 --
-serialize :: DNSGrammar Text Text -> Either [SomeException] Text
+serialize :: DNSGrammar i Text Text -> Either [SomeException] Text
 serialize = isPythonFile
  <=< (second (display . serializeGrammar) . escapeDNSGrammar)
 
@@ -100,36 +99,21 @@ serialize = isPythonFile
 --                              "interactive"]}
 --
 --
+--
 -- as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long grammars. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
 --
 -- ('DNSImport's don't need to be at the start of the grammar or even above the production that uses it. but it looks nice)
 --
-serializeGrammar :: DNSGrammar DNSName DNSText -> Doc
-serializeGrammar grammar = grammar_
- where
- grammar_ = vsep $ punctuate "\n"
+serializeGrammar :: DNSGrammar i DNSName DNSText -> Doc
+serializeGrammar DNSGrammar{_dnsProductions,_dnsVocabularies,_dnsImports}
+ = vsep
+ . punctuate "\n" $
   [ "_commands_rules_ =" <+> "'''"
-  , imports_
-  , rules_
+  , serializeImports _dnsImports
+  , serializeProductions _dnsProductions
   , "'''"
-  , "_commands_lists_ =" <+> lists_
+  , "_commands_lists_ =" <+> serializeVocabularies _dnsVocabularies
   ]
- imports_ = serializeImports (grammar ^. dnsImports)
- rules_ = serializeRules grammar
- lists_ = serializeLists grammar
-
--- | serializes a grammar into a Python string.
---
--- imports all 'DNSBuiltinRules', whether used or not.
---
---
-serializeRules :: DNSGrammar DNSName DNSText -> Doc
-serializeRules (DNSGrammar{_dnsExport,_dnsProductions})
- = cat
- . punctuate "\n"
- . (serializeExport _dnsExport :)
- . concatMap serializeProduction
- $ _dnsProductions
 
 -- | not unlike 'serializeProduction', but only inserts one newline between imports, not
 -- two as between productions, for readability.
@@ -140,32 +124,64 @@ serializeRules (DNSGrammar{_dnsExport,_dnsProductions})
 -- <dgnletters> imported;
 --
 serializeImports :: [DNSImport DNSName] -> Doc
-serializeImports = vsep . fmap (\l ->serializeLHS l <+> "imported" <> ";")
+serializeImports = vsep . fmap (\l -> serializeLHS l <+> "imported" <> ";")
+
+-- | serializes a 'DNSVocabulary' into a Python @Dict@.
+--
+-- 'serializeVocabulary' is implemented differently from
+-- 'serializeProduction', even though conceptually they are
+-- both 'DNSProduction's. a 'DNSList' must be mutated in Python,
+-- not (as the 'DNSRule's are) defined as a @gramSpec@ String.
+--
+-- serializeVocabularies $ [DNSVocabulary undefined (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"], DNSVocabulary (DNSList (DNSName "empty")) []]
+-- {"list": ["one", "two", "three"], "empty": []}
+--
+--
+serializeVocabularies :: [DNSVocabulary i DNSName DNSText] -> Doc
+serializeVocabularies
+ = enclosePythonic "{" "}" ","
+ . mapMaybe serializeVocabulary
+
+-- | 
+--
+-- serializeVocabulary $ DNSVocabulary undefined (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"]
+-- "list": ["one", "two", "three"]
+--
+--
+serializeVocabulary :: DNSVocabulary i DNSName DNSText -> Possibly Doc
+serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
+ (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
+serializeVocabulary _ = failed "serializeVocabulary"
+
+-- | serializes 'DNSProduction's into a Python @String@.
+--
+--
+--
+--
+serializeProductions :: NonEmpty (DNSProduction i DNSName DNSText) -> Doc
+serializeProductions (export :| productions)
+ = cat
+ . punctuate "\n"
+ $ serializeExport export : fmap serializeProduction productions
 
 -- | like @'serializeProduction' ('DNSProduction' ...)@, only
 -- it inserts @"exported"@.
 --
--- >>> serializeExport $ DNSProduction (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "hello")))
--- <rule> exported  = "hello";
+-- >>> serializeExport $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
+-- <rule> exported  = "token";
 --
-serializeExport :: DNSProduction True DNSName DNSText -> Doc
-serializeExport (DNSProduction l (nonemptyDNSRHS -> toList -> rs)) =
- serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
+serializeExport :: DNSProduction i DNSName DNSText -> Doc
+serializeExport (DNSProduction _ l (nonemptyDNSRHS -> toList -> rs))
+ = serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 -- |
 --
--- >>> serializeProduction $ DNSProduction (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "hello")))
--- <rule>  = "hello";
--- >>> serializeProduction $ DNSVocabulary undefined undefined :: Maybe Doc
--- Nothing
+-- >>> serializeProduction $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
+-- <rule>  = "token";
 --
--- see 'serializeVocabulary' for the 'DNSVocabulary' case.
---
-serializeProduction :: DNSProduction False DNSName DNSText -> Possibly Doc
-serializeProduction (DNSProduction l (nonemptyDNSRHS -> toList -> rs)) = return $
- serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
-serializeProduction DNSVocabulary{} = failed "serializeProduction"
--- serializeProduction DNSVocabulary{} = mempty -- not identity to vertical alignment
+serializeProduction :: DNSProduction i DNSName DNSText -> Doc
+serializeProduction (DNSProduction _ l (nonemptyDNSRHS -> toList -> rs))
+ = serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 {- |
 
@@ -182,10 +198,10 @@ serializeRHS $ DNSAlternatives
 
 -}
 serializeRHS :: DNSRHS DNSName DNSText -> Doc
-serializeRHS (DNSTerminal t)      = serializeToken t
-serializeRHS (DNSNonTerminal (SomeDNSLHS l))   = serializeLHS l
-serializeRHS (DNSOptional r)      = "[" <> serializeRHS r <> "]"
-serializeRHS (DNSMultiple r)      = "(" <> serializeRHS r <> ")+"
+serializeRHS (DNSTerminal t)                  = serializeToken t
+serializeRHS (DNSNonTerminal (SomeDNSLHS l))  = serializeLHS l
+serializeRHS (DNSOptional r)                  = "[" <> serializeRHS r <> "]"
+serializeRHS (DNSMultiple r)                  = "(" <> serializeRHS r <> ")+"
 serializeRHS (DNSSequence     (toList -> rs)) = align . fillSep . fmap serializeRHS $ rs
 serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . fmap serializeRHS $ rs) <> ")"
 
@@ -220,39 +236,6 @@ serializeLHS (DNSBuiltinList b)    = "{" <> text s <> "}"
 serializeToken :: DNSToken DNSText -> Doc
 serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
-
--- | serialize the 'DNSList's that were ignored by 'serializeRules'.
---
-serializeLists :: DNSGrammar DNSName DNSText -> Doc
-serializeLists = serializeVocabularies . _dnsProductions
-
--- |
---
--- 'serializeVocabulary' is implemented differently from
--- 'serializeProduction', even though conceptually they are
--- both 'DNSProduction's. a 'DNSList' must be mutated in Python,
--- not (as the 'DNSRules' are) defined as a @gramSpec@ String.
---
--- serializeVocabularies $ [DNSVocabulary (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"], DNSVocabulary (DNSList (DNSName "empty")) []]
--- {"list": ["one", "two", "three"], "empty": []}
---
---
-serializeVocabularies :: [DNSProduction False DNSName DNSText] -> Doc
-serializeVocabularies
- = enclosePythonic "{" "}" ","
- . mapMaybe serializeVocabulary
-
--- | serializes a 'DNSVocabulary' into a Python dictionary.
---
--- serializeVocabulary $ DNSVocabulary (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"]
--- "list": ["one", "two", "three"]
---
--- a safe partial-function (outputs a list).
-serializeVocabulary :: DNSProduction False DNSName DNSText -> Possibly Doc
-serializeVocabulary (DNSVocabulary (DNSList (DNSName n)) ts) = return $
- (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
-serializeVocabulary _ = failed "serializeVocabulary"
--- serializeVocabulary _ = mempty -- not identity to all operations on documents
 
 -- | splits a multi-line collection-literal with the separator at the
 -- end of each line, not at the start.
@@ -299,12 +282,8 @@ enclosePythonic left right sep ds
 --
 -- a Kleisli arrow (?) where @m ~ Either [SomeException]@.
 --
-escapeDNSGrammar :: DNSGrammar Text Text -> Either [SomeException] (DNSGrammar DNSName DNSText)
+escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSName DNSText)
 escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
-
--- | @Either@ is a @Monad@: it short-circuits. 'Validation' is an @Applicative@, but not a @Monad@: under @traverse@ (or @bitraverse@), it runs the validation (@:: a -> f b@) on every field (@:: a@) in the traversable (@:: t a@), monoidally appending together all errors, not just the first.
-eitherToValidations :: Either e a -> Validation [e] a
-eitherToValidations = eitherToValidation . first (:[])
 
 -- | preserves the input when a valid Python file (with 'parseModule'),
 -- reports the syntax error otherwise.
@@ -337,15 +316,18 @@ getNames = nub . bifoldMap (:[]) (const [])
 -- e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
 --
 -- >>> map unDNSText $ getWords grammar
--- ["ls","git","rm","status","-f","force","-r","recursive","-a","all","-i","interactive"]
+-- ["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
 --
 getWords :: (Eq t, Bifoldable p) => p n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
 
--- | pushes a 'DNSProduction' into a 'DNSRHS',
--- and makes a new transformed 'DNSProduction'
+-- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',
+-- and makes a new transformed 'DNSProduction'. and hints that it be 'dnsInline'd.
 --
 -- a helper function for defining higher-order productions.
-pushDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction True n t -> DNSProduction True n t
-pushDNSProduction f n (DNSProduction l _) = DNSProduction (DNSRule n) (f (DNSNonTerminal (SomeDNSLHS l)))
+yankDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction DNSInfo n t -> DNSProduction DNSInfo n t
+yankDNSProduction f n (DNSProduction i l _) = DNSProduction
+ (i & dnsInline .~ True)
+ (DNSRule n)
+ (f (DNSNonTerminal (SomeDNSLHS l)))
 

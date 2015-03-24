@@ -42,7 +42,7 @@ many0 = many0C
 multipleC :: Command a -> Command [a]
 multipleC command = Command
  (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
- (multipleDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (multipleDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (\context -> (command ^. comParser) context `manyUntil` context)
  where
  Just lhs = lhsFromName 'multipleC
@@ -51,7 +51,7 @@ multipleC command = Command
 manyC :: Command a -> Command [a]
 manyC command = Command
  (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
- (multipleDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (multipleDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (\context -> Parsec.many1 $ (command ^. comParser) context)
  where
  Just lhs = lhsFromName 'manyC
@@ -60,7 +60,7 @@ manyC command = Command
 many0C :: Command a -> Command [a]
 many0C command = Command
  (bimapRule (appLHS lhs) multipleRHS (command ^. comRule))
- (zeroOrMoreDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (zeroOrMoreDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (\context -> Parsec.many $ (command ^. comParser) context)
  where
  Just lhs = lhsFromName 'many0C
@@ -70,12 +70,12 @@ multipleRHS :: RHS a -> RHS [a]
 multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
 
 -- |
-multipleDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
-multipleDNSProduction = pushDNSProduction DNSMultiple
+multipleDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+multipleDNSProduction = yankDNSProduction DNSMultiple
 
 -- | 'DNSMultiple' recognizes one or more, @('DNSOptional' . 'DNSMultiple') recognizes zero or more.
-zeroOrMoreDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
-zeroOrMoreDNSProduction = pushDNSProduction (DNSOptional . DNSMultiple)
+zeroOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+zeroOrMoreDNSProduction = yankDNSProduction (DNSOptional . DNSMultiple)
 
 
 -- ================================================================ --
@@ -96,7 +96,7 @@ optionalEnum = optionC enumDefault
 optionC :: a -> Command a -> Command a
 optionC theDefault command = Command
  (bimapRule (appLHS lhs) (optionRHS theDefault) (command ^. comRule))
- (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (optionalDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (\context -> Parsec.option theDefault $ (command ^. comParser) context)
  where
  Just lhs = lhsFromName 'optionC
@@ -105,7 +105,7 @@ optionC theDefault command = Command
 optionalC :: Command a -> Command (Maybe a)
 optionalC command = Command
  (bimapRule (appLHS lhs) optionalRHS (command ^. comRule))
- (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (optionalDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (\context -> Parsec.optionMaybe $ (command ^. comParser) context)
  where
  Just lhs = lhsFromName 'optionalC
@@ -119,8 +119,8 @@ optionRHS :: a -> RHS a -> RHS a
 optionRHS x r = pure x <|> r
 
 -- |
-optionalDNSProduction :: DNSCommandName -> DNSProduction True DNSCommandName t -> DNSProduction True DNSCommandName t
-optionalDNSProduction = pushDNSProduction DNSOptional
+optionalDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+optionalDNSProduction = yankDNSProduction DNSOptional
 
 
 -- ================================================================ --
@@ -148,14 +148,8 @@ unsafeFellRHS rhs = genericCommand (unsafeLHSFromRHS rhs) rhs
 maybeAtomC :: Command a -> Perms RHS (Maybe a)
 maybeAtomC command = (maybeAtom . liftCommand) $ Command
  (bimapRule (appLHS lhs) id (command ^. comRule))
- (optionalDNSProduction (combinatorDNSCommandName lhs) (command ^. comGrammar))
+ (optionalDNSProduction (defaultDNSExpandedName lhs) (command ^. comGrammar))
  (command ^. comParser)
  where
  Just lhs  = lhsFromName 'maybeAtomC
-
-
-combinatorDNSCommandName :: LHS -> DNSCommandName
-combinatorDNSCommandName
- = set (dnsMetaInfo.dnsInline) True
- . defaultDNSMetaName
 

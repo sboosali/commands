@@ -236,12 +236,13 @@ positive = 'positive
 
 
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = specialCommand 'dictation empty
- (DNSProduction (DNSRule name) (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))))
+dictation = specialCommand 'dictation
+ empty
+ (DNSProduction info (DNSRule name) (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))))
  (\context -> Dictation <$> anyBlack `manyUntil` context)
  where
- name = set (dnsMetaInfo.dnsInline) True $ defaultDNSMetaName (unsafeLHSFromName 'dictation)
-
+ name = defaultDNSExpandedName (unsafeLHSFromName 'dictation)
+ info = set dnsInline True defaultDNSInfo
 
 
 

@@ -1,34 +1,29 @@
 {-# LANGUAGE DataKinds, ExistentialQuantification, NamedFieldPuns #-}
 module Commands.Frontends.Dragon13.Render where
 import Commands.Command.Types            ()
--- import Commands.Etc
+import Commands.Etc ()
 import Commands.Frontends.Dragon13.Types
--- import Commands.Grammar
+import Commands.Frontends.Dragon13.Lens
 import Commands.Grammar.Types
 import Control.Alternative.Free.Tree
 
 import Control.Applicative
--- import Data.Foldable                     (foldMap)
--- import Data.Function                     (on)
--- import Data.List                         (nub, nubBy)
+import Control.Lens
 import Data.List.NonEmpty                (nonEmpty)
 import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 
 
-renderRule :: Rule x -> DNSProduction True DNSCommandName DNSCommandToken
-renderRule = renderProduction
-
 -- |
 --
 -- 'RHS' instantiate @Alternative@, and so may be @empty@. but 'DNSProduction' take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ for empty 'RHS's (later optimized away).
-renderProduction :: Rule x -> DNSProduction True DNSCommandName DNSCommandToken
-renderProduction (Rule l r) = DNSProduction lhs rhs
+renderRule :: Rule x -> DNSProduction DNSInfo DNSCommandName DNSCommandToken
+renderRule (Rule l r) = DNSProduction defaultDNSInfo lhs rhs
  where
  lhs = renderLHS l
  rhs = renderRHS r
 
 renderLHS :: LHS -> DNSLHS LHSRule DNSCommandName
-renderLHS = DNSRule . defaultDNSMetaName
+renderLHS = DNSRule . defaultDNSExpandedName
 
 -- |
 renderRHS :: RHS x -> DNSRHS DNSCommandName DNSCommandToken
@@ -45,5 +40,5 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 renderSymbol :: Symbol x -> DNSRHS DNSCommandName DNSCommandToken
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal (DNSToken t))
- (\(Command {_comGrammar = DNSProduction lhs _}) -> DNSNonTerminal (SomeDNSLHS lhs))
+ (\command -> DNSNonTerminal (SomeDNSLHS (command ^. comGrammar.dnsProductionLHS)))
 

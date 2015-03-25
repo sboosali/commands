@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns #-}
-{-# LANGUAGE PackageImports, RankNTypes, TemplateHaskell                    #-}
+{-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns, PackageImports #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                                  #-}
 module Commands.Grammar.Types where
 import Commands.Command.Types            ()
 import Commands.Etc
+import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Types
 import Commands.Parse.Types
 import Control.Alternative.Free.Tree
@@ -28,7 +29,9 @@ data Command a = Command
  }
  deriving (Functor)
 
-type DNSCommandGrammar = DNSProduction DNSInfo DNSCommandName DNSCommandToken
+type DNSCommandGrammar = DNSCommandProduction
+
+type DNSCommandProduction = DNSProduction DNSInfo DNSCommandName DNSCommandToken
 
 type DNSCommandName = DNSExpandedName LHS
 
@@ -148,8 +151,15 @@ makeLenses ''Rule
 makeLenses ''DNSExpandedName
 makeLenses ''DNSInfo
 
+
 comLHS :: Lens' (Command a) LHS
 comLHS = comRule . ruleLHS
 
 comRHS :: Lens' (Command a) (RHS a)
 comRHS = comRule . ruleRHS
+
+comExpand :: Lens' (Command a) Natural
+comExpand = comGrammar.dnsProductionInfo.dnsExpand
+
+comInline :: Lens' (Command a) Bool
+comInline = comGrammar.dnsProductionInfo.dnsInline

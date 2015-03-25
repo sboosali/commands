@@ -5,16 +5,18 @@ module Commands.Etc where
 import           Commands.Instances           ()
 
 import           Control.Applicative
+import           Control.Lens                 (Lens', lens)
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
+import           Data.Bifunctor               (first)
+import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.Hashable
+import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Monoid                  ((<>))
 import           Data.Text.Lazy               (Text)
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
                                                typeRepTyCon)
-import           Data.Either.Validation            (Validation,eitherToValidation)
-import           Data.Bifunctor                    (first )
 import qualified Debug.Trace
 import           GHC.Generics                 (Generic)
 import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
@@ -23,8 +25,6 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                PkgName (PkgName))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
-import Data.List.NonEmpty (NonEmpty(..))
-import Control.Lens (Lens', lens)
 
 
 -- | generalized 'Maybe':

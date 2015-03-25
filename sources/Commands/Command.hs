@@ -18,13 +18,14 @@ import           Control.Monad.Catch                  (SomeException (..),
                                                        catches)
 import           Data.Bifunctor                       (second)
 import           Data.Foldable                        (asum)
+import qualified Data.List                            as List
+import           Data.List.NonEmpty                   (NonEmpty (..))
 import qualified Data.Map                             as Map
 import           Data.Proxy
 import qualified Data.Text.Lazy                       as T
 import           Data.Typeable                        (Typeable)
 import           GHC.Generics                         (Generic)
 import           Language.Haskell.TH.Syntax           (Name)
-import Data.List.NonEmpty (NonEmpty(..))
 
 
 -- |
@@ -69,9 +70,16 @@ import Data.List.NonEmpty (NonEmpty(..))
 --
 serialized :: Command x -> Either [SomeException] T.Text
 serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
-  ((command ^. comGrammar) :| ((\(Some command) -> command ^. comGrammar) <$> Map.elems (reifyCommand command)))
+  (getDescendentProductions command)
   []  -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
   dnsHeader
+
+-- | doesn't double count the 'dnsExport' when it's its own descendent.
+getDescendentProductions :: Command x -> NonEmpty DNSCommandProduction
+getDescendentProductions command = export :| List.delete export productions
+ where
+ export = command^.comGrammar
+ productions =  ((\(Some command) -> command^.comGrammar) <$> (Map.elems . reifyCommand $ command))
 
 parses :: Command a -> String -> Possibly a
 parses command = parsing (command ^. comParser)

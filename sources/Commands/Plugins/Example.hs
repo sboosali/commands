@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
-{-# LANGUAGE ViewPatterns                                         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands
@@ -21,6 +20,7 @@ import           Data.Foldable                   (Foldable (..), asum,
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
 import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
+import           Numeric.Natural                 ()
 import           Prelude                         hiding (foldr)
 import           System.Timeout                  (timeout)
 import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
@@ -37,7 +37,8 @@ data Root
  -- Roots [Root]
  deriving (Show,Eq)
 
-root = 'root <=> empty
+root = set comExpand 1 $ 'root
+ <=> empty
  <|> Repeat      # positive & root
  <|> ReplaceWith # "replace" & dictation & "with" & dictation
  <|> Undo        # "no"         -- order matters..
@@ -78,7 +79,7 @@ data Phrase
  | Dictated Dictation
  deriving (Show,Eq,Ord)
 
-phrase = 'phrase
+phrase = set comExpand 1 $ 'phrase
 
  <=> Verbatim # "say" & dictation
  <|> Escaped  # "lit" & keyword & phrase
@@ -314,85 +315,85 @@ main = do
  attemptSerialize root -- timed out. fast after Commands.Commands.Sugar, I think. Theory: may be left associated tree is efficient, wall arbitrarily associated free alternatives is obscenely polynomial inefficient. But even for such a small grammar? May be non-left association causes non-termination?
  -- I don't think so: {<|> Repeat     <$> liftCommand positive <*> liftCommand root} still terminates in both the serialization in the parsing. Maybe because all the alternatives (or their children) were not left associated? I don't know
  -- See also: attemptParse (multipleC root) "no 1 replace this and that with that and this"
+ -- print $ stronglyConnComp . fmap dnsAdjacency . getDescendentProductions $ root
 
+ -- putStrLn ""
+ -- attemptParse positive "9"
+ -- attemptParse dictation "this and that"
+ -- attemptParse root "no"
+ -- attemptParse root "no way"
+ -- attemptParse root "replace this and that with that and this"
+ -- attemptParse root "1 1 no"
+ -- attemptParse root "say 638 Pine St., Redwood City 94063"
+ -- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
 
- putStrLn ""
- attemptParse positive "9"
- attemptParse dictation "this and that"
- attemptParse root "no"
- attemptParse root "no way"
- attemptParse root "replace this and that with that and this"
- attemptParse root "1 1 no"
- attemptParse root "say 638 Pine St., Redwood City 94063"
- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
+ -- attemptParse (multipleC root) "no no"
+ -- attemptParse (multipleC root) "no replace this with that"
+ -- attemptParse (multipleC root) "no 1 replace this with that"
+ -- attemptParse (multipleC root) "no 1 replace this and that with that and this" -- timed out. left recursion?
 
- attemptParse (multipleC root) "no no"
- attemptParse (multipleC root) "no replace this with that"
- attemptParse (multipleC root) "no 1 replace this with that"
- attemptParse (multipleC root) "no 1 replace this and that with that and this" -- timed out. left recursion?
-
- putStrLn ""
- attemptParse click "single left click"
- attemptParse click "left click"
- attemptParse click "single click"
- attemptParse click "click"
+ -- putStrLn ""
+ -- attemptParse click "single left click"
+ -- attemptParse click "left click"
+ -- attemptParse click "single click"
+ -- attemptParse click "click"
 
  putStrLn ""
  -- attemptParse phrase
 
 
 
- putStrLn ""
- attemptNameRHS ("from" &> place)
- attemptNameRHS ("to"   &> place)
- attemptNameRHS ("by"   &> transport)
+ -- putStrLn ""
+ -- attemptNameRHS ("from" &> place)
+ -- attemptNameRHS ("to"   &> place)
+ -- attemptNameRHS ("by"   &> transport)
 
 
 
- putStrLn ""
- attemptSerialize directions
- putStrLn ""
- traverse_ (attemptParse directions) exampleDirections
- attemptParse directions "directions from Redwood City to San Francisco by public transit"
+ -- putStrLn ""
+ -- attemptSerialize directions
+ -- putStrLn ""
+ -- traverse_ (attemptParse directions) exampleDirections
+ -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
 
- putStrLn ""
- attemptSerialize directions_
- putStrLn ""
- traverse_ (attemptParse directions_) exampleDirections
+ -- putStrLn ""
+ -- attemptSerialize directions_
+ -- putStrLn ""
+ -- traverse_ (attemptParse directions_) exampleDirections
 
- putStrLn ""
- print (getWords . _comGrammar $ button)
+ -- putStrLn ""
+ -- print (getWords . _comGrammar $ button)
 
- putStrLn ""
- print $ cycles $
-  [ ("non recursive",        "N", [])
-  , ("self recursive",       "S", ["S"])
-  , ("mutually recursive A", "A", ["B"])
-  , ("mutually recursive B", "B", ["A","C"])
-  , ("mutually recursive C", "C", ["A","S","N"])
-  ]
+ -- putStrLn ""
+ -- print $ cycles $
+ --  [ ("non recursive",        "N", [])
+ --  , ("self recursive",       "S", ["S"])
+ --  , ("mutually recursive A", "A", ["B"])
+ --  , ("mutually recursive B", "B", ["A","C"])
+ --  , ("mutually recursive C", "C", ["A","S","N"])
+ --  ]
 
- putStrLn ""
- print $ SomeDNSLHS (DNSList "n")
- print $ DNSNonTerminal (SomeDNSLHS (DNSList "n"))
- print $ DNSOptional (DNSNonTerminal (SomeDNSLHS (DNSList "n")))
+ -- putStrLn ""
+ -- print $ SomeDNSLHS (DNSList "n")
+ -- print $ DNSNonTerminal (SomeDNSLHS (DNSList "n"))
+ -- print $ DNSOptional (DNSNonTerminal (SomeDNSLHS (DNSList "n")))
 
- putStrLn ""
- let name = DNSNonTerminal (SomeDNSLHS (DNSList "A"))
- let rhs = DNSAlternatives $ fromList [ name, DNSSequence $ fromList [DNSTerminal (DNSToken "t"), DNSNonTerminal (SomeDNSLHS (DNSList "B")), DNSOptional (DNSMultiple name)] ]
- print $ transform (\case
-   DNSNonTerminal ((== (SomeDNSLHS (DNSList "A"))) -> True) -> DNSNonTerminal (SomeDNSLHS (DNSList "XXX"))
-   r -> r)
-  rhs
+ -- putStrLn ""
+ -- let name = DNSNonTerminal (SomeDNSLHS (DNSList "A"))
+ -- let rhs = DNSAlternatives $ fromList [ name, DNSSequence $ fromList [DNSTerminal (DNSToken "t"), DNSNonTerminal (SomeDNSLHS (DNSList "B")), DNSOptional (DNSMultiple name)] ]
+ -- print $ transform (\case
+ --   DNSNonTerminal ((== (SomeDNSLHS (DNSList "A"))) -> True) -> DNSNonTerminal (SomeDNSLHS (DNSList "XXX"))
+ --   r -> r)
+ --  rhs
 
- putStrLn ""
- attemptParse phrase "parens snake upper some words" -- lol "ens"
- attemptParse phrase "par snake upper some words"
- attemptParse phrase "say some words"
- attemptParse phrase "par quote par snake unquote snake some words"
- attemptParse phrase "spell grave zero ay bee sea some words"
- attemptParse phrase "spell grave zero ay bee sea"
- attemptParse phrase "string some words"
+ -- putStrLn ""
+ -- attemptParse phrase "parens snake upper some words" -- lol "ens"
+ -- attemptParse phrase "par snake upper some words"
+ -- attemptParse phrase "say some words"
+ -- attemptParse phrase "par quote par snake unquote snake some words"
+ -- attemptParse phrase "spell grave zero ay bee sea some words"
+ -- attemptParse phrase "spell grave zero ay bee sea"
+ -- attemptParse phrase "string some words"
 
  -- putStrLn ""
  -- attemptParse speech "lore some words roar"

@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds, ExistentialQuantification, NamedFieldPuns #-}
 module Commands.Frontends.Dragon13.Render where
 import Commands.Command.Types            ()
-import Commands.Etc ()
-import Commands.Frontends.Dragon13.Types
+import Commands.Etc                      ()
 import Commands.Frontends.Dragon13.Lens
+import Commands.Frontends.Dragon13.Types
 import Commands.Grammar.Types
 import Control.Alternative.Free.Tree
 

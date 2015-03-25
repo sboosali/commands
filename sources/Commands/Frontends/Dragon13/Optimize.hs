@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, LambdaCase, NamedFieldPuns, ViewPatterns #-}
 module Commands.Frontends.Dragon13.Optimize where
 import           Commands.Etc
--- import           Commands.Frontends.Dragon13.Lens
+import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
@@ -9,15 +9,16 @@ import           Commands.Graph
 
 import           Control.Lens
 import           Data.Bifunctor                    (first)
--- import           Data.Graph
--- import           Data.List
--- import qualified Data.List                         as List
+import           Data.Graph
+import qualified Data.List                         as List
 import           Data.Map.Strict                   (Map)
 -- import qualified Data.Map.Strict                   as Map
--- import           Data.Monoid                       ((<>))
+import           Control.Applicative
+import           Data.List.NonEmpty                (NonEmpty (..))
+import           Data.Monoid                       ((<>))
 import           Data.Text.Lazy                    (Text)
 import qualified Data.Text.Lazy                    as T
--- import           Numeric.Natural
+import           Numeric.Natural
 
 
 -- |
@@ -48,106 +49,126 @@ optimizeGrammar
  = first renderDNSExpandedName
  . compactGrammar
  -- . vocabulariseGrammar
+ . expandGrammar
  -- . inlineGrammar -- TODO
- -- . expandGrammar -- TODO
 
 
 
--- -- ================================================================ --
+-- ================================================================ --
 
--- -- |
--- expandGrammar :: (Eq n, Ord n) => DNSGrammar DNSInfo (DNSExpandedName n) t -> DNSGrammar DNSInfo (DNSExpandedName n) t
--- expandGrammar g@DNSGrammar{_dnsExport,_dnsImports}
---  = DNSGrammar e _dnsImports (vocabularies <> fmap upcastDNSProduction ps)
---  where
---  ([e], ps) = partition (`equalDNSProduction` _dnsExport) expanded -- TODO if pattern match fails, expansion has corrupted the grammar
---  expanded = expandSCCs . stronglyConnComp . fmap dnsAdjacency $ productions
---  (vocabularies,productions) = partitionDNSGrammar g
+{- |
 
--- dnsAdjacency :: DNSProduction DNSInfo (DNSExpandedName n) t -> DNSAdjacency n t
--- dnsAdjacency p = (p,l,ls)
---  where
---  l  = p ^. dnsProductionLHS
---  ls = getNonTerminals p
+eliminates all cycles from the graph induced by 'dnsAdjacency':
 
--- -- |
--- --
--- expandSCCs :: (Eq n) => [SCC (DNSProduction DNSInfo (DNSExpandedName n) t)] -> [DNSProduction DNSInfo (DNSExpandedName n) t]
--- expandSCCs = concatMap $ \case
---  AcyclicSCC p -> [p]
---  CyclicSCC ps -> expandProductionCycle ps
+TODO prop> all (\case { AcyclicSCC{} -> True; _ -> False }) ('stronglyConnComp' . fmap 'dnsAdjacency' . toListOf dnsProductions . expandGrammar $ g)
 
--- {- | expands each recursive 'DNSProduction' in the cycle (i.e. the input)
--- to the depth 'dnsExpand'.
+preserves the 'dnsExport':
 
--- the original name is preserved as the "root", to be consistent with
--- references outside the cycle.
+TODO prop> (g ^. dnsExport) `equalDNSProduction` (expandGrammar g ^. dnsExport)
 
+-}
+expandGrammar :: (Eq n, Ord n) => DNSGrammar DNSInfo (DNSExpandedName n) t -> DNSGrammar DNSInfo (DNSExpandedName n) t
+expandGrammar (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
+ where
+ ([e], ps) = List.partition (`equalDNSProduction` _e) expanded -- TODO if pattern match fails, expansion has corrupted the grammar
+ expanded = expandSCCs . stronglyConnComp . fmap dnsAdjacency $ (_e:_ps)
 
--- -- TODO nonempty
+{- | induces a graph on a 'DNSGrammar', where:
 
--- -- TODO? prop> length (expandProductionCycle c) == expandProductionCycle_measure c
+* nodes are 'DNSProduction's
+* out-edges are when a 'DNSProduction's 'DNSRHS' holds a 'DNSProduction's 'DNSLHS' as a 'DNSNonTerminal'.
 
--- -- TODO Arbitrary newtype must be biased towards mutually recursive productions
+-}
+dnsAdjacency :: DNSProduction DNSInfo (DNSExpandedName n) t -> DNSAdjacency n t
+dnsAdjacency p = (p,l,ls)
+ where
+ l  = SomeDNSLHS (p^.dnsProductionLHS)
+ ls = getNonTerminals p
 
--- -}
--- expandProductionCycle :: (Eq n) => [DNSProduction DNSInfo (DNSExpandedName n) t] -> [DNSProduction DNSInfo (DNSExpandedName n) t]
--- expandProductionCycle ps = concatMap (expandProductionCycleTo ls (expandProductionMaxDepth ps)) ps
---  where
---  ls = ps ^.. (each.dnsProductionLHS)
+-- |
+--
+expandSCCs :: (Eq n) => [SCC (DNSProduction DNSInfo (DNSExpandedName n) t)] -> [DNSProduction DNSInfo (DNSExpandedName n) t]
+expandSCCs = concatMap $ \case
+ AcyclicSCC p -> [p] -- acyclic productions don't need to be expanded
+ CyclicSCC ps -> expandProductionCycle ps
 
--- -- |
--- --
--- expandProductionCycleTo :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction DNSInfo (DNSExpandedName n) t -> [DNSProduction DNSInfo (DNSExpandedName n) t]
--- expandProductionCycleTo ls d p@(DNSProduction l r)
---   = [DNSProduction l $ expandRHSAt ls d r] -- TODO this guarantees the irrefutable pattern match above i.e. ([e], ps)
---  <> fmap (\k -> expandProductionAt ls k p) [1..d]
---  <> [DNSProduction (expandLHSAt 0 l) $ first defaultDNSExpandedName zeroDNSRHS]
+{- | expands each recursive 'DNSProduction' in the cycle (i.e. the input)
+to the depth 'dnsExpand'.
 
--- expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction DNSInfo (DNSExpandedName n) t -> DNSProduction DNSInfo (DNSExpandedName n) t
--- expandProductionAt ls d (DNSProduction l r) = DNSProduction (expandLHSAt d l) $ expandRHSAt ls (d-1) r
-
--- expandRHSAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSRHS (DNSExpandedName n) t -> DNSRHS (DNSExpandedName n) t
--- expandRHSAt ls d = transform $ \case
---  DNSNonTerminal (shouldExpand ls -> Just (SomeDNSLHS l)) -> DNSNonTerminal (SomeDNSLHS (expandLHSAt d l))
---  r -> r
-
--- shouldExpand :: (Eq n) => DNSExpanded n t -> SomeDNSLHS (DNSExpandedName n) -> Maybe (SomeDNSLHS (DNSExpandedName n))
--- shouldExpand ls l = List.find (==l) ls
-
--- expandLHSAt :: Natural -> DNSLHS l (DNSExpandedName n) -> DNSLHS l (DNSExpandedName n)
--- expandLHSAt = set (dnsLHSName.dnsMetaExpansion._Just)
+the original name is preserved as the "root", to be consistent with
+references outside the cycle.
 
 
+-- TODO nonempty
 
--- {- |
+-- TODO? prop> length (expandProductionCycle c) == expandProductionCycle_measure c
 
--- -- TODO prop> \(NonEmpty ls) -> length ls <= expandProductionCycle_measure ls
+-- TODO Arbitrary newtype should be biased towards mutually recursive productions, maybe by parameterising on @n@ a small enum.
 
--- -}
--- expandProductionCycle_measure ::  [DNSProduction DNSInfo (DNSExpandedName n) t] -> Natural
--- expandProductionCycle_measure ps = n + (n * d)
---  where
---  n = genericLength ps
---  d = expandProductionMaxDepth ps
+-}
+expandProductionCycle :: (Eq n) => [DNSProduction DNSInfo (DNSExpandedName n) t] -> [DNSProduction DNSInfo (DNSExpandedName n) t]
+expandProductionCycle ps = expandProductionCycleTo ls (expandProductionMaxDepth ps) =<< ps
+ where
+ ls = SomeDNSLHS <$> (ps ^.. each.dnsProductionLHS)
 
--- {- | for a cycle of mutually-recursive productions, take the 'maximum'
--- of their 'dnsExpand's.
+-- |
+--
+-- guarantees that the 'DNSLHS' of the input 'DNSProduction', matches the 'DNSLHS' of the first output 'DNSProduction'.
+--
+-- something like prop> \e n p -> let (q:|_) = expandProductionCycleTo e n p in q `equalDNSProduction` p
+--
+-- TODO this guarantee then guarantees the success of the irrefutable pattern match in expandGrammar i.e. ([e], ps)
+expandProductionCycleTo
+ :: (Eq n)
+ => DNSExpanded n t
+ -> Natural
+ -> DNSProduction DNSInfo (DNSExpandedName n) t
+ -> [DNSProduction DNSInfo (DNSExpandedName n) t]
+expandProductionCycleTo ls d p@(DNSProduction i l r)
+  = [DNSProduction i l $ expandRHSAt ls d r]
+ <> fmap (\k -> expandProductionAt ls k p) (reverse [1..d])
+ <> [DNSProduction i (expandLHSAt 0 l) $ defaultDNSExpandedName `first` zeroDNSRHS]
 
--- since we must expand each production to the
--- same depth, and since each production can be configured with its own
--- depth, we need some aggregate.
+expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProduction DNSInfo (DNSExpandedName n) t -> DNSProduction DNSInfo (DNSExpandedName n) t
+expandProductionAt ls d (DNSProduction i l r) = DNSProduction i (expandLHSAt d l) (expandRHSAt ls (d-1) r)
+
+expandLHSAt :: Natural -> DNSLHS l (DNSExpandedName n) -> DNSLHS l (DNSExpandedName n)
+expandLHSAt = set (dnsLHSName.dnsExpansion) . Just
+
+expandRHSAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSRHS (DNSExpandedName n) t -> DNSRHS (DNSExpandedName n) t
+expandRHSAt ls d = transform $ \case
+ DNSNonTerminal (shouldExpand ls -> Just (SomeDNSLHS l)) -> DNSNonTerminal (SomeDNSLHS (expandLHSAt d l))
+ r -> r
+
+shouldExpand :: (Eq n) => DNSExpanded n t -> SomeDNSLHS (DNSExpandedName n) -> Maybe (SomeDNSLHS (DNSExpandedName n))
+shouldExpand ls l = List.find (==l) ls
 
 
--- -}
--- expandProductionMaxDepth :: [DNSProduction DNSInfo (DNSExpandedName n) t] -> Natural
--- expandProductionMaxDepth
---  = maximum
---  . fmap (maybe 0 id)  -- each Nothing comes from DNSBuiltin
---  . fmap (\p -> p ^? dnsProductionExpand)
---  where
---  dnsProductionExpand = dnsProductionName.dnsMetaInfo.dnsExpand
 
+{- |
+
+-- TODO prop> \(NonEmpty ls) -> length ls <= expandProductionCycle_measure ls
+
+-}
+expandProductionCycle_measure ::  [DNSProduction DNSInfo (DNSExpandedName n) t] -> Natural
+expandProductionCycle_measure ps = n + (n * d)
+ where
+ n = List.genericLength ps
+ d = expandProductionMaxDepth ps
+
+{- | for a cycle of mutually-recursive productions, take the 'maximum'
+of their 'dnsExpand's.
+
+since we must expand each production to the
+same depth, and since each production can be configured with its own
+depth, we need some aggregate.
+
+
+-}
+expandProductionMaxDepth :: [DNSProduction DNSInfo (DNSExpandedName n) t] -> Natural
+expandProductionMaxDepth
+ = maximum
+ . fmap (\p -> p ^. dnsProductionInfo.dnsExpand)
 
 
 -- -- ================================================================ --
@@ -198,27 +219,31 @@ optimizeGrammar
 -- -- ================================================================ --
 
 -- -- |
--- vocabulariseGrammar :: (Eq n) => DNSGrammar DNSInfo (DNSExpandedName n) t -> DNSGrammar DNSInfo (DNSExpandedName n) t
+-- vocabulariseGrammar :: (Eq n, Eq t) => DNSGrammar DNSInfo (DNSExpandedName n) t -> DNSGrammar DNSInfo (DNSExpandedName n) t
 -- vocabulariseGrammar = id
+
+
+
 
 
 -- -- ================================================================ --
 
 -- |
-renderDNSExpandedName :: DNSExpandedName Text -> Text
-renderDNSExpandedName = view dnsExpandedName
--- TODO use dnsMetaExpansion
-
--- |
-compactGrammar :: DNSGrammar DNSInfo (DNSExpandedName LHS) t -> DNSGrammar DNSInfo (DNSExpandedName Text) t
+compactGrammar :: (Functor f) => DNSGrammar i (f LHS) t -> DNSGrammar i (f Text) t
 compactGrammar = first (fmap (T.pack . showLHS . compactLHS))
+-- compactGrammar = first (fmap (T.pack . showLHS))
 
 -- |
 compactLHS :: LHS -> LHS
 compactLHS (LHS (GUI (Package _) (Module _) (Identifier occ))) = LHS (GUI (Package "") (Module "") (Identifier occ))
 compactLHS (l `LHSApp` ls) = compactLHS l `LHSApp` fmap compactLHS ls
 compactLHS l = l
--- TODO safely compact i.e. unambiguously. compare each against all, with getNames. Build a Trie
+-- TODO safely compact i.e. unambiguously. compare each against all, with getNames. Build a Trie?
+
+-- |
+renderDNSExpandedName :: DNSExpandedName Text -> Text
+renderDNSExpandedName (DNSExpandedName Nothing  n) = n
+renderDNSExpandedName (DNSExpandedName (Just k) n) = n <> T.pack "____" <> T.pack (show k)
 
 
 -- ================================================================ --

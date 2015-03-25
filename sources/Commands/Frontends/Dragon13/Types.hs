@@ -78,7 +78,7 @@ dnsHeader = DNSBuiltinRule <$> constructors
 
 -- ================================================================ --
 
--- | 
+-- |
 --
 --
 data DNSProduction i n t = DNSProduction
@@ -93,7 +93,7 @@ instance Bifoldable    (DNSProduction i) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSProduction i) where
  bitraverse f g (DNSProduction i l rs) = DNSProduction i <$> traverse f l <*> bitraverse f g rs
 
--- | 
+-- |
 --
 --
 --
@@ -208,7 +208,7 @@ zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 --
 -- @unitDNSRHS = 'DNSOptional' 'zeroDNSRHS'@
 --
--- which somehow actually works in the speech recognition engine.
+-- denotationally, we have equational reasoning. operationally, I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (that fails), but then the option is matched (always succeeds).
 --
 unitDNSRHS :: DNSRHS n t
 unitDNSRHS = DNSOptional zeroDNSRHS
@@ -252,6 +252,8 @@ data DNSLHS (l :: LHSKind) n where
  DNSBuiltinRule :: DNSBuiltinRule -> DNSLHS LHSRule x
  DNSList        :: n              -> DNSLHS LHSList n
  DNSBuiltinList :: DNSBuiltinList -> DNSLHS LHSList x
+
+-- TODO enforce whether DNSLHS, well, whether it can be on the LHS rather than only in an RHS.
 
 deriving instance (Show n) => Show (DNSLHS l n)
 instance (Eq n) => Eq (DNSLHS l n) where (==) = equalDNSLHS

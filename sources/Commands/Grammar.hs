@@ -94,8 +94,8 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
 --
 -- TODO for compactness, keep unique fully qualified identifier, but later render as unqualified identifier with possible compact unique suffix
 showLHS :: LHS -> String
-showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ)))
- = intercalate "__" [occ, mod, pkg]
+showLHS (LHS (GUI (Package "") (Module "") (Identifier occ))) = occ -- TODO compactLHS
+showLHS (LHS (GUI (Package pkg) (Module mod) (Identifier occ))) = intercalate "__" [occ, mod, pkg]
  -- = occ <> "__" <> hashAlphanumeric (pkg <> "__" <> mod <> "__" <> occ)
 showLHS (LHSInt i) = "i_" <> hashAlphanumeric i
 showLHS (l `LHSApp` ls) = intercalate "____" (showLHS l : fmap showLHS ls)

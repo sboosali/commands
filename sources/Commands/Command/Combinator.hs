@@ -13,6 +13,7 @@ import           Commands.Command
 import           Commands.Etc
 -- import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
+import           Commands.Frontends.Dragon13.Lens
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
@@ -66,7 +67,9 @@ many0C command = Command
 
 -- |
 multipleRHS :: RHS a -> RHS [a]
-multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
+-- multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
+multipleRHS r = pure [] <|> (:[]) <$> r  -- TODO horribly horrible, but the recursion causes non-termination.
+
 
 -- |
 oneOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
@@ -128,7 +131,6 @@ optionalDNSProduction = yankDNSProduction DNSOptional
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
 maybeAtomR
  = maybeAtomC
- -- . set (grammar .dnsExport .dnsProductionName .dnsMetaInfo .dnsInline) True  -- TODO removes production but doesn't in-line RHS
  . unsafeFellRHS
 
 -- |

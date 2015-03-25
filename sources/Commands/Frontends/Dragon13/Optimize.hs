@@ -54,8 +54,8 @@ optimizeGrammar
  = first renderDNSExpandedName
  . compactGrammar
  -- . vocabulariseGrammar
- . inlineGrammar
  . expandGrammar
+ -- . inlineGrammar
 
 
 
@@ -199,9 +199,9 @@ inlineAway :: (Ord n) => DNSInlined n t -> [DNSProductionOptimizeable n t] -> [D
 inlineAway = undefined -- TODO  rewriteOn?
 
 inlineProduction :: (Ord n) => DNSInlined n t -> DNSProductionOptimizeable n t -> DNSProductionOptimizeable n t
-inlineProduction lrs = transformOn dnsProductionRHS $ \case
- DNSNonTerminal (shouldInline lrs -> Just r) -> r
- r -> r
+inlineProduction lrs = rewriteOn dnsProductionRHS $ \case
+ DNSNonTerminal l -> shouldInline lrs l
+ _ -> Nothing
 
 shouldInline :: (Ord n) => DNSInlined n t -> SomeDNSLHS (DNSExpandedName n) -> Maybe (DNSRHS (DNSExpandedName n) t)
 shouldInline lrs l = Map.lookup l lrs

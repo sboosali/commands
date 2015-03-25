@@ -79,17 +79,17 @@ data Phrase
  | Dictated Dictation
  deriving (Show,Eq,Ord)
 
-phrase = set comExpand 1 $ 'phrase
+phrase = set comExpand 3 $ 'phrase
 
  <=> Verbatim # "say" & dictation
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- -- <|> Pressed  # "press" & many key & optional phrase -- TODO
- -- <|> Spelled  # "spell" & many character & optional phrase
- -- <|> Spelled  # many character & optional phrase
- -- <|> Letter   # character & optional phrase
- -- <|> Cap      # "cap" & character & optional phrase
+ <|> Pressed  # "press" & many key & optional phrase
+ <|> Spelled  # "spell" & many character & optional phrase
+ <|> Spelled  #           many character & optional phrase
+ <|> Letter   # character & optional phrase
+ <|> Cap      # "cap" & character & optional phrase
 
  <|> Case     # casing   & phrase
  <|> Join     # joiner   & phrase
@@ -289,6 +289,11 @@ exampleDirections = fmap (unwords . words)
 
 
 
+data Even = Even (Maybe Odd)  deriving Show
+data Odd  = Odd  (Maybe Even) deriving Show
+odd_  = set comExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
+even_ = set comExpand 1 $ 'even_ <=> Even # "even" & optional odd_
+
 
 
 -- it seems to be synchronous, even with threaded I guess?
@@ -304,7 +309,7 @@ attempt = attemptAsynchronously 1
 
 attemptParse command = attempt . handleParse command
 
-attemptSerialize command = attemptAsynchronously 2 $ either print T.putStrLn $ serialized command
+attemptSerialize command = attemptAsynchronously 3 $ either print T.putStrLn $ serialized command
 
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 
@@ -409,9 +414,10 @@ main = do
  -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions odd_)
  -- putStrLn ""
  -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions even_)
-
-data Even = Even (Maybe Odd)  deriving Show
-data Odd  = Odd  (Maybe Even) deriving Show
-odd_  = set comExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
-even_ = set comExpand 1 $ 'even_ <=> Even # "even" & optional odd_
-
+ putStrLn ""
+ traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions $ optional even_)
+ putStrLn ""
+ traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ even_)
+ putStrLn ""
+ traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ optional even_)
+ 

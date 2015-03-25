@@ -9,7 +9,6 @@ import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Instances                ()
-import Commands.Grammar.Types
 
 import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))
@@ -24,7 +23,6 @@ import qualified Data.Text.Lazy                    as T
 import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 import Data.List.NonEmpty (NonEmpty(..))
-import Control.Lens
 import           Data.Maybe                        (mapMaybe)
 
 
@@ -320,14 +318,4 @@ getNames = nub . bifoldMap (:[]) (const [])
 --
 getWords :: (Eq t, Bifoldable p) => p n t -> [t]
 getWords = nub . bifoldMap (const []) (:[])
-
--- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',
--- and makes a new transformed 'DNSProduction'. and hints that it be 'dnsInline'd.
---
--- a helper function for defining higher-order productions.
-yankDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction DNSInfo n t -> DNSProduction DNSInfo n t
-yankDNSProduction f n (DNSProduction i l _) = DNSProduction
- (i & dnsInline .~ True)
- (DNSRule n)
- (f (DNSNonTerminal (SomeDNSLHS l)))
 

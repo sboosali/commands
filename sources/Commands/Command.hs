@@ -71,15 +71,16 @@ import           Language.Haskell.TH.Syntax           (Name)
 serialized :: Command x -> Either [SomeException] T.Text
 serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
   (getDescendentProductions command)
-  []  -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
+  []
   dnsHeader
+ -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
 -- | doesn't double count the 'dnsExport' when it's its own descendent.
 getDescendentProductions :: Command x -> NonEmpty DNSCommandProduction
 getDescendentProductions command = export :| List.delete export productions
  where
  export = command^.comGrammar
- productions =  ((\(Some command) -> command^.comGrammar) <$> (Map.elems . reifyCommand $ command))
+ productions = ((\(Some command) -> command^.comGrammar) <$> (Map.elems . reifyCommand $ command))
 
 parses :: Command a -> String -> Possibly a
 parses command = parsing (command ^. comParser)

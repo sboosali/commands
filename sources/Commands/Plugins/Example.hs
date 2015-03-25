@@ -85,7 +85,7 @@ phrase = set comExpand 1 $ 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- -- <|> Pressed  # "press" & many key & optional phrase
+ -- <|> Pressed  # "press" & many key & optional phrase -- TODO
  -- <|> Spelled  # "spell" & many character & optional phrase
  -- <|> Spelled  # many character & optional phrase
  -- <|> Letter   # character & optional phrase
@@ -356,8 +356,8 @@ main = do
  -- traverse_ (attemptParse directions) exampleDirections
  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
 
- -- putStrLn ""
- -- attemptSerialize directions_
+ putStrLn ""
+ attemptSerialize directions_
  -- putStrLn ""
  -- traverse_ (attemptParse directions_) exampleDirections
 
@@ -399,11 +399,19 @@ main = do
  -- attemptParse speech "lore some words roar"
 
  putStrLn ""
- attemptParse even_ "even odd even "
- attemptSerialize even_ -- mutually recursive grammars can't be serialized
+ attemptParse even_ "even odd even"
+ attemptSerialize odd_
+ attemptSerialize even_
 
-data Even = Even (Maybe Odd) deriving Show
-even_ = 'even_ <=> Even # "even" & optional odd_
-data Odd = Odd (Maybe Even) deriving Show
-odd_ = 'odd_ <=> Odd # "odd" & optional even_
+ -- putStrLn ""
+ -- traverse_ print $ [odd_ ^. comLHS, even_ ^. comLHS]
+ -- putStrLn ""
+ -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions odd_)
+ -- putStrLn ""
+ -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions even_)
+
+data Even = Even (Maybe Odd)  deriving Show
+data Odd  = Odd  (Maybe Even) deriving Show
+odd_  = set comExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
+even_ = set comExpand 1 $ 'even_ <=> Even # "even" & optional odd_
 

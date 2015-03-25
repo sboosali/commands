@@ -11,9 +11,8 @@
 module Commands.Command.Combinator where
 import           Commands.Command
 import           Commands.Etc
--- import           Commands.Frontends.Dragon13.Lens
-import           Commands.Frontends.Dragon13.Types
 import           Commands.Frontends.Dragon13.Lens
+import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parsec
@@ -45,7 +44,8 @@ multipleC command = Command
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (\context -> (command ^. comParser) context `manyUntil` context)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'multipleC `appLHS`) multipleRHS (command ^. comRule)
+ l = unsafeLHSFromName 'multipleC `appLHS` (command ^. comLHS)
+ r = multipleRHS command (multipleC command)
 
 -- |
 manyC :: Command a -> Command [a]
@@ -54,7 +54,8 @@ manyC command = Command
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (\context -> Parsec.many1 $ (command ^. comParser) context)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'manyC `appLHS`) multipleRHS (command ^. comRule)
+ l = unsafeLHSFromName 'manyC `appLHS` (command ^. comLHS)
+ r = multipleRHS command (manyC command)
 
 -- |
 many0C :: Command a -> Command [a]
@@ -63,13 +64,19 @@ many0C command = Command
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (\context -> Parsec.many $ (command ^. comParser) context)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'many0C `appLHS`) multipleRHS (command ^. comRule)
+ l = unsafeLHSFromName 'many0C `appLHS` (command ^. comLHS)
+ r = multipleRHS command (many0C command)
+
+-- -- |
+-- multipleRHS :: RHS a -> RHS [a]
+-- multipleRHS r = pure [] <|> (:[]) <$> r  -- TODO horribly horrible, but the recursion causes non-termination.
+-- -- multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
+-- -- TODO you can't recur on RHS directly, you must recur through a Command, to terminate.
+-- TODO horribly horrible, we shouldn't just ignore the RHS: we're not, the command contains it
 
 -- |
-multipleRHS :: RHS a -> RHS [a]
--- multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
-multipleRHS r = pure [] <|> (:[]) <$> r  -- TODO horribly horrible, but the recursion causes non-termination.
-
+multipleRHS :: Command a -> Command [a] -> RHS [a]
+multipleRHS c cs = pure [] <|> (:) <$> liftCommand c <*> liftCommand cs
 
 -- |
 oneOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
@@ -101,7 +108,8 @@ optionC theDefault command = Command
  (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (\context -> Parsec.option theDefault $ (command ^. comParser) context)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'optionC `appLHS`) (optionRHS theDefault) (command ^. comRule)
+ l = unsafeLHSFromName 'optionC `appLHS` (command ^. comLHS)
+ r = optionRHS theDefault command
 
 -- |
 optionalC :: Command a -> Command (Maybe a)
@@ -110,15 +118,25 @@ optionalC command = Command
  (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (\context -> Parsec.optionMaybe $ (command ^. comParser) context)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'optionalC `appLHS`) optionalRHS (command ^. comRule)
+ l = unsafeLHSFromName 'optionalC `appLHS` (command ^. comLHS)
+ r = optionalRHS command
+
+-- -- |
+-- optionalRHS :: RHS a -> RHS (Maybe a)
+-- optionalRHS r = pure Nothing <|> Just <$> r  -- TODO doesn't seem to preserve lower-order rule
 
 -- |
-optionalRHS :: RHS a -> RHS (Maybe a)
-optionalRHS r = pure Nothing <|> Just <$> r  -- TODO doesn't seem to preserve lower-order rule
+optionalRHS :: Command a -> RHS (Maybe a)
+optionalRHS c = pure Nothing <|> Just <$> liftCommand c
+
+-- -- |
+-- optionRHS :: a -> RHS a -> RHS a
+-- optionRHS x r = pure x <|> r
 
 -- |
-optionRHS :: a -> RHS a -> RHS a
-optionRHS x r = pure x <|> r
+optionRHS :: a -> Command a -> RHS a
+optionRHS x c = pure x <|> liftCommand c
+
 
 -- |
 optionalDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
@@ -131,6 +149,7 @@ optionalDNSProduction = yankDNSProduction DNSOptional
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
 maybeAtomR
  = maybeAtomC
+ . set (comGrammar .dnsProductionInfo .dnsInline) True
  . unsafeFellRHS
 
 -- |
@@ -152,7 +171,7 @@ maybeAtomC command = (maybeAtom . liftCommand) $ Command
  (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
  (command ^. comParser)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomC `appLHS`) id (command ^. comRule)
+ Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomC `appLHS`) (const $ liftCommand command) (command ^. comRule)
 
 
 -- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',

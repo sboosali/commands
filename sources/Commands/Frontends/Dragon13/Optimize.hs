@@ -55,7 +55,7 @@ optimizeGrammar
  . compactGrammar
  -- . vocabulariseGrammar
  . expandGrammar
- -- . inlineGrammar
+ . inlineGrammar
 
 
 

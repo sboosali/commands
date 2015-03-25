@@ -295,6 +295,12 @@ odd_  = set comExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
 even_ = set comExpand 1 $ 'even_ <=> Even # "even" & optional odd_
 
 
+data Even2 = Even2 [Odd2]  deriving Show
+data Odd2  = Odd2  [Even2] deriving Show
+odd2  = set comExpand 1 $ 'odd2  <=> Odd2  # "odd"  & multiple even2
+even2 = set comExpand 1 $ 'even2 <=> Even2 # "even" & multiple odd2
+
+
 
 -- it seems to be synchronous, even with threaded I guess?
 attemptAsynchronously :: Int -> IO () -> IO ()
@@ -405,8 +411,11 @@ main = do
 
  putStrLn ""
  attemptParse even_ "even odd even"
- attemptSerialize odd_
  attemptSerialize even_
+
+ putStrLn ""
+ attemptParse even2 "even odd even"
+ attemptSerialize even2
 
  -- putStrLn ""
  -- traverse_ print $ [odd_ ^. comLHS, even_ ^. comLHS]
@@ -414,10 +423,11 @@ main = do
  -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions odd_)
  -- putStrLn ""
  -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions even_)
- putStrLn ""
- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions $ optional even_)
+ -- putStrLn ""
+ -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions $ optional even_)
+
  putStrLn ""
  traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ even_)
  putStrLn ""
- traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ optional even_)
- 
+ traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ even2)
+

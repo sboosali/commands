@@ -121,11 +121,11 @@ reifyCommand command = execState (reifyCommand_ command) Map.empty
 
 reifyCommand_ :: Command x -> State ReifiedCommand ()
 reifyCommand_ command = do
- let Rule l rs = command ^. comRule
+ let Rule l r = command ^. comRule
  visited <- gets $ Map.member l
  unless visited $ do
   modify $ Map.insert l (Some command)
-  reifyRHS_ rs
+  reifyRHS_ r
 
 -- TODO is this a traversal or something? over the functor
 reifyRHS_ :: RHS x -> State ReifiedCommand ()

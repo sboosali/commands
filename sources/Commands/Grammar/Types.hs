@@ -30,6 +30,7 @@ data Command a = Command
  deriving (Functor)
 
 type DNSCommandGrammar = DNSCommandProduction
+ -- DNSGrammar DNSInfo DNSCommandName DNSCommandToken
 
 type DNSCommandProduction = DNSProduction DNSInfo DNSCommandName DNSCommandToken
 

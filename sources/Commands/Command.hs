@@ -75,12 +75,18 @@ serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
   dnsHeader
  -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
--- | doesn't double count the 'dnsExport' when it's its own descendent.
+-- | the transitive dependencies of a grammar. doesn't double count the 'dnsExport' when it's its own descendent.
 getDescendentProductions :: Command x -> NonEmpty DNSCommandProduction
 getDescendentProductions command = export :| List.delete export productions
  where
  export = command^.comGrammar
  productions = ((\(Some command) -> command^.comGrammar) <$> (Map.elems . reifyCommand $ command))
+-- TODO store productions, grammars, commands?
+
+-- -- | the non-transitive dependencies of a grammar.
+-- getChildrenProductions :: Command x -> NonEmpty DNSCommandProduction
+-- getChildrenProductions = view (comGrammar.dnsProductions)
+
 
 parses :: Command a -> String -> Possibly a
 parses command = parsing (command ^. comParser)

@@ -22,7 +22,9 @@ import Data.Monoid
 
 mostly satisfies Applicative laws: identity and interchange and composition, sort of by construction, and ignoring Many; and homomorphism, possibly.
 
-Explicitly violates distributivity (i.e. can't rewrite @(x + y) * z@ into @(x * z) + (y * z)@), an Alternative law. the interpretation (i.e. a function of type @Alt f a -> _@) can distribute or not as needed.
+Explicitly violates (both left- and right-) distributivity (i.e. can't rewrite @(x + y) * z@ into @(x * z) + (y * z)@; nor can @x * (y + z)@ be rewritten into @(x * y) + (x * z)@), an Alternative law. the interpretation (i.e. a function of type @Alt f a -> _@) can distribute or not as needed.
+
+
 
 Why? Because in @txa '<*>' 'Many' txs@, while @txs@ should always be
 bounded, it may become unbounded under distribution. in analogy, the finite:
@@ -47,6 +49,8 @@ we can understand that by rejecting arbitrary distributivity our free alternativ
 At least, I did, when writing a parser generator for a grammar (of
 type free alternative).
 
+(we have infinite "sum"s, but not infinite "product"s: because @<|>@ preserves the type of its arguments, but @<*>@ changes the type, and you can't have an infinite type. which is why @<*>@ doesn't really seem like "multiplication" to me, but it helps me think about all this).
+
 
 = the 'Alternative' instance
 
@@ -55,6 +59,8 @@ satisfies the monoid laws of identity and associativity.
 satisfies annihilation, but not necessarily distributivity. (see above)
 
 also, @let 'Many'{} = xs '<|>' ys@ succeeds unless both @xs@ and @ys@ are non-@Many@.
+
+(so.. I think we have an algebraic structure that is a monoid in two ways ("addition" with "zero", and "multiplication" with "one"), related by an annihilator ("zero" under "multiplication") but not by distributivity. Don't know what it's called, or if it matters, but watch out.)
 
 
 = Notes on Implementation:
@@ -86,6 +92,14 @@ and:
 * @txas :: [Alt f (x -> a)]
 
 (why? easier than the reader/writer doing type inference in their head).
+
+
+= Related
+
+* <http://stackoverflow.com/questions/15722906/must-mplus-always-be-associative-haskell-wiki-vs-oleg-kiselyov/15853770#15853770>
+
+* <http://winterkoninkje.dreamwidth.org/90905.html>
+
 
 
 -}

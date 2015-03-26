@@ -117,6 +117,7 @@ library
   , hashable ==1.2.*
   , data-default-generics ==0.3.*
   , nats
+  , reducers ==3.10.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

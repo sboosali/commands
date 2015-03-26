@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, LambdaCase, NamedFieldPuns, ViewPatterns #-}
+{-# LANGUAGE DataKinds, LambdaCase, ViewPatterns, GADTs #-}
 module Commands.Frontends.Dragon13.Optimize where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Lens
@@ -12,6 +12,7 @@ import           Control.Lens
 import           Data.Bifunctor                    (first)
 import           Data.Graph
 import qualified Data.List                         as List
+import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.List.NonEmpty                (NonEmpty (..))
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
@@ -19,6 +20,9 @@ import           Data.Monoid                       ((<>))
 import           Data.Text.Lazy                    (Text)
 import qualified Data.Text.Lazy                    as T
 import           Numeric.Natural
+import Data.Semigroup.Applicative (Ap (..))
+import           Data.Either                       (partitionEithers)
+import Data.Foldable                     (foldMap)
 
 
 -- |
@@ -26,6 +30,8 @@ type DNSGrammarOptimizeable n t = DNSGrammar DNSInfo (DNSExpandedName n) t
 
 -- |
 type DNSProductionOptimizeable n t = DNSProduction DNSInfo (DNSExpandedName n) t
+
+type DNSVocabularyOptimizeable n t = DNSVocabulary DNSInfo (DNSExpandedName n) t
 
 -- |
 type DNSAdjacency n t = Adjacency (SomeDNSLHS (DNSExpandedName n)) (DNSProductionOptimizeable n t)
@@ -35,6 +41,9 @@ type DNSExpanded n t = [SomeDNSLHS (DNSExpandedName n)]
 
 -- |
 type DNSInlined n t = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS (DNSExpandedName n) t)
+
+-- |
+type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList (DNSExpandedName n))
 
 
 -- ================================================================ --
@@ -49,13 +58,14 @@ type DNSInlined n t = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS (DNSExpandedN
 --
 -- TODO prop> introduces no naming collisions
 --
-optimizeGrammar :: DNSGrammar DNSInfo (DNSExpandedName LHS) t -> DNSGrammar DNSInfo Text t
+optimizeGrammar :: (Eq t) => DNSGrammar DNSInfo (DNSExpandedName LHS) t -> DNSGrammar DNSInfo Text t
 optimizeGrammar
  = first renderDNSExpandedName
  . compactGrammar
- -- . vocabulariseGrammar
  . expandGrammar
+ . vocabularizeGrammar
  . inlineGrammar
+ . simplifyGrammar
 
 
 
@@ -217,17 +227,72 @@ partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
 
 
 
--- -- ================================================================ --
+-- ================================================================ --
 
--- -- |
--- vocabulariseGrammar :: (Eq n, Eq t) => DNSGrammarOptimizeable n t -> DNSGrammarOptimizeable n t
--- vocabulariseGrammar = id
+-- |
+-- TODO prop>
+vocabularizeGrammar :: (Ord n, Eq t) => DNSGrammarOptimizeable n t -> DNSGrammarOptimizeable n t
+vocabularizeGrammar (DNSGrammar _ps _vs _is) = DNSGrammar ps vs _is
+ where
+ ps = rules2lists vocabularized <$> productions
+ vs = vocabularies <> _vs
+ vocabularized = Map.fromList . fmap (\(DNSList n) -> (n, DNSList n)) $ (vocabularies ^.. each.dnsVocabularyLHS) -- TODO partial function
+ (productions, vocabularies) = partitionVocabularizables _ps
+
+-- | 
+partitionVocabularizables
+ :: NonEmpty (DNSProductionOptimizeable n t)
+ -> (NonEmpty (DNSProductionOptimizeable n t), [DNSVocabularyOptimizeable n t])
+partitionVocabularizables (e:|_ps) = (e:|ps, vs)
+ where
+ (ps, vs) = partitionEithers . fmap canVocabularize $ _ps
+
+-- | 
+canVocabularize :: DNSProductionOptimizeable n t -> Either (DNSProductionOptimizeable n t) (DNSVocabularyOptimizeable n t)
+canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getApp . onlyTokens) r of
+ Nothing -> Left p
+ Just ts -> Right $ DNSVocabulary i (DNSList n) ts
+canVocabularize _ = undefined -- TODO distinguish between LHS that can and can't be on the left-hand side, as it were
+
+{- | returns all the tokens in the right-hand side, but only if that
+right-hand side has only tokens (or nested alternatives thereof).
+
+>>> :set -XOverloadedLists -XOverloadedStrings
+
+>>> getApp $ onlyTokens $ DNSTerminal "one"
+Just [DNSToken "one"]
+
+>>> getApp $ onlyTokens $ DNSSequence ["one"]
+Nothing
+
+>>> getApp $ onlyTokens $ DNSAlternatives ["one", DNSNonTerminal undefined]
+Nothing
+
+>>> getApp $ onlyTokens $ DNSAlternatives ["one", DNSAlternatives ["two", "three"], "four"]
+Just [DNSToken "one",DNSToken "two",DNSToken "three",DNSToken "four"]
+
+@('foldMap' onlyTokens :: [DNSRHS n t] -> 'Ap' Maybe [t])@, 
+where the 'Foldable' is @[]@ and the 'Monoid' is @'Ap' Maybe [_]@, 
+has the correct short-circuiting behavior. 
+(see <https://byorgey.wordpress.com/2011/04/18/monoids-for-maybe/>)
+
+
+-}
+onlyTokens :: DNSRHS n t -> Ap Maybe [DNSToken t]
+onlyTokens = \case
+ DNSTerminal t      -> (Ap . Just) [t]
+ DNSAlternatives rs -> foldMap onlyTokens rs
+ _                  -> Ap Nothing
+
+-- | 
+rules2lists :: (Ord n) => DNSVocabularized n -> DNSProductionOptimizeable n t -> DNSProductionOptimizeable n t
+rules2lists ls = transformOn dnsProductionRHS $ \case
+ DNSNonTerminal (SomeDNSLHS (DNSRule ((flip Map.lookup) ls -> Just l))) -> DNSNonTerminal (SomeDNSLHS l)
+ r -> r
 
 
 
-
-
--- -- ================================================================ --
+-- ================================================================ --
 
 -- |
 compactGrammar :: (Functor f) => DNSGrammar i (f LHS) t -> DNSGrammar i (f Text) t
@@ -248,3 +313,18 @@ renderDNSExpandedName (DNSExpandedName (Just k) n) = n <> T.pack "____" <> T.pac
 
 
 -- ================================================================ --
+
+simplifyGrammar :: (Eq t, Eq n) => DNSGrammar i n t -> DNSGrammar i n t
+simplifyGrammar = over (dnsProductions.each.dnsProductionRHS) simplifyRHS
+
+-- | all simplifications are "inductive" (I think that's the word), i.e. they structurally reduce the input. Thus, we know 'rewrite' terminates.
+simplifyRHS :: (Eq t, Eq n) => DNSRHS n t -> DNSRHS n t
+simplifyRHS = rewrite $ \case
+ DNSSequence     (r :| [])   -> Just r
+ DNSAlternatives (r :| [])   -> Just r
+ DNSMultiple (DNSMultiple r) -> Just $ DNSMultiple r -- TODO  valid?
+ DNSOptional (DNSOptional r) -> Just $ DNSOptional r -- TODO  valid?
+ -- terminates:
+ DNSAlternatives (NonEmpty.partition (==zeroDNSRHS) -> ((_:_), rs)) ->
+   Just $ maybe zeroDNSRHS DNSAlternatives (NonEmpty.nonEmpty rs)
+ _ -> Nothing

@@ -15,6 +15,7 @@ import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
 import Prelude             hiding (mapM)
+import GHC.Exts ( IsString(..) )
 
 
 -- ================================================================ --
@@ -142,6 +143,10 @@ instance Plated (DNSRHS n t) where
  plate f (DNSSequence rs)     = DNSSequence     <$> traverse f rs -- TODO is the instance correct? Are these "immediate" children? they are non-transitive, and seem necessary for the use I want
  plate f (DNSAlternatives rs) = DNSAlternatives <$> traverse f rs
  plate _ r = pure r
+
+-- | for readable @doctest@s 
+instance (IsString t) => (IsString (DNSRHS n t)) where
+ fromString = DNSTerminal . DNSToken . fromString
 
 -- | the "additive identity" i.e.:
 --
@@ -330,6 +335,7 @@ instance Functor     SomeDNSLHS where fmap     = fmapDefault
 instance Foldable    SomeDNSLHS where foldMap  = foldMapDefault
 instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$> traverse f l
 
+
 -- ================================================================ --
 
 -- | the "leaves" of the grammar.
@@ -337,4 +343,8 @@ data DNSToken t
  = DNSToken t -- ^ e.g. @"word or phrase"@
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+-- | for readable @doctest@s 
+instance (IsString t) => (IsString (DNSToken t)) where
+ fromString = DNSToken . fromString
 

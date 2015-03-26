@@ -326,9 +326,6 @@ attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 main = do
 
  putStrLn ""
- attemptSerialize root
-
- putStrLn ""
  attemptParse positive "9"
  attemptParse dictation "this and that"
  attemptParse root "no"
@@ -406,10 +403,16 @@ main = do
  -- putStrLn ""
  -- attemptParse speech "lore some words roar"
 
- putStrLn ""
- attemptParse even_ "even odd even"
- attemptSerialize even_
+ -- putStrLn ""
+ -- attemptParse even_ "even odd even"
+ -- attemptSerialize even_
+
+ -- putStrLn ""
+ -- attemptParse even2 "even odd even"
+ -- attemptSerialize even2
 
  putStrLn ""
- attemptParse even2 "even odd even"
- attemptSerialize even2
+
+ putStrLn ""
+ attemptSerialize root
+

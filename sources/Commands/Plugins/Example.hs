@@ -237,15 +237,18 @@ positive = 'positive
 
 
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = specialCommand 'dictation
- empty
- (DNSProduction info (DNSRule name) (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation))))
+dictation = dragonCommand 'dictation
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
  (\context -> Dictation <$> anyBlack `manyUntil` context)
- where
- name = defaultDNSExpandedName (unsafeLHSFromName 'dictation)
- info = set dnsInline True defaultDNSInfo
 
+newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
+letters = dragonCommand 'letters
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
+ (\context -> Letters <$> anyLetter `manyUntil` context) -- TODO greedy (many) versus non-greedy (manyUntil)
 
+-- |
+-- TODO spacing, casing, punctuation; are all weird when letters are recognized by Dragon NaturallySpeaking.
+anyLetter = anyChar
 
 
 
@@ -323,41 +326,35 @@ attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 main = do
 
  putStrLn ""
- attemptSerialize root -- timed out. fast after Commands.Commands.Sugar, I think. Theory: may be left associated tree is efficient, wall arbitrarily associated free alternatives is obscenely polynomial inefficient. But even for such a small grammar? May be non-left association causes non-termination?
- -- I don't think so: {<|> Repeat     <$> liftCommand positive <*> liftCommand root} still terminates in both the serialization in the parsing. Maybe because all the alternatives (or their children) were not left associated? I don't know
- -- See also: attemptParse (multipleC root) "no 1 replace this and that with that and this"
- -- print $ stronglyConnComp . fmap dnsAdjacency . getDescendentProductions $ root
+ attemptSerialize root
 
- -- putStrLn ""
- -- attemptParse positive "9"
- -- attemptParse dictation "this and that"
- -- attemptParse root "no"
- -- attemptParse root "no way"
- -- attemptParse root "replace this and that with that and this"
- -- attemptParse root "1 1 no"
- -- attemptParse root "say 638 Pine St., Redwood City 94063"
- -- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
+ putStrLn ""
+ attemptParse positive "9"
+ attemptParse dictation "this and that"
+ attemptParse root "no"
+ attemptParse root "no way"
+ attemptParse root "replace this and that with that and this"
+ attemptParse root "1 1 no"
+ attemptParse root "say 638 Pine St., Redwood City 94063"
+ attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
 
- -- attemptParse (multipleC root) "no no"
- -- attemptParse (multipleC root) "no replace this with that"
- -- attemptParse (multipleC root) "no 1 replace this with that"
- -- attemptParse (multipleC root) "no 1 replace this and that with that and this" -- timed out. left recursion?
+ attemptParse (multipleC root) "no no 1 replace this and that with that and this"
 
- -- putStrLn ""
- -- attemptParse click "single left click"
- -- attemptParse click "left click"
- -- attemptParse click "single click"
- -- attemptParse click "click"
+ putStrLn ""
+ attemptParse click "single left click"
+ attemptParse click "left click"
+ attemptParse click "single click"
+ attemptParse click "click"
 
  putStrLn ""
  -- attemptParse phrase
 
 
 
- -- putStrLn ""
- -- attemptNameRHS ("from" &> place)
- -- attemptNameRHS ("to"   &> place)
- -- attemptNameRHS ("by"   &> transport)
+ putStrLn ""
+ attemptNameRHS ("from" &> place)
+ attemptNameRHS ("to"   &> place)
+ attemptNameRHS ("by"   &> transport)
 
 
 
@@ -397,14 +394,14 @@ main = do
  --   r -> r)
  --  rhs
 
- -- putStrLn ""
- -- attemptParse phrase "parens snake upper some words" -- lol "ens"
- -- attemptParse phrase "par snake upper some words"
- -- attemptParse phrase "say some words"
- -- attemptParse phrase "par quote par snake unquote snake some words"
- -- attemptParse phrase "spell grave zero ay bee sea some words"
- -- attemptParse phrase "spell grave zero ay bee sea"
- -- attemptParse phrase "string some words"
+ putStrLn ""
+ attemptParse phrase "parens snake upper some words" -- lol "ens"
+ attemptParse phrase "par snake upper some words"
+ attemptParse phrase "say some words"
+ attemptParse phrase "par quote par snake unquote snake some words"
+ attemptParse phrase "spell grave zero ay bee sea some words"
+ attemptParse phrase "spell grave zero ay bee sea"
+ attemptParse phrase "string some words"
 
  -- putStrLn ""
  -- attemptParse speech "lore some words roar"
@@ -416,18 +413,3 @@ main = do
  putStrLn ""
  attemptParse even2 "even odd even"
  attemptSerialize even2
-
- -- putStrLn ""
- -- traverse_ print $ [odd_ ^. comLHS, even_ ^. comLHS]
- -- putStrLn ""
- -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions odd_)
- -- putStrLn ""
- -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions even_)
- -- putStrLn ""
- -- traverse_ print $ (^.. each.dnsProductionLHS.dnsLHSName.dnsExpandedName) (getDescendentProductions $ optional even_)
-
- putStrLn ""
- traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ even_)
- putStrLn ""
- traverse_ print $ (\(Some command) -> command ^? comGrammar.dnsProductionLHS.dnsLHSName.dnsExpandedName) <$> (reifyCommand $ even2)
-

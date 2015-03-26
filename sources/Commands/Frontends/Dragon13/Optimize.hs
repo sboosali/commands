@@ -210,7 +210,7 @@ partitionInlined
  :: (Ord n)
  => [DNSProductionOptimizeable n t]
  -> ( DNSInlined n t , [DNSProductionOptimizeable n t] )
-partitionInlined ps = (yesInlined, notInlined)
+partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
  where
  yesInlined = Map.fromList . fmap (\(DNSProduction _ l r) -> (SomeDNSLHS l, r)) $ _yesInlined
  (_yesInlined, notInlined) = List.partition (view (dnsProductionInfo.dnsInline)) ps

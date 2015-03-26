@@ -45,7 +45,8 @@ multipleC command = Command
  (\context -> (command ^. comParser) context `manyUntil` context)
  where
  l = unsafeLHSFromName 'multipleC `appLHS` (command ^. comLHS)
- r = multipleRHS command (multipleC command)
+ r = multipleRHS command self
+ self = multipleC command
 
 -- |
 manyC :: Command a -> Command [a]
@@ -55,7 +56,8 @@ manyC command = Command
  (\context -> Parsec.many1 $ (command ^. comParser) context)
  where
  l = unsafeLHSFromName 'manyC `appLHS` (command ^. comLHS)
- r = multipleRHS command (manyC command)
+ r = multipleRHS command self
+ self = manyC command
 
 -- |
 many0C :: Command a -> Command [a]
@@ -65,7 +67,8 @@ many0C command = Command
  (\context -> Parsec.many $ (command ^. comParser) context)
  where
  l = unsafeLHSFromName 'many0C `appLHS` (command ^. comLHS)
- r = multipleRHS command (many0C command)
+ r = multipleRHS command self
+ self = many0C command
 
 -- -- |
 -- multipleRHS :: RHS a -> RHS [a]

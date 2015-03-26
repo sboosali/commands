@@ -114,6 +114,15 @@ specialCommand name r g p = Command (Rule l r) g p
  where
  Just l = lhsFromName name
 
+-- | helper function for conveniently defined Dragon NaturallySpeaking built-ins.
+dragonCommand :: Name -> DNSCommandRHS -> Parser a -> Command a
+dragonCommand name rhs p = Command
+ (Rule l empty)
+ (DNSProduction (set dnsInline True defaultDNSInfo) (DNSRule (defaultDNSExpandedName l)) rhs)
+ p
+ where
+ Just l = lhsFromName name
+
 -- | a default 'Command' for simple ADTs.
 --
 -- with 'Enum' ADTs, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parser's and 'DNSGrammar's. without TemplateHaskell.

@@ -34,6 +34,8 @@ type DNSCommandGrammar = DNSCommandProduction
 
 type DNSCommandProduction = DNSProduction DNSInfo DNSCommandName DNSCommandToken
 
+type DNSCommandRHS = DNSRHS DNSCommandName DNSCommandToken
+
 type DNSCommandName = DNSExpandedName LHS
 
 -- | not 'Text' because user-facing "config" modules (e.g.

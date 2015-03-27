@@ -25,6 +25,7 @@ module Commands
  , module Commands.Frontends.Dragon13.Render
  , module Commands.Frontends.Dragon13.Text
  , module Commands.Frontends.Dragon13.Lens
+ , module Commands.Frontends.Dragon13.Shim
  , module Commands.Frontends.Dragon13.Types
  , module Commands.Frontends.Dragon13
 
@@ -52,6 +53,7 @@ import Commands.Frontends.Dragon13
 import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Optimize
 import Commands.Frontends.Dragon13.Render
+import Commands.Frontends.Dragon13.Shim
 import Commands.Frontends.Dragon13.Text
 import Commands.Frontends.Dragon13.Types
 import Commands.Grammar

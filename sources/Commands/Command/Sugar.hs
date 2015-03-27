@@ -28,7 +28,9 @@ name <=> r = genericCommand l r
 
 
 
--- | e.g. inference for @True # "true"@ (__no__ @OverloadedStrings@):
+-- | like '<$' or '<$>', given the type (see the 'AppRHS' instances in this module).
+--
+-- e.g. inference for @True # "true"@ (__without__ @OverloadedStrings@):
 --
 -- @
 -- (#) :: (AppRHS a) => LeftR a b -> a -> RHS b
@@ -42,7 +44,10 @@ name <=> r = genericCommand l r
 (#) :: (AppRHS a) => LeftR a b -> a -> RHS b
 f # x = pure f `appR` x
 
--- | e.g. inference for @TODO@ (__no__ @OverloadedStrings@):
+-- | like '<*' or '<*>', given the type (see the 'AppRHS' instances in this
+-- module).
+--
+-- e.g. inference for @TODO@ (__without__ @OverloadedStrings@):
 --
 -- @
 (&) :: (AppRHS a) => RHS (LeftR a b) -> a -> RHS b

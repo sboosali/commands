@@ -8,9 +8,11 @@ import           Control.Applicative
 import           Control.Lens                 (Lens', lens)
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
+import           Data.Bifoldable              (Bifoldable, bifoldMap)
 import           Data.Bifunctor               (first)
 import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.Hashable
+import           Data.List                    (nub)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Monoid                  ((<>))
 import           Data.Text.Lazy               (Text)
@@ -164,3 +166,17 @@ nonemptyTail = lens
 -- | @Either@ is a @Monad@: it short-circuits. 'Validation' is an @Applicative@, but not a @Monad@: under @traverse@ (or @bitraverse@), it runs the validation (@:: a -> f b@) on every field (@:: a@) in the traversable (@:: t a@), monoidally appending together all errors, not just the first.
 eitherToValidations :: Either e a -> Validation [e] a
 eitherToValidations = eitherToValidation . first (:[])
+
+-- | a 'bifoldMap' on the left, removing duplicates.
+--
+--
+--
+--
+getLefts :: (Eq n, Bifoldable p) => p n t -> [n]
+getLefts = nub . bifoldMap (:[]) (const [])
+
+-- | a 'bifoldMap' on the right, removing duplicates.
+--
+--
+getRights :: (Eq t, Bifoldable p) => p n t -> [t]
+getRights = nub . bifoldMap (const []) (:[])

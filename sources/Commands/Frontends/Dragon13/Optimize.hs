@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, LambdaCase, ViewPatterns, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs, LambdaCase, ViewPatterns #-}
 module Commands.Frontends.Dragon13.Optimize where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Lens
@@ -10,19 +10,19 @@ import           Commands.Graph
 import           Control.Applicative
 import           Control.Lens
 import           Data.Bifunctor                    (first)
+import           Data.Either                       (partitionEithers)
+import           Data.Foldable                     (foldMap)
 import           Data.Graph
 import qualified Data.List                         as List
-import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.List.NonEmpty                (NonEmpty (..))
+import qualified Data.List.NonEmpty                as NonEmpty
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Monoid                       ((<>))
+import           Data.Semigroup.Applicative        (Ap (..))
 import           Data.Text.Lazy                    (Text)
 import qualified Data.Text.Lazy                    as T
 import           Numeric.Natural
-import Data.Semigroup.Applicative (Ap (..))
-import           Data.Either                       (partitionEithers)
-import Data.Foldable                     (foldMap)
 
 
 -- |
@@ -239,7 +239,7 @@ vocabularizeGrammar (DNSGrammar _ps _vs _is) = DNSGrammar ps vs _is
  vocabularized = Map.fromList . fmap (\(DNSList n) -> (n, DNSList n)) $ (vocabularies ^.. each.dnsVocabularyLHS) -- TODO partial function
  (productions, vocabularies) = partitionVocabularizables _ps
 
--- | 
+-- |
 partitionVocabularizables
  :: NonEmpty (DNSProductionOptimizeable n t)
  -> (NonEmpty (DNSProductionOptimizeable n t), [DNSVocabularyOptimizeable n t])
@@ -247,7 +247,7 @@ partitionVocabularizables (e:|_ps) = (e:|ps, vs)
  where
  (ps, vs) = partitionEithers . fmap canVocabularize $ _ps
 
--- | 
+-- |
 canVocabularize :: DNSProductionOptimizeable n t -> Either (DNSProductionOptimizeable n t) (DNSVocabularyOptimizeable n t)
 canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getApp . onlyTokens) r of
  Nothing -> Left p
@@ -271,9 +271,9 @@ Nothing
 >>> getApp $ onlyTokens $ DNSAlternatives ["one", DNSAlternatives ["two", "three"], "four"]
 Just [DNSToken "one",DNSToken "two",DNSToken "three",DNSToken "four"]
 
-@('foldMap' onlyTokens :: [DNSRHS n t] -> 'Ap' Maybe [t])@, 
-where the 'Foldable' is @[]@ and the 'Monoid' is @'Ap' Maybe [_]@, 
-has the correct short-circuiting behavior. 
+@('foldMap' onlyTokens :: [DNSRHS n t] -> 'Ap' Maybe [t])@,
+where the 'Foldable' is @[]@ and the 'Monoid' is @'Ap' Maybe [_]@,
+has the correct short-circuiting behavior.
 (see <https://byorgey.wordpress.com/2011/04/18/monoids-for-maybe/>)
 
 
@@ -284,7 +284,7 @@ onlyTokens = \case
  DNSAlternatives rs -> foldMap onlyTokens rs
  _                  -> Ap Nothing
 
--- | 
+-- |
 rules2lists :: (Ord n) => DNSVocabularized n -> DNSProductionOptimizeable n t -> DNSProductionOptimizeable n t
 rules2lists ls = transformOn dnsProductionRHS $ \case
  DNSNonTerminal (SomeDNSLHS (DNSRule ((flip Map.lookup) ls -> Just l))) -> DNSNonTerminal (SomeDNSLHS l)

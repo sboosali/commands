@@ -1,20 +1,22 @@
 {-# LANGUAGE ViewPatterns #-}
 module Commands.Test.Properties where
-import Commands.Etc                      hiding (failed)
-import Commands.Frontends.Dragon13
-import Commands.Frontends.Dragon13.Text
-import Commands.Frontends.Dragon13.Types
-import Commands.Test.Arbitrary
-import Commands.Test.Types
-import Data.Bifunctor                    (bimap)
-import Test.QuickCheck.Modifiers
-import Test.QuickCheck.Property
+import           Commands.Etc                      hiding (failed)
+import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Text
+import           Commands.Frontends.Dragon13.Types
+import           Commands.Test.Arbitrary
+import           Commands.Test.Types
+
+import           Data.Bifunctor                    (bimap)
+import qualified Data.Text.Lazy                    as T
+import           Test.QuickCheck.Modifiers
+import           Test.QuickCheck.Property
 
 
--- | if the grammar can be escaped, its serialization must be valid Python.
+-- | if the grammar has already been escaped, its serialization into the shim must be valid Python.
 prop_DNSGrammar :: DNSGrammar () DNSName DNSText -> Result
-prop_DNSGrammar grammar = case isPythonFile . display . serializeGrammar $ grammar of
-  Left _  -> failed
-  Right _ -> succeeded
-
+prop_DNSGrammar grammar = case shimmySerialization (T.pack "'localhost'") (serializeGrammar grammar) of
+ Left  {} -> failed
+ Right {} -> succeeded
 -- rejected = result { ok = Nothing }  i.e.  Discard  i.e.  as if precondition were False
+

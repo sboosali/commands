@@ -1,34 +1,40 @@
 {-# LANGUAGE DataKinds, GADTs, NamedFieldPuns, OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms, RankNTypes, ViewPatterns           #-}
+{-# LANGUAGE PatternSynonyms, RankNTypes, ViewPatterns, RecordWildCards          #-}
 -- | Uses pretty printer combinators for readability of serialization.
 --
 --
 module Commands.Frontends.Dragon13 where
 
 import           Commands.Etc
-import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
+import           Commands.Frontends.Dragon13.Text
+import           Commands.Frontends.Dragon13.Shim
+import           Commands.Frontends.Dragon13.Lens
 import           Commands.Instances                ()
 
-import           Control.Monad                     ((<=<))
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bifoldable
-import           Data.Bifunctor                    (second)
 import           Data.Bitraversable
 import           Data.Either.Validation            (validationToEither)
 import           Data.Foldable                     (toList)
-import           Data.List                         (nub)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
-import           Language.Python.Version2.Parser   (parseModule)
 import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
 import Data.List.NonEmpty (NonEmpty(..))
 import           Data.Maybe                        (mapMaybe)
+import Control.Lens
 
+
+-- | 
+data SerializedGrammar = SerializedGrammar
+ { serializedRules  :: Doc
+ , serializedLists  :: Doc
+ , serializedExport :: Doc
+ }
 
 {- $setup
 
->>> :set -XOverloadedLists -XOverloadedStrings
+>>> :set -XOverloadedLists -XOverloadedStrings -XNamedFieldPuns
 >>> :{
 let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
             [ DNSSequence
@@ -58,60 +64,69 @@ let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
 -}
 
--- | serialize a grammar into a Python file, unless:
---
--- * the grammars terminals/non-terminals don't lex (with 'escapeDNSGrammar')
--- * the Python file doesn't parse (with 'isPythonFile')
---
---
---
---
-serialize :: DNSGrammar i Text Text -> Either [SomeException] Text
-serialize = isPythonFile
- <=< (second (display . serializeGrammar) . escapeDNSGrammar)
+{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
 
--- | serializes a grammar into two Python assignments.
---
---
--- >>> serializeGrammar grammar
--- _commands_rules_ = '''
--- <BLANKLINE>
--- <dgndictation> imported;
--- <dgnwords> imported;
--- <dgnletters> imported;
--- <BLANKLINE>
--- <root> exported  = {command}
---                    <subcommand> [({flag})+]
---                  | "ls";
--- <BLANKLINE>
--- <subcommand>  = "status"
---               | <dgndictation>;
--- <BLANKLINE>
--- '''
--- <BLANKLINE>
--- _commands_lists_ = {"command": ["git",
---                                 "rm"],
---                     "flag": ["force",
---                              "recursive",
---                              "all",
---                              "interactive"]}
---
---
---
--- as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long grammars. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
---
--- ('DNSImport's don't need to be at the start of the grammar or even above the production that uses it. but it looks nice)
---
-serializeGrammar :: DNSGrammar i DNSName DNSText -> Doc
-serializeGrammar DNSGrammar{_dnsProductions,_dnsVocabularies,_dnsImports}
- = vsep
- . punctuate "\n" $
-  [ "_commands_rules_ =" <+> "'''"
-  , serializeImports _dnsImports
-  , serializeProductions _dnsProductions
+* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
+* the Python file doesn't parse (with 'newPythonFile')
+
+>>> let Right{} = shimmySerialization "'localhost'" (serializeGrammar grammar)
+
+a Kleisli arrow (when partially applied).
+
+-}
+shimmySerialization :: Text -> SerializedGrammar -> Possibly PythonFile
+shimmySerialization url = newPythonFile . display . getShim . asShimR url
+
+{- | serializes an (escaped) grammar into a Python Docstring and a
+Python Dict.
+
+
+>>> let SerializedGrammar{serializedRules,serializedLists,serializedExport} = serializeGrammar grammar
+>>> serializedExport
+"root"
+>>> serializedRules
+'''
+<BLANKLINE>
+<dgndictation> imported;
+<dgnwords> imported;
+<dgnletters> imported;
+<BLANKLINE>
+<root> exported  = {command}
+                   <subcommand> [({flag})+]
+                 | "ls";
+<BLANKLINE>
+<subcommand>  = "status"
+              | <dgndictation>;
+<BLANKLINE>
+'''
+
+>>> serializedLists
+{"command": ["git","rm"],
+ "flag": ["force",
+          "recursive",
+          "all",
+          "interactive"]}
+
+
+as you can see, horizontally delimited 'Doc'uments are vertically aligned iff they are too wide. 'encloseSep' and 'enclosePythonic' provide this behavior. this improves readability of long grammars. when things are good, the serialized grammar is loaded by another program (NatLink) anyway. when things go bad, it's good to have a format a human can read, to ease debugging.
+
+('DNSImport's don't need to be at the start of the grammar or even above the production that uses it. but it looks nice)
+
+
+-}
+serializeGrammar :: DNSGrammar i DNSName DNSText -> SerializedGrammar
+serializeGrammar grammar = SerializedGrammar{..}
+ where
+ serializedLists  = serializeVocabularies (grammar^.dnsVocabularies)
+ serializedExport = serializeName name
+ serializedRules  = vsep . punctuate "\n" $
+  [ "'''"
+  , serializeImports     (grammar^.dnsImports)
+  , serializeProductions (grammar^.dnsProductions)
   , "'''"
-  , "_commands_lists_ =" <+> serializeVocabularies _dnsVocabularies
   ]
+ serializeName = dquotes . text
+ name = unDNSName (grammar^?!dnsExport.dnsProductionLHS.dnsLHSName) -- TODO unsafe
 
 -- | not unlike 'serializeProduction', but only inserts one newline between imports, not
 -- two as between productions, for readability.
@@ -124,28 +139,33 @@ serializeGrammar DNSGrammar{_dnsProductions,_dnsVocabularies,_dnsImports}
 serializeImports :: [DNSImport DNSName] -> Doc
 serializeImports = vsep . fmap (\l -> serializeLHS l <+> "imported" <> ";")
 
--- | serializes a 'DNSVocabulary' into a Python @Dict@.
---
--- 'serializeVocabulary' is implemented differently from
--- 'serializeProduction', even though conceptually they are
--- both 'DNSProduction's. a 'DNSList' must be mutated in Python,
--- not (as the 'DNSRule's are) defined as a @gramSpec@ String.
---
--- serializeVocabularies $ [DNSVocabulary undefined (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"], DNSVocabulary (DNSList (DNSName "empty")) []]
--- {"list": ["one", "two", "three"], "empty": []}
---
---
-serializeVocabularies :: [DNSVocabulary i DNSName DNSText] -> Doc
+{- | serializes a 'DNSVocabulary' into a Python @Dict@.
+
+'serializeVocabulary' is implemented differently from
+'serializeProduction', even though conceptually they are
+both 'DNSProduction's. a 'DNSList' must be mutated in Python,
+not (as the 'DNSRule's are) defined as a @gramSpec@ String.
+
+>>> serializeVocabularies []
+{}
+
+>>> serializeVocabularies $ [DNSVocabulary () (DNSList (DNSName "list")) [DNSToken (DNSText "one"), DNSToken (DNSText "two")], DNSVocabulary () (DNSList (DNSName "empty")) []]
+{"list": ["one","two"],
+ "empty": []}
+
+-}
+serializeVocabularies
+ :: [DNSVocabulary i DNSName DNSText] -> Doc
 serializeVocabularies
  = enclosePythonic "{" "}" ","
  . mapMaybe serializeVocabulary
 
--- | 
---
--- serializeVocabulary $ DNSVocabulary undefined (DNSList (DNSName "list")) [DNSText "one", DNSText "two", DNSText "three"]
--- "list": ["one", "two", "three"]
---
---
+{- | 
+
+>>> serializeVocabulary $ DNSVocabulary () (DNSList (DNSName "list")) [DNSToken (DNSText "one"), DNSToken (DNSText "two")]
+"list": ["one","two"]
+
+-}
 serializeVocabulary :: DNSVocabulary i DNSName DNSText -> Possibly Doc
 serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
  (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
@@ -235,33 +255,34 @@ serializeToken :: DNSToken DNSText -> Doc
 serializeToken (DNSToken (DNSText s))        = dquotes (text s)
 serializeToken (DNSPronounced _ (DNSText s)) = dquotes (text s)
 
--- | splits a multi-line collection-literal with the separator at the
--- end of each line, not at the start.
---
--- compare Python-layout, via 'enclosePythonic' (which parses as Python):
---
--- @
--- {"command": ["git",
---              "rm"],
---  "flag": ["force",
---           "recursive",
---           "all",
---           "interactive"]}
--- @
---
--- against Haskell-layout, via 'encloseSep':
---
--- @
--- {"command": ["git"
---             ,"rm"]
--- ,"flag": ["force"
---          ,"recursive"
---          ,"all"
---          ,"interactive"]}
--- @
---
--- which doesn't parse as Python.
---
+{- | splits a multi-line collection-literal with the separator at the
+end of each line, not at the start.
+
+compare Python-layout, via 'enclosePythonic' (which parses as Python):
+
+@
+{"command": ["git",
+             "rm"],
+ "flag": ["force",
+          "recursive",
+          "all",
+          "interactive"]}
+@
+
+against Haskell-layout, via 'encloseSep':
+
+@
+{"command": ["git"
+            ,"rm"]
+,"flag": ["force"
+         ,"recursive"
+         ,"all"
+         ,"interactive"]}
+@
+
+which doesn't parse as Python.
+
+-}
 enclosePythonic :: Doc -> Doc -> Doc -> [Doc] -> Doc
 enclosePythonic left right sep ds
   = left
@@ -278,44 +299,43 @@ enclosePythonic left right sep ds
 --
 -- a 'bitraverse'.
 --
--- a Kleisli arrow (?) where @m ~ Either [SomeException]@.
+-- a Kleisli arrow where @(m ~ Either [SomeException])@
 --
 escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSName DNSText)
 escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
 
--- | preserves the input when a valid Python file (with 'parseModule'),
--- reports the syntax error otherwise.
---
--- a Kleisli arrow (?)
---
--- TODO change to check that with two expressions are a Dictionary and a String
---
-isPythonFile :: Text -> Either [SomeException] Text
-isPythonFile s = case parseModule (T.unpack s) "" of
- Right {} -> Right s
- Left  e  -> Left [SomeException e]
+{- | simple conversion.
 
--- | get all the names in the left-hand sides of the grammar, without duplicates.
---
--- a 'bifoldMap' on the left.
---
--- e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
---
--- >>> map unDNSName $ getNames grammar
--- ["root","command","subcommand","flag"]
---
+@asShimR url SerializedGrammar{..}@
+
+-}
+asShimR :: Text -> SerializedGrammar -> ShimR Doc
+asShimR url SerializedGrammar{..} = ShimR serializedRules serializedLists serializedExport (text url)
+
+{- | get all the names in the left-hand sides of the grammar, without duplicates. 
+Works on different levels of the grammar.
+
+e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
+
+>>> map unDNSName $ getNames grammar
+["root","command","subcommand","flag"]
+
+@getNames = 'getLefts'@
+
+-}
 getNames :: (Eq n, Bifoldable p) => p n t -> [n]
-getNames = nub . bifoldMap (:[]) (const [])
+getNames = getLefts
 
--- | get all the words in the terminals of the grammar, without duplicates.
---
--- a 'bifoldMap' on the right.
---
--- e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
---
--- >>> map unDNSText $ getWords grammar
--- ["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
---
+{- | get all the words in the terminals of the grammar, without duplicates. 
+Works on different levels of the grammar.
+
+e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
+
+>>> map unDNSText $ getWords grammar
+["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
+
+@getWords = 'getRights'@
+
+-}
 getWords :: (Eq t, Bifoldable p) => p n t -> [t]
-getWords = nub . bifoldMap (const []) (:[])
-
+getWords = getRights

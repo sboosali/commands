@@ -14,8 +14,8 @@ import Data.Char           (toLower)
 import Data.Foldable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
+import GHC.Exts            (IsString (..))
 import Prelude             hiding (mapM)
-import GHC.Exts ( IsString(..) )
 
 
 -- ================================================================ --
@@ -144,7 +144,7 @@ instance Plated (DNSRHS n t) where
  plate f (DNSAlternatives rs) = DNSAlternatives <$> traverse f rs
  plate _ r = pure r
 
--- | for readable @doctest@s 
+-- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSRHS n t)) where
  fromString = DNSTerminal . DNSToken . fromString
 
@@ -344,7 +344,7 @@ data DNSToken t
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
--- | for readable @doctest@s 
+-- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
  fromString = DNSToken . fromString
 

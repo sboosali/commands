@@ -68,11 +68,13 @@ import           Language.Haskell.TH.Syntax           (Name)
 -- (not indirect as now), just like Parsec.
 -- if that makes things better and not worse, that would be cool.
 --
-serialized :: Command x -> Either [SomeException] T.Text
-serialized command = serialize . second T.pack . optimizeGrammar $ DNSGrammar
-  (getDescendentProductions command)
-  []
-  dnsHeader
+-- a Kleisli arrow.
+--
+serialized :: Command x -> Either [SomeException] SerializedGrammar
+serialized command = do
+ let g = second T.pack . optimizeGrammar $ DNSGrammar (getDescendentProductions command) [] dnsHeader
+ eg <- escapeDNSGrammar g
+ return $ serializeGrammar eg
  -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
 -- | the transitive dependencies of a grammar. doesn't double count the 'dnsExport' when it's its own descendent.

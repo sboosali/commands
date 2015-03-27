@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections  #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase         #-}
+{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes, RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
 import           Commands
@@ -10,7 +10,8 @@ import           Control.Applicative.Permutation
 import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Lens                    hiding (( # ), (&))
-import           Control.Monad                   (void, (<=<), (>=>))
+import           Control.Monad                   (replicateM, void, (<=<),
+                                                  (>=>))
 import           Control.Monad.Catch             (catches)
 import           Control.Parallel
 import           Data.Bitraversable
@@ -18,8 +19,10 @@ import           Data.Either                     (either)
 import           Data.Foldable                   (Foldable (..), asum,
                                                   traverse_)
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
+import qualified Data.Text.Lazy                  as T
 import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
+import           Language.Python.Version2.Parser (parseModule)
 import           Numeric.Natural                 ()
 import           Prelude                         hiding (foldr)
 import           System.Timeout                  (timeout)
@@ -318,40 +321,46 @@ attempt = attemptAsynchronously 1
 
 attemptParse command = attempt . handleParse command
 
-attemptSerialize command = attemptAsynchronously 3 $ either print T.putStrLn $ serialized command
+attemptSerialize command = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized command
 
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
+
+printSerializedGrammar SerializedGrammar{..} = do
+ replicateM 3 $ putStrLn ""
+ T.putStrLn $ display serializedRules
+ putStrLn ""
+ T.putStrLn $ display serializedLists
 
 
 main = do
 
- putStrLn ""
- attemptParse positive "9"
- attemptParse dictation "this and that"
- attemptParse root "no"
- attemptParse root "no way"
- attemptParse root "replace this and that with that and this"
- attemptParse root "1 1 no"
- attemptParse root "say 638 Pine St., Redwood City 94063"
- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
+ -- putStrLn ""
+ -- attemptParse positive "9"
+ -- attemptParse dictation "this and that"
+ -- attemptParse root "no"
+ -- attemptParse root "no way"
+ -- attemptParse root "replace this and that with that and this"
+ -- attemptParse root "1 1 no"
+ -- attemptParse root "say 638 Pine St., Redwood City 94063"
+ -- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
 
- attemptParse (multipleC root) "no no 1 replace this and that with that and this"
+ -- attemptParse (multipleC root) "no no 1 replace this and that with that and this"
 
- putStrLn ""
- attemptParse click "single left click"
- attemptParse click "left click"
- attemptParse click "single click"
- attemptParse click "click"
+ -- putStrLn ""
+ -- attemptParse click "single left click"
+ -- attemptParse click "left click"
+ -- attemptParse click "single click"
+ -- attemptParse click "click"
 
- putStrLn ""
+ -- putStrLn ""
  -- attemptParse phrase
 
 
 
- putStrLn ""
- attemptNameRHS ("from" &> place)
- attemptNameRHS ("to"   &> place)
- attemptNameRHS ("by"   &> transport)
+ -- putStrLn ""
+ -- attemptNameRHS ("from" &> place)
+ -- attemptNameRHS ("to"   &> place)
+ -- attemptNameRHS ("by"   &> transport)
 
 
 
@@ -361,8 +370,8 @@ main = do
  -- traverse_ (attemptParse directions) exampleDirections
  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
 
- putStrLn ""
- attemptSerialize directions_
+ -- putStrLn ""
+ -- attemptSerialize directions_
  -- putStrLn ""
  -- traverse_ (attemptParse directions_) exampleDirections
 
@@ -391,14 +400,14 @@ main = do
  --   r -> r)
  --  rhs
 
- putStrLn ""
- attemptParse phrase "parens snake upper some words" -- lol "ens"
- attemptParse phrase "par snake upper some words"
- attemptParse phrase "say some words"
- attemptParse phrase "par quote par snake unquote snake some words"
- attemptParse phrase "spell grave zero ay bee sea some words"
- attemptParse phrase "spell grave zero ay bee sea"
- attemptParse phrase "string some words"
+ -- putStrLn ""
+ -- attemptParse phrase "parens snake upper some words" -- lol "ens"
+ -- attemptParse phrase "par snake upper some words"
+ -- attemptParse phrase "say some words"
+ -- attemptParse phrase "par quote par snake unquote snake some words"
+ -- attemptParse phrase "spell grave zero ay bee sea some words"
+ -- attemptParse phrase "spell grave zero ay bee sea"
+ -- attemptParse phrase "string some words"
 
  -- putStrLn ""
  -- attemptParse speech "lore some words roar"
@@ -411,8 +420,21 @@ main = do
  -- attemptParse even2 "even odd even"
  -- attemptSerialize even2
 
- putStrLn ""
+ -- attemptSerialize root
+
+ -- putStrLn ""
+ -- let theShim = ShimR "'''_'''" "{'_':'_'}" "'_'" "'_'"
+ -- putStrLn $ getShim theShim
+ -- writeShim "shim.py" theShim
+ -- print $ take 30 $ show $ parseModule (getShim theShim) ""
+
 
  putStrLn ""
- attemptSerialize root
+ let Right sg = serialized root
 
+ -- T.putStrLn $ (display . getShim . asShimR (T.pack "'localhost'") $ sg)
+ -- writeShim "_shim.py" (fmap (T.unpack . display) . asShimR (T.pack "'localhost'") $ sg)
+
+ PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
+ T.putStrLn $ pf
+ writeFile "_shim.py" (T.unpack pf)

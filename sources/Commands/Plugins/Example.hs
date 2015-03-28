@@ -3,7 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
-import           Commands
+import           Commands.Core
+import           Commands.Frontends.Dragon13
 
 import           Control.Applicative             hiding (many, optional)
 import           Control.Applicative.Permutation

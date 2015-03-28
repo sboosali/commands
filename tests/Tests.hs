@@ -11,7 +11,8 @@ tastytest = defaultMain $ testGroup "QuickCheck"
 
 main = do
  doctest
-  [ "sources/Commands"
+  [ "sources/Commands/Core"
+
   , "sources/Commands/Etc"
   , "sources/Commands/Instances"
 
@@ -29,6 +30,7 @@ main = do
   , "sources/Commands/Frontends/Dragon13/Render"
   , "sources/Commands/Frontends/Dragon13/Optimize"
   , "sources/Commands/Frontends/Dragon13/Shim"
+  , "sources/Commands/Frontends/Dragon13/Serialize"
 
   , "sources/Commands/Command"
   , "sources/Commands/Command/Types"

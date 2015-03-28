@@ -57,7 +57,7 @@ library
 
  -- modules exported by the library
  exposed-modules:
-  Commands
+  Commands.Core
 
   Commands.Etc
   Commands.Instances
@@ -76,6 +76,7 @@ library
   Commands.Frontends.Dragon13.Render
   Commands.Frontends.Dragon13.Optimize
   Commands.Frontends.Dragon13.Shim
+  Commands.Frontends.Dragon13.Serialize
 
   Commands.Command
   Commands.Command.Types

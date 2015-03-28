@@ -12,22 +12,12 @@ you can import this module to your "configuration" module, which should just def
 
 
 -}
-module Commands
+module Commands.Core
  ( module Commands.Etc
- -- , module Commands.Instances
 
  , module Commands.Command.Combinator
  , module Commands.Command.Sugar
- -- , module Commands.Command.Types
  , module Commands.Command
-
- , module Commands.Frontends.Dragon13.Optimize
- , module Commands.Frontends.Dragon13.Render
- , module Commands.Frontends.Dragon13.Text
- , module Commands.Frontends.Dragon13.Lens
- , module Commands.Frontends.Dragon13.Shim
- , module Commands.Frontends.Dragon13.Types
- , module Commands.Frontends.Dragon13
 
  , module Commands.Grammar.Types
  , module Commands.Grammar
@@ -43,25 +33,16 @@ module Commands
  , module Control.Alternative.Free.Tree
  ) where
 
+import Commands.Command
 import Commands.Command.Combinator
 import Commands.Command.Sugar
 import Commands.Etc
-import Commands.Instances                   ()
--- import Commands.Command.Types
-import Commands.Command
-import Commands.Frontends.Dragon13
-import Commands.Frontends.Dragon13.Lens
-import Commands.Frontends.Dragon13.Optimize
-import Commands.Frontends.Dragon13.Render
-import Commands.Frontends.Dragon13.Shim
-import Commands.Frontends.Dragon13.Text
-import Commands.Frontends.Dragon13.Types
 import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Graph
+import Commands.Instances            ()
 import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
-import Commands.Parsec                      hiding (lower, option, optional,
-                                             runParser)
-import Control.Alternative.Free.Tree        hiding (Empty)
+import Commands.Parsec               hiding (lower, option, optional, runParser)
+import Control.Alternative.Free.Tree hiding (Empty)

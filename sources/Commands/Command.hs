@@ -2,30 +2,30 @@
 {-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Command where
 import           Commands.Etc
-import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Optimize
 import           Commands.Frontends.Dragon13.Render
+import           Commands.Frontends.Dragon13.Serialize
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Parse
 import           Commands.Parse.Types
-import           Commands.Parsec                      (parserUnit)
+import           Commands.Parsec                       (parserUnit)
 
 import           Control.Applicative
 import           Control.Lens
-import           Control.Monad.Catch                  (SomeException (..),
-                                                       catches)
-import           Data.Bifunctor                       (second)
-import           Data.Foldable                        (asum)
-import qualified Data.List                            as List
-import           Data.List.NonEmpty                   (NonEmpty (..))
-import qualified Data.Map                             as Map
+import           Control.Monad.Catch                   (SomeException (..),
+                                                        catches)
+import           Data.Bifunctor                        (second)
+import           Data.Foldable                         (asum)
+import qualified Data.List                             as List
+import           Data.List.NonEmpty                    (NonEmpty (..))
+import qualified Data.Map                              as Map
 import           Data.Proxy
-import qualified Data.Text.Lazy                       as T
-import           Data.Typeable                        (Typeable)
-import           GHC.Generics                         (Generic)
-import           Language.Haskell.TH.Syntax           (Name)
+import qualified Data.Text.Lazy                        as T
+import           Data.Typeable                         (Typeable)
+import           GHC.Generics                          (Generic)
+import           Language.Haskell.TH.Syntax            (Name)
 
 
 -- |

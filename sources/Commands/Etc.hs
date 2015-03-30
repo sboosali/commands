@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts #-}
-{-# LANGUAGE RankNTypes                                                 #-}
--- {-# LANGUAGE GADTs, PolyKinds, KindSignatures #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                                                #-}
 module Commands.Etc where
 import           Commands.Instances           ()
 
@@ -180,3 +179,15 @@ getLefts = nub . bifoldMap (:[]) (const [])
 --
 getRights :: (Eq t, Bifoldable p) => p n t -> [t]
 getRights = nub . bifoldMap (const []) (:[])
+
+
+-- | a (pseudo)-refinement type.
+newtype Positive = Positive { getPositive :: Int }
+ deriving (Show,Eq,Ord)
+
+-- | smart constructor for 'Positive'.
+newPositive :: Int -> Possibly Positive
+newPositive i = if i >= 1
+ then return (Positive i)
+ else failure 'newPositive
+

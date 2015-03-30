@@ -234,7 +234,6 @@ times = enumCommand :: Command Times
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button = qualifiedCommand
 
-newtype Positive = Positive Int deriving (Show,Eq)
 positive = 'positive
  <=> Positive # (asum . fmap int) [1..9]
 
@@ -433,9 +432,6 @@ main = do
  putStrLn ""
  let Right sg = serialized root
 
- -- T.putStrLn $ (display . getShim . asShimR (T.pack "'localhost'") $ sg)
- -- writeShim "_shim.py" (fmap (T.unpack . display) . asShimR (T.pack "'localhost'") $ sg)
-
  PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
  T.putStrLn $ pf
- writeFile "_shim.py" (T.unpack pf)
+ -- writeFile "_shim.py" (T.unpack pf)

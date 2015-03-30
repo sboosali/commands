@@ -122,6 +122,7 @@ library
   , reducers                  ==3.10.*
   , formatting                ==6.2.*
   , interpolatedstring-perl6  ==0.9.*
+  , free  ==4.11.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

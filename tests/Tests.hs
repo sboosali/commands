@@ -1,48 +1,52 @@
+{-# LANGUAGE LambdaCase #-}
 module Main where
 import Commands.Test.Properties
 import Test.DocTest
 import Test.Tasty
 import Test.Tasty.QuickCheck
+import Data.Monoid                   ((<>))
 
 
 tastytest = defaultMain $ testGroup "QuickCheck"
  [ testProperty "serialized DNSGrammar is valid Python" prop_DNSGrammar
  ]
 
-main = do
- doctest
-  [ "sources/Commands/Core"
+modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
-  , "sources/Commands/Etc"
-  , "sources/Commands/Instances"
+  [ "Commands.Core"
 
-  , "sources/Commands/Grammar/Types"
-  , "sources/Commands/Grammar"
+  , "Commands.Etc"
+  , "Commands.Instances"
 
-  , "sources/Commands/Parse/Types"
-  , "sources/Commands/Parse"
-  , "sources/Commands/Parsec"
+  , "Commands.Grammar.Types"
+  , "Commands.Grammar"
 
-  , "sources/Commands/Frontends/Dragon13"
-  , "sources/Commands/Frontends/Dragon13/Types"
-  , "sources/Commands/Frontends/Dragon13/Lens"
-  , "sources/Commands/Frontends/Dragon13/Text"
-  , "sources/Commands/Frontends/Dragon13/Render"
-  , "sources/Commands/Frontends/Dragon13/Optimize"
-  , "sources/Commands/Frontends/Dragon13/Shim"
-  , "sources/Commands/Frontends/Dragon13/Serialize"
+  , "Commands.Parse.Types"
+  , "Commands.Parse"
+  , "Commands.Parsec"
 
-  , "sources/Commands/Command"
-  , "sources/Commands/Command/Types"
-  , "sources/Commands/Command/Sugar"
-  , "sources/Commands/Command/Combinator"
+  , "Commands.Frontends.Dragon13"
+  , "Commands.Frontends.Dragon13.Types"
+  , "Commands.Frontends.Dragon13.Lens"
+  , "Commands.Frontends.Dragon13.Text"
+  , "Commands.Frontends.Dragon13.Render"
+  , "Commands.Frontends.Dragon13.Optimize"
+  , "Commands.Frontends.Dragon13.Shim"
+  , "Commands.Frontends.Dragon13.Serialize"
 
-  , "sources/Commands/Munging"
+  , "Commands.Command"
+  , "Commands.Command.Types"
+  , "Commands.Command.Sugar"
+  , "Commands.Command.Combinator"
 
-  , "sources/Commands/Plugins/Example"
+  , "Commands.Munging"
 
-  , "sources/Control/Alternative/Free/Tree"
-  , "sources/Commands/Graph"
+  , "Commands.Plugins.Example"
+
+  , "Control.Alternative.Free.Tree"
+  , "Commands.Graph"
   ]
 
+main = do
+ doctest modules
  -- tastytest TODO

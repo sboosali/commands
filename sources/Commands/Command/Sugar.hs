@@ -14,11 +14,11 @@ infix  2 <=>
 -- infixl 3 <|>
 -- infixl 4 <$>
 -- infixl 4 <*>
-infixl 4 #
+infixl 4 # -- TODO   `(#) = review` or something in lens
 infixl 4 <&>
 infixl 4 <&
 infixl 4 &>
-infixl 4 &
+infixl 4 & -- TODO   `(&) = flip ($)` in base in 7.10
 
 
 (<=>) :: Name -> RHS a -> Command a

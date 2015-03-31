@@ -63,7 +63,7 @@ inside the 'qq', besides escaping backslashes (@r'\\\\'@ renders as r'\\') and i
 getShim :: (IsString t, Monoid t) => ShimR t -> t
 getShim ShimR{..} = [qq|
 
-
+from natlinkmain import (setCheckForGrammarChanges)
 from natlinkutils import (GrammarBase)
 
 # standard library
@@ -86,6 +86,7 @@ class NarcissisticGrammar(GrammarBase):
     gramSpec = rules
 
     def initialize(self):
+        setCheckForGrammarChanges(1) # automatically reload on file change (not only when microphone toggles on)
         self.load(self.gramSpec, allResults=1, hypothesis=1)
         set_lists(self, lists)
         self.activate({__export__}, exclusive=1, noError=1)
@@ -149,4 +150,5 @@ def unload():
     if narcissistic_grammar:
         narcissistic_grammar.unload()
     narcissistic_grammar = None
+
 |]

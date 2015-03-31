@@ -1,10 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 module Main where
 import Commands.Test.Properties
+import Data.Monoid              ((<>))
 import Test.DocTest
 import Test.Tasty
 import Test.Tasty.QuickCheck
-import Data.Monoid                   ((<>))
 
 
 tastytest = defaultMain $ testGroup "QuickCheck"

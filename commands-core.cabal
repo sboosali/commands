@@ -33,15 +33,13 @@ tested-with: GHC == 7.8.3
 -- extra files to be distributed with the package
 extra-source-files:
  README.md
+ cbits/objc_actor.h
 
 -- extra files to be distributed with the package
--- access with:
---  getDataFileName :: FilePath -> IO FilePath
---  file <- getDataFileName "data/file.txt"
---  data <- readFile file
+-- access with: {getDataFileName :: FilePath -> IO FilePath}
+--  data <- readFile <$> getDataFileName "data/file.txt"
 data-files:
 
--- constraint on the version of Cabal needed to build this package
 cabal-version:       >=1.10
 
 
@@ -51,11 +49,12 @@ source-repository head
 
 
 library
+ if os(darwin)
+   buildable: True
+ else
+   buildable: False
 
- -- directories with source files
  hs-source-dirs: sources
-
- -- modules exported by the library
  exposed-modules:
   Commands.Core
 
@@ -78,6 +77,16 @@ library
   Commands.Frontends.Dragon13.Shim
   Commands.Frontends.Dragon13.Serialize
 
+  Commands.Backends.OSX
+  Commands.Backends.OSX.Example
+  Commands.Backends.OSX.Types
+  Commands.Backends.OSX.Bindings
+  Commands.Backends.OSX.Bindings.Raw
+  Commands.Backends.OSX.Constants
+  Commands.Backends.OSX.Marshall
+  Commands.Backends.OSX.Execute
+  Commands.Backends.OSX.DSL
+
   Commands.Command
   Commands.Command.Types
   Commands.Command.Sugar
@@ -90,18 +99,23 @@ library
   Commands.Graph
   Control.Alternative.Free.Tree
 
- -- modules included in this library, but not exported
- other-modules:
+ c-sources:        cbits/objc_actor.m
+ include-dirs:     cbits
+ includes:         cbits/objc_actor.h
+ install-includes: cbits/objc_actor.h
+ ld-options: -ObjC
+ frameworks: Cocoa
 
- -- other library packages from which modules are imported
  build-depends:
 
     base                      ==4.7.*
+  , template-haskell          ==2.9.*
   , containers                ==0.5.*
+  -- for doctest:
   , transformers              ==0.3.*
   , transformers-compat       ==0.4.*
+  -- ?
   , mtl                       ==2.1.*
-  , template-haskell          ==2.9.*
 
   , exceptions                ==0.6.*
   , lens                      ==4.8.*
@@ -122,7 +136,10 @@ library
   , reducers                  ==3.10.*
   , formatting                ==6.2.*
   , interpolatedstring-perl6  ==0.9.*
+
+  , bv  ==0.3.*
   , free  ==4.11.*
+
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

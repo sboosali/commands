@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                                                #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                                #-}
 module Commands.Etc where
 import           Commands.Instances           ()
 

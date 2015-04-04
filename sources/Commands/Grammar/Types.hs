@@ -19,14 +19,14 @@ import Numeric.Natural                   (Natural)
 
 -- |
 --
--- Command ~ LHS * DNSGrammar Text Text * Parser a
+-- Grammar ~ LHS * DNSGrammar Text Text * Parser a
 --
--- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
+-- RHS ~ Alt Symbol ~ Constant Word + Grammar ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
 --
-data Command a = Command
- { _comRule    :: Rule a            -- ^ covariant Functor
- , _comGrammar :: DNSCommandGrammar -- ^ Const is invariant Functor?
- , _comParser  :: Parser a          -- ^ covariant Functor
+data Grammar a = Grammar
+ { _gramRule    :: Rule a            -- ^ covariant Functor
+ , _gramGrammar :: DNSCommandGrammar -- ^ Const is invariant Functor?
+ , _gramParser  :: Parser a          -- ^ covariant Functor
  -- , _comCompiler :: Compiler a        -- ^ contravariant Functor TODO https://ocharles.org.uk/blog/guest-posts/2013-12-21-24-days-of-hackage-contravariant.html
  }
  deriving (Functor)
@@ -100,7 +100,7 @@ appLHS lhs = (lhs `LHSApp`) . (:[])
 type RHS = Alt Symbol
 
 -- |
-type Symbol = Sum (Constant Word) Command
+type Symbol = Sum (Constant Word) Grammar
 
 -- |
 newtype Word = Word { unWord :: String }
@@ -109,7 +109,7 @@ newtype Word = Word { unWord :: String }
 -- | exhaustive destructor.
 --
 -- (frees clients from @transformers@ imports. @PatternSynonyms@ in 7.10 can't check exhaustiveness and breaks haddock).
-symbol :: (Word -> b) -> (Command a -> b) -> Symbol a -> b
+symbol :: (Word -> b) -> (Grammar a -> b) -> Symbol a -> b
 symbol f _ (InL (Constant w)) = f w
 symbol _ g (InR r) = g r
 
@@ -118,11 +118,11 @@ fromWord :: Word -> Symbol a
 fromWord = InL . Constant
 
 -- | constructor.
-fromCommand :: Command a -> Symbol a
-fromCommand = InR
+fromGrammar :: Grammar a -> Symbol a
+fromGrammar = InR
 
-liftCommand :: Command a -> RHS a
-liftCommand = lift . fromCommand
+liftGrammar :: Grammar a -> RHS a
+liftGrammar = lift . fromGrammar
 
 liftString :: String -> RHS a
 liftString = lift . fromWord . Word
@@ -162,22 +162,22 @@ defaultDNSInfo = DNSInfo 0 False
 
 
 
-makeLenses ''Command
+makeLenses ''Grammar
 makeLenses ''Rule
 
 makeLenses ''DNSExpandedName
 makeLenses ''DNSInfo
 
 
-comLHS :: Lens' (Command a) LHS
-comLHS = comRule . ruleLHS
+gramLHS :: Lens' (Grammar a) LHS
+gramLHS = gramRule . ruleLHS
 
-comRHS :: Lens' (Command a) (RHS a)
-comRHS = comRule . ruleRHS
+gramRHS :: Lens' (Grammar a) (RHS a)
+gramRHS = gramRule . ruleRHS
 
-comExpand :: Lens' (Command a) Natural
-comExpand = comGrammar.dnsProductionInfo.dnsExpand
+gramExpand :: Lens' (Grammar a) Natural
+gramExpand = gramGrammar.dnsProductionInfo.dnsExpand
 
-comInline :: Lens' (Command a) Bool
-comInline = comGrammar.dnsProductionInfo.dnsInline
+gramInline :: Lens' (Grammar a) Bool
+gramInline = gramGrammar.dnsProductionInfo.dnsInline
 

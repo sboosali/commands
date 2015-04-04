@@ -11,6 +11,33 @@ tastytest = defaultMain $ testGroup "QuickCheck"
  [ testProperty "serialized DNSGrammar is valid Python" prop_DNSGrammar
  ]
 
+
+{- object file needed because:
+
+@
+ByteCodeLink: can't find label
+During interactive linking, GHCi couldn't find the following symbol:
+  currentApplicationPath
+This may be due to you not asking GHCi to load extra object files,
+archives or DLLs needed by your current session.
+@
+
+after adding @"dist/build/cbits/objc_actor.o"@, still doesn't work:
+
+@
+ghc: panic! (the 'impossible' happened)
+  (GHC version 7.8.3 for x86_64-apple-darwin):
+  Loading temp shared object failed: dlopen(/var/folders/2z/3c9t_c2d22175v217mf5znsh0000gn/T/ghc96820_0/ghc96820_1.dylib, 9): Symbol not found: _NSStringPboardType
+  Referenced from: /var/folders/2z/3c9t_c2d22175v217mf5znsh0000gn/T/ghc96820_0/ghc96820_1.dylib
+  Expected in: flat namespace
+ in /var/folders/2z/3c9t_c2d22175v217mf5znsh0000gn/T/ghc96820_0/ghc96820_1.dylib
+@
+
+even with: @["-frameworkCocoa", "-optl-ObjC"]@
+
+-}
+doctestArgs = [ "-frameworkCocoa", "-optl-ObjC", "dist/build/cbits/objc_actor.o" ] <> modules
+
 modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
   [ "Commands.Core"
@@ -34,6 +61,16 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Frontends.Dragon13.Shim"
   , "Commands.Frontends.Dragon13.Serialize"
 
+  , "Commands.Backends.OSX"
+  , "Commands.Backends.OSX.Example"
+  , "Commands.Backends.OSX.Types"
+  , "Commands.Backends.OSX.Bindings"
+  , "Commands.Backends.OSX.Bindings.Raw"
+  , "Commands.Backends.OSX.Constants"
+  , "Commands.Backends.OSX.Marshall"
+  , "Commands.Backends.OSX.Execute"
+  , "Commands.Backends.OSX.DSL"
+
   , "Commands.Command"
   , "Commands.Command.Types"
   , "Commands.Command.Sugar"
@@ -48,5 +85,5 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   ]
 
 main = do
- doctest modules
+ doctest doctestArgs
  -- tastytest TODO

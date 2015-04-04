@@ -38,5 +38,5 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 renderSymbol :: Symbol x -> DNSRHS DNSCommandName DNSCommandToken
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal (DNSToken t))
- (\command -> DNSNonTerminal (SomeDNSLHS (command ^. comGrammar.dnsProductionLHS)))
+ (\grammar -> DNSNonTerminal (SomeDNSLHS (grammar ^. gramGrammar.dnsProductionLHS)))
 

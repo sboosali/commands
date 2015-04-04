@@ -42,7 +42,7 @@ data Root
  -- Roots [Root]
  deriving (Show,Eq)
 
-root = set comExpand 1 $ 'root
+root = set gramExpand 1 $ 'root
  <=> empty
  <|> Repeat      # positive & root
  <|> ReplaceWith # "replace" & dictation & "with" & dictation
@@ -54,10 +54,10 @@ root = set comExpand 1 $ 'root
  -- <|> Roots       # (multipleC root)
 
 data Action = Copy | Delete | Next deriving (Show,Eq,Enum,Typeable)
-action = enumCommand
+action = enumGrammar
 
 data Region = Char | Word | Line deriving (Show,Eq,Enum,Typeable)
-region = enumCommand
+region = enumGrammar
 
 -- Action = Pick | Go |
 -- Region = Selection |
@@ -84,7 +84,7 @@ data Phrase
  | Dictated Dictation
  deriving (Show,Eq,Ord)
 
-phrase = set comExpand 3 $ 'phrase
+phrase = set gramExpand 3 $ 'phrase
 
  <=> Verbatim # "say" & dictation
  <|> Escaped  # "lit" & keyword & phrase
@@ -105,10 +105,10 @@ phrase = set comExpand 3 $ 'phrase
 speech = phrase -- TODO
 
 data Joiner = Camel | Class | Snake | Dash | File | Squeeze deriving (Show,Eq,Ord,Enum,Typeable)
-joiner = enumCommand
+joiner = enumGrammar
 
 data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
-casing = enumCommand
+casing = enumGrammar
 
 -- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
 data Brackets = Brackets String String | Bracket Char deriving (Show,Eq,Ord,Typeable)
@@ -123,7 +123,7 @@ brackets = 'brackets
 
 bracket c = Brackets [c] [c]
 
-character :: Command Char
+character :: Grammar Char
 character = 'character <=> empty
 
  <|> '`' # "grave"
@@ -202,16 +202,16 @@ character = 'character <=> empty
 
 -- | 'Key's and 'Char'acters are "incomparable":
 --
--- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
+-- * many modifiers are keys that aren't characters (e.g. 'GrammarKey')
 -- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
 --
 -- so we can't embed the one into the other, but we'll just keep things simple with duplication.
 --
-key :: Command Key
+key :: Grammar Key
 key = 'key <=> empty
 
 type Keyword = Word -- TODO
-keyword :: Command Keyword
+keyword :: Grammar Keyword
 keyword = 'keyword <=> empty
 
 type Separator = String -- TODO
@@ -219,20 +219,20 @@ type Separator = String -- TODO
 
 
 data Click = Click Times Button deriving (Show,Eq)
-click :: Command Click
+click :: Grammar Click
 click = 'click <=>
  Click # optionalEnum times & optionalEnum button & "click"
  -- type inference with the {&} sugar even works for:
- --  Click # optionalEnum enumCommand & optionalEnum enumCommand & "click"
+ --  Click # optionalEnum enumGrammar & optionalEnum enumGrammar & "click"
  -- the terminal "click" makes the grammar "non-canonical" i.e.
  --  where product types are merged with <*> (after "lifting" into RHS)
  --  and sum types are merged with <|> (after "tagging" with the constructor)
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = enumCommand :: Command Times
+times = enumGrammar :: Grammar Times
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
-button = qualifiedCommand
+button = qualifiedGrammar
 
 positive = 'positive
  <=> Positive # (asum . fmap int) [1..9]
@@ -240,12 +240,12 @@ positive = 'positive
 
 
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = dragonCommand 'dictation
+dictation = dragonGrammar 'dictation
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
  (\context -> Dictation <$> anyBlack `manyUntil` context)
 
 newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
-letters = dragonCommand 'letters
+letters = dragonGrammar 'letters
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
  (\context -> Letters <$> anyLetter `manyUntil` context) -- TODO greedy (many) versus non-greedy (manyUntil)
 
@@ -271,7 +271,7 @@ directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
  <*> maybeAtomR ("by"   &> transport))
 
 -- data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
--- directions__ :: Command Directions__
+-- directions__ :: Grammar Directions__
 -- directions__ = 'directions__ <=> "directions" &> (runPerms $ Directions__
  -- <$> maybeAtomR ("from" &> dictation)
  -- <*> maybeAtomR ("to"   &> dictation)
@@ -282,7 +282,7 @@ newtype Place = Place String deriving (Show,Eq)
 place = 'place <=> Place # vocabulary ["here","there"]
 
 data Transport = Foot | Bike | PublicTransit | Car deriving (Show,Ord,Eq,Enum,Typeable)
-transport = enumCommand
+transport = enumGrammar
 
 exampleDirections = fmap (unwords . words)
  [ "directions from here to there  by bike"
@@ -297,14 +297,14 @@ exampleDirections = fmap (unwords . words)
 
 data Even = Even (Maybe Odd)  deriving Show
 data Odd  = Odd  (Maybe Even) deriving Show
-odd_  = set comExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
-even_ = set comExpand 1 $ 'even_ <=> Even # "even" & optional odd_
+odd_  = set gramExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
+even_ = set gramExpand 1 $ 'even_ <=> Even # "even" & optional odd_
 
 
 data Even2 = Even2 [Odd2]  deriving Show
 data Odd2  = Odd2  [Even2] deriving Show
-odd2  = set comExpand 1 $ 'odd2  <=> Odd2  # "odd"  & multiple even2
-even2 = set comExpand 1 $ 'even2 <=> Even2 # "even" & multiple odd2
+odd2  = set gramExpand 1 $ 'odd2  <=> Odd2  # "odd"  & multiple even2
+even2 = set gramExpand 1 $ 'even2 <=> Even2 # "even" & multiple odd2
 
 
 
@@ -319,9 +319,9 @@ attemptAsynchronously seconds action = do
 
 attempt = attemptAsynchronously 1
 
-attemptParse command = attempt . handleParse command
+attemptParse grammar = attempt . handleParse grammar
 
-attemptSerialize command = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized command
+attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
 
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 
@@ -376,7 +376,7 @@ main = do
  -- traverse_ (attemptParse directions_) exampleDirections
 
  -- putStrLn ""
- -- print (getWords . _comGrammar $ button)
+ -- print (getWords . _gramGrammar $ button)
 
  -- putStrLn ""
  -- print $ cycles $
@@ -444,5 +444,5 @@ main = do
 
 
 -- data Test = Test deriving (Show,Eq,Enum,Typeable)
--- test = enumCommand
+-- test = enumGrammar
 test = 'test <=> id # multiple transport

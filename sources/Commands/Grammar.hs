@@ -83,7 +83,7 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: Symbol x -> Int
- hashSymbol = symbol (hash . unWord) (hash . view comLHS)
+ hashSymbol = symbol (hash . unWord) (hash . view gramLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --
@@ -101,37 +101,37 @@ showLHS (LHSInt i) = "i_" <> hashAlphanumeric i
 showLHS (l `LHSApp` ls) = intercalate "____" (showLHS l : fmap showLHS ls)
 
 
--- | transforms a possibly-infinite structure with direct references (i.e. a recursively-defined 'Command') into a certainly-finite structure (i.e. a 'Map') with indirect references (i.e. its keys).
+-- | transforms a possibly-infinite structure with direct references (i.e. a recursively-defined 'Grammar') into a certainly-finite structure (i.e. a 'Map') with indirect references (i.e. its keys).
 --
--- returns all a 'Command' 's transitive descendents (children, children's children, etc.).
+-- returns all a 'Grammar' 's transitive descendents (children, children's children, etc.).
 --
 -- even without their types, you can still extract their untyped 'LHS', count them, etc.
 --
 -- a parent can be its own descendent, i.e.
 --
--- @Some command `elem` comDescendents command@
+-- @Some grammar `elem` comDescendents grammar@
 --
 -- is @True@.
--- this means the command is (self- / mutually-) recursive.
+-- this means the grammar is (self- / mutually-) recursive.
 --
 -- Note on Naming: the "reify" means "reifying the references between rules".
 --
-reifyCommand :: Command x -> ReifiedCommand
-reifyCommand command = execState (reifyCommand_ command) Map.empty
+reifyGrammar :: Grammar x -> ReifiedGrammar
+reifyGrammar grammar = execState (reifyGrammar_ grammar) Map.empty
 
-reifyCommand_ :: Command x -> State ReifiedCommand ()
-reifyCommand_ command = do
- let Rule l r = command ^. comRule
+reifyGrammar_ :: Grammar x -> State ReifiedGrammar ()
+reifyGrammar_ grammar = do
+ let Rule l r = grammar ^. gramRule
  visited <- gets $ Map.member l
  unless visited $ do
-  modify $ Map.insert l (Some command)
+  modify $ Map.insert l (Some grammar)
   reifyRHS_ r
 
 -- TODO is this a traversal or something? over the functor
-reifyRHS_ :: RHS x -> State ReifiedCommand ()
+reifyRHS_ :: RHS x -> State ReifiedGrammar ()
 reifyRHS_ (Pure _)     = return ()
 reifyRHS_ (Many rs)    = traverse_ reifyRHS_ rs
-reifyRHS_ (fs `App` x) = reifyRHS_ fs >> symbol (\_ -> return ()) reifyCommand_ x
+reifyRHS_ (fs `App` x) = reifyRHS_ fs >> symbol (\_ -> return ()) reifyGrammar_ x
 reifyRHS_ (fs :<*> xs) = reifyRHS_ fs >> reifyRHS_ xs
 
-type ReifiedCommand = Map LHS (Some Command)
+type ReifiedGrammar = Map LHS (Some Grammar)

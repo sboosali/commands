@@ -34,29 +34,29 @@ import           Language.Haskell.TH.Syntax            (Name)
 --
 -- = INTERNALS
 --
--- this function doesn't simply project the 'Command'
--- onto its 'DNSProduction' with '_comGrammar',
--- the way 'parses' simply extracts what it needs with '_comParser'.
--- instead, this function expects the '_comRule' to be correct, from
+-- this function doesn't simply project the 'Grammar'
+-- onto its 'DNSProduction' with '_gramGrammar',
+-- the way 'parses' simply extracts what it needs with '_gramParser'.
+-- instead, this function expects the '_gramRule' to be correct, from
 -- which it extracts the descendents the root production depends on.
 --
--- one problem is that this implicit dependency between '_comGrammar'
--- and '_comRule' forces library authors to maintain consistency
--- between '_comGrammar' and '_comRule' within every 'Command'.
+-- one problem is that this implicit dependency between '_gramGrammar'
+-- and '_gramRule' forces library authors to maintain consistency
+-- between '_gramGrammar' and '_gramRule' within every 'Grammar'.
 --
 -- however,
 -- this shouldn't be a problem for library users, given that
 -- consistency is guaranteed by the library author.
--- this is because the "higher level" 'genericCommand' API derives
--- '_comGrammar' from '_comRule'.
--- if a library user uses the "lower-level" 'specialCommand', then
+-- this is because the "higher level" 'genericGrammar' API derives
+-- '_gramGrammar' from '_gramRule'.
+-- if a library user uses the "lower-level" 'specialGrammar', then
 -- they will need __want__ to learn some internals anyway.
 --
--- a previous alternative to had been for '_comGrammar' to be a 'Lens'
+-- a previous alternative to had been for '_gramGrammar' to be a 'Lens'
 -- onto a 'DNSGrammar', not a 'DNSProduction'. naïvely storing your
 -- descendents in a linear structure (i.e. the list of 'DNSProduction'
 -- in a 'DNSGrammar') caused non-termination when serializing
--- mutually-recursive 'Command's.
+-- mutually-recursive 'Grammar's.
 --
 -- a possible future alternative might
 -- be for a production to store it's transitive productions
@@ -70,86 +70,86 @@ import           Language.Haskell.TH.Syntax            (Name)
 --
 -- a Kleisli arrow.
 --
-serialized :: Command x -> Either [SomeException] SerializedGrammar
-serialized command = do
- let g = second T.pack . optimizeGrammar $ DNSGrammar (getDescendentProductions command) [] dnsHeader
+serialized :: Grammar x -> Either [SomeException] SerializedGrammar
+serialized grammar = do
+ let g = second T.pack . optimizeGrammar $ DNSGrammar (getDescendentProductions grammar) [] dnsHeader
  eg <- escapeDNSGrammar g
  return $ serializeGrammar eg
- -- TODO let command store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
+ -- TODO let grammar store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
 -- | the transitive dependencies of a grammar. doesn't double count the 'dnsExport' when it's its own descendent.
-getDescendentProductions :: Command x -> NonEmpty DNSCommandProduction
-getDescendentProductions command = export :| List.delete export productions
+getDescendentProductions :: Grammar x -> NonEmpty DNSCommandProduction
+getDescendentProductions grammar = export :| List.delete export productions
  where
- export = command^.comGrammar
- productions = ((\(Some command) -> command^.comGrammar) <$> (Map.elems . reifyCommand $ command))
+ export = grammar^.gramGrammar
+ productions = ((\(Some grammar) -> grammar^.gramGrammar) <$> (Map.elems . reifyGrammar $ grammar))
 -- TODO store productions, grammars, commands?
 
 -- -- | the non-transitive dependencies of a grammar.
--- getChildrenProductions :: Command x -> NonEmpty DNSCommandProduction
--- getChildrenProductions = view (comGrammar.dnsProductions)
+-- getChildrenProductions :: Grammar x -> NonEmpty DNSCommandProduction
+-- getChildrenProductions = view (gramGrammar.dnsProductions)
 
 
-parses :: Command a -> String -> Possibly a
-parses command = parsing (command ^. comParser)
+parses :: Grammar a -> String -> Possibly a
+parses grammar = parsing (grammar ^. gramParser)
 
-handleParse :: Show a => Command a -> String -> IO ()
-handleParse command s = do
- (print =<< (command `parses` s)) `catches` parseHandlers
+handleParse :: Show a => Grammar a -> String -> IO ()
+handleParse grammar s = do
+ (print =<< (grammar `parses` s)) `catches` parseHandlers
 
 
 -- |
-genericCommand :: LHS -> RHS a -> Command a
-genericCommand l r = Command (Rule l r) g p
+genericGrammar :: LHS -> RHS a -> Grammar a
+genericGrammar l r = Grammar (Rule l r) g p
  where
  -- g = bimap T.pack T.pack $ renderRHS r
  g = renderRule (Rule l r)
  p = rparser r
 
--- | builds a special 'Command' directly, not indirectly via 'Rule'.
+-- | builds a special 'Grammar' directly, not indirectly via 'Rule'.
 --
 -- warning: partial function:
 --
 -- * match fails on non-global 'Name's
-specialCommand :: Name -> RHS a -> DNSCommandGrammar -> Parser a -> Command a
-specialCommand name r g p = Command (Rule l r) g p
+specialGrammar :: Name -> RHS a -> DNSCommandGrammar -> Parser a -> Grammar a
+specialGrammar name r g p = Grammar (Rule l r) g p
  where
  Just l = lhsFromName name
 
 -- | helper function for conveniently defined Dragon NaturallySpeaking built-ins.
-dragonCommand :: Name -> DNSCommandRHS -> Parser a -> Command a
-dragonCommand name rhs p = Command
+dragonGrammar :: Name -> DNSCommandRHS -> Parser a -> Grammar a
+dragonGrammar name rhs p = Grammar
  (Rule l empty)
  (DNSProduction (set dnsInline True defaultDNSInfo) (DNSRule (defaultDNSExpandedName l)) rhs)
  p
  where
  Just l = lhsFromName name
 
--- | a default 'Command' for simple ADTs.
+-- | a default 'Grammar' for simple ADTs.
 --
 -- with 'Enum' ADTs, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parser's and 'DNSGrammar's. without TemplateHaskell.
 --
--- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Command's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
+-- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Grammar's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
 --
 --
-enumCommand :: forall a. (Typeable a, Enum a, Show a) => Command a
-enumCommand = genericCommand
+enumGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
+enumGrammar = genericGrammar
  (lhsOfType (Proxy :: Proxy a))
  (asum . fmap con $ constructors)
 
--- | a default 'Command' for simple ADTs.
+-- | a default 'Grammar' for simple ADTs.
 --
 -- detects the type name in a constructor name (as a
 -- prefix/infix/suffix) and elides the affix.
 --
--- useful when you want your @commands@-DSL terminals to be
+-- useful when you want your @grammars@-DSL terminals to be
 -- unqualified (for convenience), but you want your Haskell
 -- identifiers to be qualified (to avoid conflicts). e.g.:
 --
 -- >>> :set -XDeriveDataTypeable
 -- >>> data Button = LeftButton | ButtonMiddleButton | ButtonRight deriving (Show,Eq,Enum,Typeable)
--- >>> let button = qualifiedCommand :: Command Button
--- >>> getWords . view comGrammar $ button
+-- >>> let button = qualifiedGrammar :: Grammar Button
+-- >>> getWords . view gramGrammar $ button
 -- ["left","middle","right"]
 --
 -- (the qualification is exaggerated to show the filtering behavior:
@@ -161,24 +161,24 @@ enumCommand = genericCommand
 --
 --
 --
-qualifiedCommand :: forall a. (Typeable a, Enum a, Show a) => Command a
-qualifiedCommand = genericCommand
+qualifiedGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
+qualifiedGrammar = genericGrammar
  (lhsOfType (Proxy :: Proxy a))
  (asum . fmap (qualifiedCon occ) $ constructors)
  where
  GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
 
--- | a default 'Command' for 'String' @newtype@s.
+-- | a default 'Grammar' for 'String' @newtype@s.
 --
 -- e.g. @newtype Place = Place String deriving (Show,Eq)@
 --
-vocabularyCommand :: (Generic a) => [String] -> RHS a
-vocabularyCommand = undefined vocabulary
+vocabularyGrammar :: (Generic a) => [String] -> RHS a
+vocabularyGrammar = undefined vocabulary
 -- (Newtype a String) => [String] -> RHS a
 
 -- | the empty grammar. See 'unitDNSRHS'.
-epsilon :: Command ()
-epsilon = Command (Rule l r) g p
+epsilon :: Grammar ()
+epsilon = Grammar (Rule l r) g p
  where
  Just l = lhsFromName 'epsilon
  r = empty

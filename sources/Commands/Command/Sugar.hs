@@ -21,8 +21,8 @@ infixl 4 &>
 infixl 4 & -- TODO   `(&) = flip ($)` in base in 7.10
 
 
-(<=>) :: Name -> RHS a -> Command a
-name <=> r = genericCommand l r
+(<=>) :: Name -> RHS a -> Grammar a
+name <=> r = genericGrammar l r
  where
  Just l = lhsFromName name
 
@@ -56,7 +56,7 @@ f # x = pure f `appR` x
 -- | specialized 'appR' has types:
 --
 -- * @a        -> String    -> RHS a@
--- * @(a -> b) -> Command a -> RHS b@
+-- * @(a -> b) -> Grammar a -> RHS b@
 -- * @(a -> b) -> RHS a     -> RHS b@
 --
 --
@@ -67,8 +67,8 @@ class (ToRHS a) => AppRHS a where
 instance AppRHS String      where
  type LeftR String b      = b
  appR f x = f <*  toR x
-instance AppRHS (Command a) where
- type LeftR (Command a) b = (a -> b)
+instance AppRHS (Grammar a) where
+ type LeftR (Grammar a) b = (a -> b)
  appR f x = f <*> toR x
 instance AppRHS (RHS a)     where
  type LeftR (RHS a) b     = (a -> b)
@@ -86,6 +86,6 @@ x &> y = toR x *> toR y
 
 class    ToRHS a           where  type ToR a           :: *;      toR :: a -> RHS (ToR a)
 instance ToRHS String      where  type ToR String      = String;  toR = liftString
-instance ToRHS (Command a) where  type ToR (Command a) = a;       toR = liftCommand
+instance ToRHS (Grammar a) where  type ToR (Grammar a) = a;       toR = liftGrammar
 instance ToRHS (RHS a)     where  type ToR (RHS a)     = a;       toR = id
 

@@ -18,14 +18,13 @@ import Data.Typeable                 (cast)
 
 
 sparser :: Symbol a -> Parser a
-sparser s context = symbol (flip wparser $ context) (flip cparser $ context) s
+sparser s context = symbol (flip wparser $ context) (flip gparser $ context) s
 
 wparser :: Word -> Parser a
 wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
 
-cparser :: Command a -> Parser a
-cparser command context = (command ^. comParser) context <?> showLHS (command ^. comLHS)
--- gparser (Rule _ rs) context = rparser rs context
+gparser :: Grammar a -> Parser a
+gparser grammar context = (grammar ^. gramParser) context <?> showLHS (grammar ^. gramLHS)
 
 -- | build a parser from a right-hand side.
 --

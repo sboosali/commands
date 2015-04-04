@@ -26,60 +26,60 @@ import qualified Text.Parsec                       as Parsec
 -- ================================================================ --
 
 -- | @= 'multipleC'@
-multiple :: Command a -> Command [a]
+multiple :: Grammar a -> Grammar [a]
 multiple = multipleC
 
 -- | @= 'manyC'@
-many :: Command a -> Command [a]
+many :: Grammar a -> Grammar [a]
 many = manyC
 
 -- | @= 'many0C'@
-many0 :: Command a -> Command [a]
+many0 :: Grammar a -> Grammar [a]
 many0 = many0C
 
 -- |
-multipleC :: Command a -> Command [a]
-multipleC command = Command
+multipleC :: Grammar a -> Grammar [a]
+multipleC grammar = Grammar
  (Rule l r)
- (oneOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (\context -> (command ^. comParser) context `manyUntil` context)
+ (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> (grammar ^. gramParser) context `manyUntil` context)
  where
- l = unsafeLHSFromName 'multipleC `appLHS` (command ^. comLHS)
- r = multipleRHS command self
- self = multipleC command
+ l = unsafeLHSFromName 'multipleC `appLHS` (grammar ^. gramLHS)
+ r = multipleRHS grammar self
+ self = multipleC grammar
 
 -- |
-manyC :: Command a -> Command [a]
-manyC command = Command
+manyC :: Grammar a -> Grammar [a]
+manyC grammar = Grammar
  (Rule l r)
- (oneOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (\context -> Parsec.many1 $ (command ^. comParser) context)
+ (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> Parsec.many1 $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'manyC `appLHS` (command ^. comLHS)
- r = multipleRHS command self
- self = manyC command
+ l = unsafeLHSFromName 'manyC `appLHS` (grammar ^. gramLHS)
+ r = multipleRHS grammar self
+ self = manyC grammar
 
 -- |
-many0C :: Command a -> Command [a]
-many0C command = Command
+many0C :: Grammar a -> Grammar [a]
+many0C grammar = Grammar
  (Rule l r)
- (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (\context -> Parsec.many $ (command ^. comParser) context)
+ (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> Parsec.many $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'many0C `appLHS` (command ^. comLHS)
- r = multipleRHS command self
- self = many0C command
+ l = unsafeLHSFromName 'many0C `appLHS` (grammar ^. gramLHS)
+ r = multipleRHS grammar self
+ self = many0C grammar
 
 -- -- |
 -- multipleRHS :: RHS a -> RHS [a]
 -- multipleRHS r = pure [] <|> (:[]) <$> r  -- TODO horribly horrible, but the recursion causes non-termination.
 -- -- multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
--- -- TODO you can't recur on RHS directly, you must recur through a Command, to terminate.
--- TODO horribly horrible, we shouldn't just ignore the RHS: we're not, the command contains it
+-- -- TODO you can't recur on RHS directly, you must recur through a Grammar, to terminate.
+-- TODO horribly horrible, we shouldn't just ignore the RHS: we're not, the grammar contains it
 
 -- |
-multipleRHS :: Command a -> Command [a] -> RHS [a]
-multipleRHS c cs = pure [] <|> (:) <$> liftCommand c <*> liftCommand cs
+multipleRHS :: Grammar a -> Grammar [a] -> RHS [a]
+multipleRHS c cs = pure [] <|> (:) <$> liftGrammar c <*> liftGrammar cs
 
 -- |
 oneOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
@@ -93,52 +93,52 @@ zeroOrMoreDNSProduction = yankDNSProduction (DNSOptional . DNSMultiple)
 -- ================================================================ --
 
 -- | @= 'optionalC'@
-optional :: Command a -> Command (Maybe a)
+optional :: Grammar a -> Grammar (Maybe a)
 optional = optionalC
 
 -- | @= 'optionC'@
-option :: a -> Command a -> Command a
+option :: a -> Grammar a -> Grammar a
 option = optionC
 
 -- | @= 'optionC' 'enumDefault'@
-optionalEnum :: (Enum a) => Command a -> Command a
+optionalEnum :: (Enum a) => Grammar a -> Grammar a
 optionalEnum = optionC enumDefault
 
 -- |
-optionC :: a -> Command a -> Command a
-optionC theDefault command = Command
+optionC :: a -> Grammar a -> Grammar a
+optionC theDefault grammar = Grammar
  (Rule l r)
- (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (\context -> Parsec.option theDefault $ (command ^. comParser) context)
+ (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> Parsec.option theDefault $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'optionC `appLHS` (command ^. comLHS)
- r = optionRHS theDefault command
+ l = unsafeLHSFromName 'optionC `appLHS` (grammar ^. gramLHS)
+ r = optionRHS theDefault grammar
 
 -- |
-optionalC :: Command a -> Command (Maybe a)
-optionalC command = Command
+optionalC :: Grammar a -> Grammar (Maybe a)
+optionalC grammar = Grammar
  (Rule l r)
- (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (\context -> Parsec.optionMaybe $ (command ^. comParser) context)
+ (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> Parsec.optionMaybe $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'optionalC `appLHS` (command ^. comLHS)
- r = optionalRHS command
+ l = unsafeLHSFromName 'optionalC `appLHS` (grammar ^. gramLHS)
+ r = optionalRHS grammar
 
 -- -- |
 -- optionalRHS :: RHS a -> RHS (Maybe a)
 -- optionalRHS r = pure Nothing <|> Just <$> r  -- TODO doesn't seem to preserve lower-order rule
 
 -- |
-optionalRHS :: Command a -> RHS (Maybe a)
-optionalRHS c = pure Nothing <|> Just <$> liftCommand c
+optionalRHS :: Grammar a -> RHS (Maybe a)
+optionalRHS c = pure Nothing <|> Just <$> liftGrammar c
 
 -- -- |
 -- optionRHS :: a -> RHS a -> RHS a
 -- optionRHS x r = pure x <|> r
 
 -- |
-optionRHS :: a -> Command a -> RHS a
-optionRHS x c = pure x <|> liftCommand c
+optionRHS :: a -> Grammar a -> RHS a
+optionRHS x c = pure x <|> liftGrammar c
 
 
 -- |
@@ -152,29 +152,29 @@ optionalDNSProduction = yankDNSProduction DNSOptional
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
 maybeAtomR
  = maybeAtomC
- . set (comGrammar .dnsProductionInfo .dnsInline) True
+ . set (gramGrammar .dnsProductionInfo .dnsInline) True
  . unsafeFellRHS
 
 -- |
-unsafeFellRHS :: RHS a -> Command a
-unsafeFellRHS rhs = genericCommand (unsafeLHSFromRHS rhs) rhs
+unsafeFellRHS :: RHS a -> Grammar a
+unsafeFellRHS rhs = genericGrammar (unsafeLHSFromRHS rhs) rhs
 
--- | changes the '_comGrammar' (and thus the '_comLHS'), but not the
--- '_comParser'.
+-- | changes the '_gramGrammar' (and thus the '_gramLHS'), but not the
+-- '_gramParser'.
 --
 -- the "optionality" (but not the "permutability") must be reified
--- for the '_comGrammar' (by this function).
--- then, both '_comGrammar' and '_comParser'  are permuted by
+-- for the '_gramGrammar' (by this function).
+-- then, both '_gramGrammar' and '_gramParser'  are permuted by
 -- 'runPerms' (not by this function) acting upon 'maybeAtom'.
 --
 --
-maybeAtomC :: Command a -> Perms RHS (Maybe a)
-maybeAtomC command = (maybeAtom . liftCommand) $ Command
+maybeAtomC :: Grammar a -> Perms RHS (Maybe a)
+maybeAtomC grammar = (maybeAtom . liftGrammar) $ Grammar
  (Rule l r)
- (optionalDNSProduction (defaultDNSExpandedName l) (command ^. comGrammar))
- (command ^. comParser)
+ (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (grammar ^. gramParser)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomC `appLHS`) (const $ liftCommand command) (command ^. comRule)
+ Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomC `appLHS`) (const $ liftGrammar grammar) (grammar ^. gramRule)
 
 
 -- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',

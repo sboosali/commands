@@ -15,8 +15,10 @@ import           Test.QuickCheck.Property
 
 -- | if the grammar has already been escaped, its serialization into the shim must be valid Python.
 prop_DNSGrammar :: DNSGrammar () DNSName DNSText -> Result
-prop_DNSGrammar grammar = case shimmySerialization (T.pack "'localhost'") (serializeGrammar grammar) of
+prop_DNSGrammar grammar = case shimmySerialization diff (serializeGrammar grammar) of
  Left  {} -> failed
  Right {} -> succeeded
 -- rejected = result { ok = Nothing }  i.e.  Discard  i.e.  as if precondition were False
-
+ where
+ -- diff = (Address (T.pack "'localhost'") (T.pack "'8000'"), Address (T.pack "'localhost'") (T.pack "'8000'"))
+ diff = (Address ("'localhost'") ("'8000'"), Address ("'localhost'") ("'8000'"))  -- TODO

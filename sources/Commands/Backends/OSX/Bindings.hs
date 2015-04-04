@@ -34,6 +34,9 @@ getClipboard :: IO Contents
 getClipboard = objc_getClipboard >>= peekCString
 
 -- |
+--
+-- note: unlike the keyboard shortcuts of 'copy',
+-- contents don't show up in Alfred's clipboard history.
 setClipboard :: Contents -> IO ()
 setClipboard s = withCString s objc_setClipboard
 

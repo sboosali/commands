@@ -73,8 +73,8 @@ let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
 a Kleisli arrow (when partially applied).
 
 -}
-shimmySerialization :: Text -> SerializedGrammar -> Possibly PythonFile
-shimmySerialization url = newPythonFile . display . getShim . asShimR url
+shimmySerialization :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> Possibly PythonFile
+shimmySerialization diff = newPythonFile . display . getShim . from_SerializedGrammar_to_ShimR diff
 
 {- | serializes an (escaped) grammar into a Python Docstring and a
 Python Dict.
@@ -303,13 +303,22 @@ enclosePythonic left right sep ds
 escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSName DNSText)
 escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
 
-{- | simple conversion.
 
-@asShimR url SerializedGrammar{..}@
+data Address = Address Host Port
+ -- TODO  deriving (Show,Eq,Ord)
+type Host = String -- TODO 
+type Port = String -- TODO 
 
--}
-asShimR :: Text -> SerializedGrammar -> ShimR Doc
-asShimR url SerializedGrammar{..} = ShimR serializedRules serializedLists serializedExport (text url)
+type ShimR_minus_SerializedGrammar = (Address, Address) -- TODO 
+
+-- | lol: @(x-y) + y = x@
+from_SerializedGrammar_to_ShimR :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> ShimR Doc
+from_SerializedGrammar_to_ShimR
+ ( Address (T.pack -> text -> serverHost) (T.pack -> text -> serverPort)
+ , Address (T.pack -> text -> clientHost) (T.pack -> text -> clientPort))
+ SerializedGrammar{..}
+ = ShimR serializedRules serializedLists serializedExport serverHost serverPort clientHost clientPort -- TODO 
+
 
 {- | get all the names in the left-hand sides of the grammar, without duplicates. 
 Works on different levels of the grammar.

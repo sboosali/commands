@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns, PackageImports #-}
 {-# LANGUAGE RankNTypes, TemplateHaskell                                  #-}
 module Commands.Grammar.Types where
-import Commands.Command.Types            ()
+-- import Commands.Command.Types
+import Commands.Backends.OSX.Types
 import Commands.Etc
 import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Types
@@ -23,11 +24,24 @@ import Numeric.Natural                   (Natural)
 -- RHS ~ Alt Symbol ~ Constant Word + Command ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
 --
 data Command a = Command
- { _comRule    :: Rule a
- , _comGrammar :: DNSCommandGrammar
- , _comParser  :: Parser a
+ { _comRule    :: Rule a            -- ^ covariant Functor
+ , _comGrammar :: DNSCommandGrammar -- ^ Const is invariant Functor?
+ , _comParser  :: Parser a          -- ^ covariant Functor
+ -- , _comCompiler :: Compiler a        -- ^ contravariant Functor TODO https://ocharles.org.uk/blog/guest-posts/2013-12-21-24-days-of-hackage-contravariant.html
  }
  deriving (Functor)
+
+
+-- |
+type Compiler a = a -> CompilerContext -> Actions ()
+-- can cache, when both arguments instantiate Eq?
+
+type CompilerContext = Application
+
+-- TODO lol
+globalContext :: CompilerContext
+globalContext = ""
+
 
 type DNSCommandGrammar = DNSCommandProduction
  -- DNSGrammar DNSInfo DNSCommandName DNSCommandToken
@@ -39,10 +53,10 @@ type DNSCommandRHS = DNSRHS DNSCommandName DNSCommandToken
 type DNSCommandName = DNSExpandedName LHS
 
 -- | not 'Text' because user-facing "config" modules (e.g.
--- "Commands.Plugins.Example") can't use:
+-- "Commands.Plugins.Example") can only use one of:
 --
--- * both OverloadedStrings
--- * and type class sugar
+-- * OverloadedStrings
+-- * type class sugar
 --
 type DNSCommandToken = String
 
@@ -166,3 +180,4 @@ comExpand = comGrammar.dnsProductionInfo.dnsExpand
 
 comInline :: Lens' (Command a) Bool
 comInline = comGrammar.dnsProductionInfo.dnsInline
+

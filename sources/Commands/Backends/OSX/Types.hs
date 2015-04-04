@@ -41,7 +41,16 @@ type CGEventFlags  = CULLong
 data MouseButton = LeftButton | MiddleButton | RightButton
  deriving (Show,Eq,Ord,Enum)
 
-type Positive = Int
+-- | a (pseudo)-refinement type.
+newtype Positive = Positive { getPositive :: Int }
+ deriving (Show,Eq,Ord)
+
+-- -- | smart constructor for 'Positive'.
+-- newPositive :: Int -> Possibly Positive
+-- newPositive i = if i >= 1
+--  then return (Positive i)
+--  else failure 'newPositive
+
 
 -- {- |
 
@@ -160,9 +169,9 @@ data Key
  deriving (Show,Eq,Ord)
 
 
-type Actions = Free Action
+type Actions = Free OSXAction
 
-data Action k
+data OSXAction k
  = SendKeyPress    [Modifier] Key                   k
  | SendMouseClick  [Modifier] Positive MouseButton  k
 

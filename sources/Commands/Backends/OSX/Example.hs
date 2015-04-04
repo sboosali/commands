@@ -14,7 +14,7 @@ main = do
 attemptActions a = do
  putStrLn ""
  putStrLn $ showActions a
- executeActions a
+ runActions a
 
 testDerived = do
  _ <- copy

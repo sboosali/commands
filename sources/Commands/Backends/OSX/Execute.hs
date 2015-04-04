@@ -12,8 +12,8 @@ import Data.List                      (intercalate)
 import Data.Monoid                    ((<>))
 
 
-executeActions :: Actions a -> IO a
-executeActions = iterM $ \case
+runActions :: Actions a -> IO a
+runActions = iterM $ \case
 
  SendKeyPress    flags key k      -> ObjC.pressKey flags key >> k
  SendMouseClick  flags n button k -> ObjC.clickMouse flags n button >> k
@@ -73,7 +73,7 @@ showActions as = "do\n" <> evalState (showActions_ as) 1
  showActions_ (Pure x) = return $ " return " <> show x <> "\n"
  showActions_ (Free a) = showAction_ a
 
- showAction_ :: (Show x) => Action (Actions x) -> State Gensym String
+ showAction_ :: (Show x) => OSXAction (Actions x) -> State Gensym String
  showAction_ = \case
   SendKeyPress    flags key k -> ((" sendKeyPress "    <> showArgs [show flags, show key]) <>)       <$> showActions_ k
   SendMouseClick  flags n b k -> ((" sendMouseClick "  <> showArgs [show flags, show n, show b]) <>) <$> showActions_ k

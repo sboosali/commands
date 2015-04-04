@@ -9,7 +9,7 @@ import Data.Foldable               (traverse_)
 import Data.Monoid                 ((<>))
 
 
-makeFree ''Action
+makeFree ''OSXAction
 
 -- TODO
 -- wait (25 ms)

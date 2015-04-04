@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
+import           Commands.Backends.OSX
 import           Commands.Core
 import           Commands.Frontends.Dragon13
 
@@ -206,7 +207,6 @@ character = 'character <=> empty
 --
 -- so we can't embed the one into the other, but we'll just keep things simple with duplication.
 --
-type Key = Char -- TODO
 key :: Command Key
 key = 'key <=> empty
 
@@ -429,9 +429,20 @@ main = do
  -- print $ take 30 $ show $ parseModule (getShim theShim) ""
 
 
- putStrLn ""
- let Right sg = serialized root
+ -- PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
+ -- T.putStrLn $ pf
+ -- -- writeFile "_shim.py" (T.unpack pf)
 
- PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
+
+ putStrLn ""
+ attemptSerialize test
+ let Right sg = serialized test  -- TODO why does the unary Test fail? Optimization?
+ let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
+ PythonFile pf <- shimmySerialization addresses sg
+ runActions $ setClipboard (T.unpack pf)
  T.putStrLn $ pf
- -- writeFile "_shim.py" (T.unpack pf)
+
+
+-- data Test = Test deriving (Show,Eq,Enum,Typeable)
+-- test = enumCommand
+test = 'test <=> id # multiple transport

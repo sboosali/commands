@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Command where
+import           Commands.Backends.OSX.Types           (Actions)
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Optimize
 import           Commands.Frontends.Dragon13.Render
@@ -96,6 +97,11 @@ parses grammar = parsing (grammar ^. gramParser)
 handleParse :: Show a => Grammar a -> String -> IO ()
 handleParse grammar s = do
  (print =<< (grammar `parses` s)) `catches` parseHandlers
+
+
+compiles :: Command a -> a -> Actions ()
+c `compiles` a = (c^.comCompiler) a globalContext
+
 
 
 -- |

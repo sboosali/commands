@@ -44,5 +44,6 @@ import Commands.Instances            ()
 import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
-import Commands.Parsec               hiding (lower, option, optional, runParser)
+import Commands.Parsec               hiding (lower, option, optional, runParser,
+                                      upper)
 import Control.Alternative.Free.Tree hiding (Empty)

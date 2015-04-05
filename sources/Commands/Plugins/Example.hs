@@ -3,60 +3,115 @@
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 module Commands.Plugins.Example where
-import           Commands.Backends.OSX
-import           Commands.Core
+import           Commands.Backends.OSX           hiding (Command)
+import qualified Commands.Backends.OSX           as OSX
+import           Commands.Core                   hiding (tab)
 import           Commands.Frontends.Dragon13
 
-import           Control.Applicative             hiding (many, optional)
 import           Control.Applicative.Permutation
-import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Lens                    hiding (( # ), (&))
-import           Control.Monad                   (replicateM, void, (<=<),
-                                                  (>=>))
-import           Control.Monad.Catch             (catches)
-import           Control.Parallel
+import           Control.Monad.Catch             (SomeException, catches)
+import           Data.Bifunctor                  (second)
 import           Data.Bitraversable
-import           Data.Either                     (either)
-import           Data.Foldable                   (Foldable (..), asum,
-                                                  traverse_)
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
 import qualified Data.Text.Lazy                  as T
 import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
 import           Language.Python.Version2.Parser (parseModule)
 import           Numeric.Natural                 ()
-import           Prelude                         hiding (foldr)
-import           System.Timeout                  (timeout)
 import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
                                                   (<$>), (<>))
+
+import           Control.Applicative             hiding (many, optional)
+import           Control.Concurrent
+import           Control.Monad                   (replicateM_, void, (<=<),
+                                                  (>=>))
+import           Control.Parallel
+import           Data.Char                       (toUpper)
+import           Data.Either                     (either)
+import           Data.Foldable                   (Foldable (..), asum,
+                                                  traverse_)
+import           Data.List                       (intercalate)
+import           Data.Monoid                     ((<>))
+import           Prelude                         hiding (foldr)
+import           System.Timeout                  (timeout)
 
 
 data Root
  = Repeat Positive Root
- | Edit Action Region
+ | Edit_ Edit
  | Undo
- | ReplaceWith Dictation Dictation
+ | ReplaceWith Phrase Phrase
  | Click_ Click
  | Phrase_ Phrase
  -- Roots [Root]
  deriving (Show,Eq)
 
-root = set gramExpand 1 $ 'root
+root :: Command Root
+root = set (comGrammar.gramExpand) 1 $ 'root
  <=> empty
- <|> Repeat      # positive & root
- <|> ReplaceWith # "replace" & dictation & "with" & dictation
+ <|> Repeat      # positive & root -- recursive is okay, only left recursion causes non-termination
+ <|> ReplaceWith # "replace" & phrase & "with" & phrase
  <|> Undo        # "no"         -- order matters..
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      # click
- <|> Edit        # action    & region
+ <|> Edit_       # edit
  <|> Phrase_     # phrase
  -- <|> Roots       # (multipleC root)
+ <%> \case
 
-data Action = Copy | Delete | Next deriving (Show,Eq,Enum,Typeable)
+  ReplaceWith this that -> \case
+   "emacs" -> do
+    press met r
+    slot (munge this)
+    slot (munge that)
+   "intellij" -> do
+    press met r
+    insert (munge this) >> press [] tab
+    slot (munge that)
+   _ -> nothing
+
+  Undo -> \case
+   _ -> press met z
+
+  Edit_ e -> \case
+   "emacs" -> editEmacs e
+   _ -> nothing
+
+  Repeat n c -> \case
+   _ -> replicateM_ (getPositive n) (root `compiles` c)
+
+  _ -> \case
+   _ -> nothing
+
+nothing = return ()
+press = sendKeyPress
+met = [OSX.Command]
+r = RKey
+z = ZKey
+tab = TabKey
+slot s = do
+ insert s
+ press [] ReturnKey
+
+munge :: Phrase -> String
+munge = spaceCase . mungePhrase
+-- TODO spaces between words, not between letters and punctuation etc. what controls this?
+
+data Edit = Edit Action Region deriving (Show,Eq,Ord)
+edit = 'edit <=> empty
+-- TODO defaults <|> Edit # action & region
+ <|> Edit undefined # region
+ <|> flip Edit undefined # action
+ <|> Edit # action & region
+-- TODO ensure no alternative is empty
+-- <|> (\a -> Edit a undefined) # action
+
+data Action = Copy | Delete | Next deriving (Show,Eq,Ord,Enum,Typeable)
 action = enumGrammar
 
-data Region = Char | Word | Line deriving (Show,Eq,Enum,Typeable)
+data Region = Char | Word | Line deriving (Show,Eq,Ord,Enum,Typeable)
 region = enumGrammar
 
 -- Action = Pick | Go |
@@ -64,6 +119,8 @@ region = enumGrammar
 -- Direction = Whole | Backwards | Forwards
 
 
+editEmacs :: Edit -> Actions ()
+editEmacs = undefined
 
 
 
@@ -72,7 +129,7 @@ data Phrase
  | Escaped    Keyword Phrase
  | Quoted     Dictation Phrase
 
- | Pressed [Key] (Maybe Phrase)
+ -- TODO | Pressed [Key] (Maybe Phrase)
  | Spelled [Char] (Maybe Phrase)
  | Letter  Char (Maybe Phrase)
  | Cap     Char (Maybe Phrase)
@@ -81,7 +138,7 @@ data Phrase
  | Join     Joiner   Phrase
  | Surround Brackets Phrase
 
- | Dictated Dictation
+ | Dictated Dictation (Maybe Phrase)
  deriving (Show,Eq,Ord)
 
 phrase = set gramExpand 3 $ 'phrase
@@ -90,7 +147,7 @@ phrase = set gramExpand 3 $ 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- <|> Pressed  # "press" & many key & optional phrase
+ -- <|> Pressed  # "press" & many key & optional phrase
  <|> Spelled  # "spell" & many character & optional phrase
  <|> Spelled  #           many character & optional phrase
  <|> Letter   # character & optional phrase
@@ -100,28 +157,75 @@ phrase = set gramExpand 3 $ 'phrase
  <|> Join     # joiner   & phrase
  <|> Surround # brackets & phrase
 
- <|> Dictated # dictation
+ <|> Dictated # dictation & optional phrase
 
 speech = phrase -- TODO
-
-data Joiner = Camel | Class | Snake | Dash | File | Squeeze deriving (Show,Eq,Ord,Enum,Typeable)
-joiner = enumGrammar
 
 data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
 casing = enumGrammar
 
--- data Brackets = Par | Square | Curl | String | Angles deriving (Show,Eq,Ord,Enum,Typeable)
-data Brackets = Brackets String String | Bracket Char deriving (Show,Eq,Ord,Typeable)
+data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
+-- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
+-- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
+-- maybe some type from data.split package, that both supports decidable equality and that can build functions
+joiner = 'joiner
+ <=> (\c -> Joiner [c]) # "join" & character
+ <|> Joiner "_" # "snake"
+ <|> Joiner "-" # "dash"
+ <|> Joiner "/" # "file"
+ <|> Joiner ""  # "squeeze"
+ <|> CamelJoiner # "camel"
+ <|> ClassJoiner # "class"
+
+data Brackets = Brackets String String deriving (Show,Eq,Ord,Typeable)
 brackets = 'brackets
  <=> bracket          # "round" & character
  <|> Brackets "(" ")" # "par"
  <|> Brackets "[" "]" # "square"
  <|> Brackets "{" "}" # "curl"
- <|> Brackets "<" ">" # "angles"
+ <|> Brackets "<" ">" # "angle"
  <|> bracket '"'      # "string"
+ <|> bracket '\''     # "ticked"
  <|> bracket '|'      # "norm"
+ -- <|> Brackets "**" "**" # "bold"
 
 bracket c = Brackets [c] [c]
+
+
+
+mungePhrase :: Phrase -> [String]
+mungePhrase = \case
+ Verbatim   (Dictation ws) -> ws
+ Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
+ Quoted     (Dictation ws) p -> ws <> mungePhrase p
+
+ Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
+ Letter  c  mp -> [c]              : maybe [] mungePhrase mp
+ Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
+
+ -- TODO inside-out or outside-in? I.e. forwards or backwards?
+ -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
+ Case     casing   p -> caseWith casing <$> mungePhrase p
+ Join     joiner   p -> [joinWith joiner $ mungePhrase p]
+ Surround brackets p -> surroundWith brackets $ mungePhrase p
+
+ Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
+
+caseWith :: Casing -> (String -> String)
+caseWith = \case
+ Upper  -> upper
+ Lower  -> lower
+ Capper -> capitalize
+
+joinWith :: Joiner -> ([String] -> String)
+joinWith = \case
+ Joiner s -> intercalate s
+ CamelJoiner -> camelCase
+ ClassJoiner -> classCase
+
+surroundWith :: Brackets -> ([String] -> [String])
+surroundWith (Brackets l r) ss = [l] <> ss <> [r]
+
 
 character :: Grammar Char
 character = 'character <=> empty
@@ -173,6 +277,10 @@ character = 'character <=> empty
  <|> '8' # "eight"
  <|> '9' # "nine"
 
+ <|> 'a' # "A"  -- TODO What can we get back from Dragon anyway?
+ <|> 'b' # "B"
+ <|> 'c' # "C"
+
  <|> 'a' # "ay"
  <|> 'b' # "bee"
  <|> 'c' # "sea"
@@ -210,7 +318,7 @@ character = 'character <=> empty
 key :: Grammar Key
 key = 'key <=> empty
 
-type Keyword = Word -- TODO
+type Keyword = String -- TODO
 keyword :: Grammar Keyword
 keyword = 'keyword <=> empty
 
@@ -306,6 +414,10 @@ data Odd2  = Odd2  [Even2] deriving Show
 odd2  = set gramExpand 1 $ 'odd2  <=> Odd2  # "odd"  & multiple even2
 even2 = set gramExpand 1 $ 'even2 <=> Even2 # "even" & multiple odd2
 
+-- data Test = Test deriving (Show,Eq,Enum,Typeable)
+-- test = enumGrammar
+test = 'test <=> id # multiple transport
+
 
 
 -- it seems to be synchronous, even with threaded I guess?
@@ -319,6 +431,22 @@ attemptAsynchronously seconds action = do
 
 attempt = attemptAsynchronously 1
 
+-- attemptCompile command text = do
+--  a <- attemptParse (view comGrammar root) text
+--  return $ (view comCompiler root) a
+
+attemptMunge' text = do
+ let a = phrase `parses` text :: Either SomeException Phrase
+ print $ second munge a
+
+attemptMunge text = do
+ case phrase `parses` text :: Either SomeException Phrase of
+  Left e  -> print e
+  Right p -> do
+   putStrLn ""
+   print p
+   print $ munge p
+
 attemptParse grammar = attempt . handleParse grammar
 
 attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
@@ -326,10 +454,11 @@ attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerialize
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
 
 printSerializedGrammar SerializedGrammar{..} = do
- replicateM 3 $ putStrLn ""
+ replicateM_ 3 $ putStrLn ""
  T.putStrLn $ display serializedRules
  putStrLn ""
  T.putStrLn $ display serializedLists
+
 
 
 main = do
@@ -434,15 +563,17 @@ main = do
  -- -- writeFile "_shim.py" (T.unpack pf)
 
 
+ -- putStrLn ""
+ -- -- attemptSerialize test
+ -- attemptSerialize (view comGrammar root)
+ -- let Right sg = serialized test  -- TODO why does the unary Test fail? Optimization?
+ -- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
+ -- PythonFile pf <- shimmySerialization addresses sg
+ -- runActions $ setClipboard (T.unpack pf)
+ -- T.putStrLn $ pf
+
+
  putStrLn ""
- attemptSerialize test
- let Right sg = serialized test  -- TODO why does the unary Test fail? Optimization?
- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
- PythonFile pf <- shimmySerialization addresses sg
- runActions $ setClipboard (T.unpack pf)
- T.putStrLn $ pf
-
-
--- data Test = Test deriving (Show,Eq,Enum,Typeable)
--- test = enumGrammar
-test = 'test <=> id # multiple transport
+ -- attemptParse (view comGrammar root) "replace this and that with that and this"
+ -- TODO verify phrase/munge with more tests
+ attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)

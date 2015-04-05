@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes, TemplateHaskell                                  #-}
 module Commands.Grammar.Types where
 -- import Commands.Command.Types
-import Commands.Backends.OSX.Types
+import Commands.Backends.OSX.Types       (Actions, Application)
 import Commands.Etc
 import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Types
@@ -17,23 +17,17 @@ import GHC.Generics                      (Generic)
 import Numeric.Natural                   (Natural)
 
 
--- |
---
--- Grammar ~ LHS * DNSGrammar Text Text * Parser a
---
--- RHS ~ Alt Symbol ~ Constant Word + Grammar ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
---
-data Grammar a = Grammar
- { _gramRule    :: Rule a            -- ^ covariant Functor
- , _gramGrammar :: DNSCommandGrammar -- ^ Const is invariant Functor?
- , _gramParser  :: Parser a          -- ^ covariant Functor
- -- , _comCompiler :: Compiler a        -- ^ contravariant Functor TODO https://ocharles.org.uk/blog/guest-posts/2013-12-21-24-days-of-hackage-contravariant.html
+data Command a = Command
+ { _comGrammar  :: Grammar a
+ , _comCompiler :: Compiler a
  }
- deriving (Functor)
+-- TODO  profunctor? does it matter?
+
 
 
 -- |
 type Compiler a = a -> CompilerContext -> Actions ()
+-- the unit (Actions ()) may cause hard to read type errors when using "copy", but avoids existential quantification
 -- can cache, when both arguments instantiate Eq?
 
 type CompilerContext = Application
@@ -41,6 +35,20 @@ type CompilerContext = Application
 -- TODO lol
 globalContext :: CompilerContext
 globalContext = ""
+
+
+-- |
+--
+-- Grammar ~ LHS * DNSGrammar Text Text * Parser a
+--
+-- RHS ~ Alt Symbol ~ Constant Word + Grammar ~ Constant Word + (LHS * DNSGrammar Text Text * Parser a)
+--
+data Grammar a = Grammar
+ { _gramRule    :: Rule a            -- ^
+ , _gramGrammar :: DNSCommandGrammar -- ^
+ , _gramParser  :: Parser a          -- ^
+ }
+ deriving (Functor)
 
 
 type DNSCommandGrammar = DNSCommandProduction
@@ -163,6 +171,7 @@ defaultDNSInfo = DNSInfo 0 False
 
 
 makeLenses ''Grammar
+makeLenses ''Command
 makeLenses ''Rule
 
 makeLenses ''DNSExpandedName

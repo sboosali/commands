@@ -5,11 +5,12 @@ import Commands.Etc               ()
 import Commands.Grammar
 import Commands.Grammar.Types
 
+import Control.Lens               (view)
+
 import Control.Applicative
 import Language.Haskell.TH.Syntax (Name)
 
-
-
+infix  1 <%>
 infix  2 <=>
 -- infixl 3 <|>
 -- infixl 4 <$>
@@ -26,7 +27,8 @@ name <=> r = genericGrammar l r
  where
  Just l = lhsFromName name
 
-
+(<%>) :: Grammar a -> Compiler a -> Command a
+(<%>) = Command
 
 -- | like '<$' or '<$>', given the type (see the 'AppRHS' instances in this module).
 --
@@ -67,6 +69,9 @@ class (ToRHS a) => AppRHS a where
 instance AppRHS String      where
  type LeftR String b      = b
  appR f x = f <*  toR x
+instance AppRHS (Command a) where
+ type LeftR (Command a) b = (a -> b)
+ appR f x = f <*> toR x
 instance AppRHS (Grammar a) where
  type LeftR (Grammar a) b = (a -> b)
  appR f x = f <*> toR x
@@ -86,6 +91,7 @@ x &> y = toR x *> toR y
 
 class    ToRHS a           where  type ToR a           :: *;      toR :: a -> RHS (ToR a)
 instance ToRHS String      where  type ToR String      = String;  toR = liftString
+instance ToRHS (Command a) where  type ToR (Command a) = a;       toR = liftGrammar . view comGrammar
 instance ToRHS (Grammar a) where  type ToR (Grammar a) = a;       toR = liftGrammar
 instance ToRHS (RHS a)     where  type ToR (RHS a)     = a;       toR = id
 

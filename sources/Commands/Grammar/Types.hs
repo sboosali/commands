@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns, PackageImports #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell, TypeOperators, DataKinds, PolyKinds, GeneralizedNewtypeDeriving, KindSignatures, FlexibleContexts, ScopedTypeVariables, GADTs                               #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell, TypeOperators, DataKinds, PolyKinds, GeneralizedNewtypeDeriving, KindSignatures, FlexibleContexts, ScopedTypeVariables, GADTs, LiberalTypeSynonyms                              #-}
 module Commands.Grammar.Types where
 -- import Commands.Command.Types
 import Commands.Backends.OSX.Types       (Actions, Application)
@@ -42,7 +42,13 @@ type RecOf a fs = Rec (Of a) fs
 --  , "parser"   :$: p
 --  , "rule"     :$: r
 --  ]
-type Command' c xc g p xp r a = RecOf a
+-- type Command' (c,xc) g (p,xp) r a = RecOf a -- can't pattern match on type aliases
+--  [ "compiler" :$: c xc
+--  , "grammar"  :$: Const g
+--  , "parser"   :$: p xp
+--  , "rule"     :$: r
+--  ]
+type Command' c xc g p xp r a = RecOf a -- after all the crazy types, must be a {Rec _ _}
  [ "compiler" :$: c xc
  , "grammar"  :$: Const g
  , "parser"   :$: p xp
@@ -52,11 +58,44 @@ type Command' c xc g p xp r a = RecOf a
 type (:+:) = Sum
 -- type RHS' = Alt GrammaticalSymbol'
 -- type GrammaticalSymbol' = Const Terminal :+: NonTerminal
-type RHS' = Alt (Const Terminal :+: NonTerminal)
-data NonTerminal a = NonTerminal
-type Terminal = ()
+type RHS' g p xp r = Alt (Const Terminal :+: NonTerminal g p xp r)
+type Terminal = String
+data NonTerminal g p xp r a = NonTerminal
 
-type DGNOSXCommand a = Command' Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext Rule a
+-- data RHS'' g p xp a = RHS'' (Alt (Either Terminal (NonTerminal'' g p xp a)))
+-- data (:+) f g a = (f a) :+ (g a)
+-- data RHS'' g p xp a = RHS'' (Alt (Const Terminal :+ NonTerminal'' g p xp) a)
+
+-- When LiberalTypeSynonyms is enabled, GHC only type-checks a signature after all type synonyms have been expanded, outermost first. You can now partially apply a type synonym, as long as it's surrounded by another type synonym such that the obvious outermost-first expansion will cause the partially-applied synonym to become fully applied.
+-- type Alt'' f a = Alt f a
+-- data RHS'' g p xp a = RHS'' (Alt'' (Const Terminal :+: NonTerminal'' g p xp) a)
+-- type NonTerminal'' g p xp = RecOf'' -- after all the crazy types, must be a {Rec _ _}
+--  [ "grammar"  :$: Const g
+--  , "parser"   :$: p xp
+--  , "rhs"      :$: RHS'' g p xp
+--  ]
+-- type RecOf'' fs a = Rec (Of a) fs
+
+data RHS'' g p xp a = RHS (Alt (Const Terminal :+: NonTerminal' g p xp) a)
+type NonTerminal' g p xp = RecOf' -- after all the crazy types, must be a {Rec _ _}
+ [ "grammar"  :$: Const g
+ , "parser"   :$: p xp
+ , "rhs"      :$: RHS'' g p xp
+ ]
+data RecOf' fs a = RecOf { getRec :: Rec (Of a) fs }
+
+{- I want to be able to mix NonTerminal with Command:
+ project a command to a non-terminal e.g.  (&) sugar
+ extend a non-terminal with a command e.g.  (<%>)
+-}
+
+
+newtype Y f = Y { unY :: f (Y f) }
+
+
+
+type OSXDGNCommand a = Command' Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext Rule a
+type DGNNonTerminal a = NonTerminal DNSCommandGrammar Parser' ParserContext Rule a
 
 type G a = RecOf a ["rule" :$: Rule, "grammar" :$: Const DNSCommandGrammar, "parser" :$: Parser' ParserContext]
 

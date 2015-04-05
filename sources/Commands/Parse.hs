@@ -17,7 +17,7 @@ import Data.Foldable                 (asum)
 import Data.Typeable                 (cast)
 
 
-sparser :: Symbol a -> Parser a
+sparser :: GrammaticalSymbol a -> Parser a
 sparser s context = symbol (flip wparser $ context) (flip gparser $ context) s
 
 wparser :: Word -> Parser a

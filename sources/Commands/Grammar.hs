@@ -82,7 +82,7 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  unsafeHashRHS (Many rs)    = hash "Many" `hashWithSalt` fmap unsafeHashRHS rs
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
- hashSymbol :: Symbol x -> Int
+ hashSymbol :: GrammaticalSymbol x -> Int
  hashSymbol = symbol (hash . unWord) (hash . view gramLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.

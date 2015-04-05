@@ -6,25 +6,25 @@ import Commands.Parsec (Parsec)
 -- import Control.Monad.Reader
 
 
--- type Parser a = Reader ParsingContext (Parsec a)
-type Parser a = ParsingContext -> (Parsec a)
+-- type Parser a = Reader ParserContext (Parsec a)
+type Parser a = ParserContext -> (Parsec a)
 
-type ParsingContext = Some Parsec
+type ParserContext = Some Parsec
 
 runParser :: Parser a -> Parsec a
 runParser = undefined
 
 -- -- | Parsers with restricted right-context-sensitivity.
 -- --
--- -- 'RightParsingContext'
+-- -- 'RightParserContext'
 -- -- existentially-quantifies its 'Parser', so the 'SensitiveParser' can
 -- -- run the parser to check whether it succeeds or fails, but it can't
 -- -- use any parse result. Neither should well-behaved
--- -- 'SensitiveParser's consume any tokens with the 'RightParsingContext':
--- -- they can wrap the 'RightParsingContext' in a call to
+-- -- 'SensitiveParser's consume any tokens with the 'RightParserContext':
+-- -- they can wrap the 'RightParserContext' in a call to
 -- -- 'Text.Parsec.lookAhead'.
 -- --
--- -- The type is isomorphic to @Compose (Reader ParsingContext) Parsec@. But
+-- -- The type is isomorphic to @Compose (Reader ParserContext) Parsec@. But
 -- -- it's @Applicative@ instance is different (see
 -- -- 'applySensitiveParser').
 -- --
@@ -36,11 +36,11 @@ runParser = undefined
 -- -- 'Alternative'. see 'proof_Applicative_SensitiveParser'
 -- -- and 'proof_Alternative_SensitiveParser'.
 -- --
--- newtype SensitiveParser a = SensitiveParser { runSensitiveParser :: ParsingContext -> Parsec a }
+-- newtype SensitiveParser a = SensitiveParser { runSensitiveParser :: ParserContext -> Parsec a }
 --  deriving (Functor)
 
 -- -- |
--- type ParsingContext = Some Parsec
+-- type ParserContext = Some Parsec
 
 -- instance Applicative SensitiveParser where
 --  pure  = pureSensitiveParser

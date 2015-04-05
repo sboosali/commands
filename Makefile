@@ -39,7 +39,8 @@ fix:
 	git vogue fix --all
 
 check:
-	cabal build --ghc-options="-fforce-recomp -fno-code"
+#	cabal build --ghc-options="-fforce-recomp -fno-code"
+	cabal build --ghc-options="-fno-code"
 
 
 # # # # # # # # # # # # # # # # # # 

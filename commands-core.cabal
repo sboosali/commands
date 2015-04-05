@@ -117,29 +117,31 @@ library
   -- ?
   , mtl                       ==2.1.*
 
+  , vinyl  ==0.5.*
   , exceptions                ==0.6.*
   , lens                      ==4.8.*
-  , bifunctors                ==4.2.*
   , parsec                    ==3.1.*
   , split                     ==0.2.*
   , either                    ==4.3.*
   , semigroups                ==0.16.*
-  , text                      ==1.2.*
-  , wl-pprint-text            ==1.1.*
-  , language-python           ==0.4.*
+
   , async                     ==2.0.*
   , parallel                  ==3.2.*
   , action-permutations       ==0.0.*
   , hashable                  ==1.2.*
   , data-default-generics     ==0.3.*
   , nats
+
+  , text                      ==1.2.*
+  , wl-pprint-text            ==1.1.*
+  , language-python           ==0.4.*
   , reducers                  ==3.10.*
   , formatting                ==6.2.*
   , interpolatedstring-perl6  ==0.9.*
+  , bifunctors                ==4.2.*
 
   , bv  ==0.3.*
   , free  ==4.11.*
-
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

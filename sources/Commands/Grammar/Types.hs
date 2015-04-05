@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns, PackageImports #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                                  #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell, TypeOperators, DataKinds, PolyKinds, GeneralizedNewtypeDeriving, KindSignatures, FlexibleContexts, ScopedTypeVariables, GADTs                               #-}
 module Commands.Grammar.Types where
 -- import Commands.Command.Types
 import Commands.Backends.OSX.Types       (Actions, Application)
@@ -10,12 +10,79 @@ import Commands.Parse.Types
 import Control.Alternative.Free.Tree
 
 import Control.Lens
+import Data.Hashable                     (Hashable)
+import Numeric.Natural                   (Natural)
+import Data.Vinyl
+
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
-import Data.Hashable                     (Hashable)
 import GHC.Generics                      (Generic)
-import Numeric.Natural                   (Natural)
+import Data.Proxy (Proxy(..))
+-- import           Control.Applicative
+-- import Control.Monad.Trans.Reader
+-- import GHC.TypeLits (Symbol)
 
+
+-- | to partially apply a type constructor upon a type argument.
+--
+-- e.g.
+--
+-- @('Of' a) :: (* -> *) -> *@
+--
+-- backwards application, as '&' to '$'.
+data Of a f = Of (f a)
+
+type RecOf a fs = Rec (Of a) fs
+
+-- type C a = Rec (Of a) ["grammar" :$: Grammar, "compiler" :$: Compiler']
+-- type C a = RecOf a ["compiler" :$: Compiler', "rule" :$: Rule, "grammar" :$: Const DNSCommandGrammar, "parser" :$: Parser']
+-- type Command' c g p r a = RecOf a
+--  [ "compiler" :$: c
+--  , "grammar"  :$: Const g
+--  , "parser"   :$: p
+--  , "rule"     :$: r
+--  ]
+type Command' c xc g p xp r a = RecOf a
+ [ "compiler" :$: c xc
+ , "grammar"  :$: Const g
+ , "parser"   :$: p xp
+ , "rule"     :$: r
+ ]
+
+type (:+:) = Sum
+-- type RHS' = Alt GrammaticalSymbol'
+-- type GrammaticalSymbol' = Const Terminal :+: NonTerminal
+type RHS' = Alt (Const Terminal :+: NonTerminal)
+data NonTerminal a = NonTerminal
+type Terminal = ()
+
+type DGNOSXCommand a = Command' Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext Rule a
+
+type G a = RecOf a ["rule" :$: Rule, "grammar" :$: Const DNSCommandGrammar, "parser" :$: Parser' ParserContext]
+
+
+getGrammar
+ :: forall a fs g field. (field ~ ("grammar" :$: Const g), field ∈ fs)
+ => RecOf a fs -> g
+getGrammar record = case rget (Proxy :: Proxy field) record of
+ Of (FieldOf (Field (Const g))) -> g
+-- getGrammar = getConst . getOf . getField . asField . rget (Proxy :: Proxy ("grammar" :$: Const g)) -- GADTs need case
+-- getGrammar = rget (Nothing :: Maybe ("grammar" :$: Const g)) -- a type of kind (* -> *) needs polykinded proxy like Proxy
+
+getParser
+ :: forall a fs p xp field. (field ~ ("parser" :$: p xp), field ∈ fs)
+ => RecOf a fs -> p xp a
+getParser record = case rget (Proxy :: Proxy field) record of
+ Of (FieldOf (Field p)) -> p
+
+getCompiler
+ :: forall a fs c xc field. (field ~ ("compiler" :$: c xc), field ∈ fs)
+ => RecOf a fs -> c xc a
+getCompiler record = case rget (Proxy :: Proxy field) record of
+ Of (FieldOf (Field c)) -> c
+
+-- type k :$: v = ElField '(k,v)
+data (s :$: f) a = FieldOf (ElField '(s, f a))
 
 data Command a = Command
  { _comGrammar  :: Grammar a
@@ -23,7 +90,11 @@ data Command a = Command
  }
 -- TODO  profunctor? does it matter?
 
+-- newtype Compiler' a = Compiler' (a -> ReaderT CompilerContext Actions ())
+newtype Compiler' x a = Compiler' (Compiler a)
+ -- deriving (Contravariant, Divisible?, Monad??)
 
+newtype Parser' x a = Parser' (Parser a)
 
 -- |
 type Compiler a = a -> CompilerContext -> Actions ()
@@ -105,10 +176,10 @@ appLHS lhs = (lhs `LHSApp`) . (:[])
 -- ("data not codata"?)
 --
 --
-type RHS = Alt Symbol
+type RHS = Alt GrammaticalSymbol
 
 -- |
-type Symbol = Sum (Constant Word) Grammar
+type GrammaticalSymbol = Sum (Constant Word) Grammar
 
 -- |
 newtype Word = Word { unWord :: String }
@@ -117,16 +188,16 @@ newtype Word = Word { unWord :: String }
 -- | exhaustive destructor.
 --
 -- (frees clients from @transformers@ imports. @PatternSynonyms@ in 7.10 can't check exhaustiveness and breaks haddock).
-symbol :: (Word -> b) -> (Grammar a -> b) -> Symbol a -> b
+symbol :: (Word -> b) -> (Grammar a -> b) -> GrammaticalSymbol a -> b
 symbol f _ (InL (Constant w)) = f w
 symbol _ g (InR r) = g r
 
 -- | constructor.
-fromWord :: Word -> Symbol a
+fromWord :: Word -> GrammaticalSymbol a
 fromWord = InL . Constant
 
 -- | constructor.
-fromGrammar :: Grammar a -> Symbol a
+fromGrammar :: Grammar a -> GrammaticalSymbol a
 fromGrammar = InR
 
 liftGrammar :: Grammar a -> RHS a

@@ -86,6 +86,7 @@ exampleCommand = undefined
 exampleNonTerminal :: DGNNonTerminal () -- yes: can totally apply
 exampleNonTerminal = undefined
 
+ -- TODO I don't know if naming the field with a equality constraint affects unification, since field's only used in another constraint
 getGrammar
  :: forall fs a g field. (field ~ ("grammar" ::$ Const g), field ∈ fs)
  => RecOf fs a -> g

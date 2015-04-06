@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor, QuasiQuotes, RankNTypes, RecordWildCards #-}
+-- | (you should read the source to this module if you want to learn about it: just think of it as a config file)
 module Commands.Frontends.Dragon13.Shim where
 
 import           Commands.Etc
@@ -82,10 +83,6 @@ from natlinkutils import (GrammarBase)
 # standard library
 import time
 from urllib2 import urlopen
-from BaseHTTPServer import  (HTTPServer,BaseHTTPRequestHandler)
-import cgi
-import threading
-
 
 
 # interpolated from "H"askell
@@ -97,8 +94,8 @@ H_EXPORT = {__export__}
 H_SERVER_HOST = {__serverHost__}
 H_SERVER_PORT = {__serverPort__}
 
-H_CLIENT_HOST = {__clientHost__}
-H_CLIENT_PORT = {__clientPort__}
+# H_CLIENT_HOST = {__clientHost__}
+# H_CLIENT_PORT = {__clientPort__}
 
 
 
@@ -133,17 +130,17 @@ class NarcissisticGrammar(GrammarBase):
         print "-  -  -  -  gotResultsInit  -  -  -  -"
         print results
 
-#    def gotResultsObject(self, recognitionType, resultsObject):
-#        words = next(get_results(resultsObject), [])
-#        text  = munge_and_flatten(words)
-#
-#        url      = 'http://%s:%s/%s' % (H_SERVER_HOST, H_SERVER_PORT, text)
-#        response = urlopen(url)
-#
-#        # don't print until the request is sent
-#        print '---------- gotResultsObject ----------'
-#        print text
-#        print (response.getcode(), list(response))
+    def gotResultsObject(self, recognitionType, resultsObject):
+        words = next(get_results(resultsObject), [])
+        text  = munge_and_flatten(words)
+
+        url      = "http://%s:%s/%s" % (H_SERVER_HOST, H_SERVER_PORT, text)
+        response = urlopen(url)
+
+        # don't print until the request is sent
+        print "---------- gotResultsObject ----------"
+        print words
+        print (response.getcode(), list(response))
 
     '''
     must it reload the grammar?
@@ -190,77 +187,21 @@ def munge_and_flatten(words):
 
 
 
-# the "runtime"
-
-class NarcissisticHandler(BaseHTTPRequestHandler):
-
-    def do_POST(self):
-        # Parse the form data posted
-        environment = dict(REQUEST_METHOD='POST', CONTENT_TYPE=self.headers['Content-Type'])
-        form = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=environment)
-
-        # Begin the response
-        self.send_response(200)
-        self.end_headers()
-
-        result = on_field('set_lists', set_word, form) # TODO arguments must be parsed, and be the right number
- #        result = on_field('set_rules', GRAMMAR.set_rules, form) # TODO arguments must be parsed, and be the right number
- # TODO  make this restful, with the path (self.path)
- # TODO  xmlrpclib
- # TODO  confirm callback(s) succeeded, or return failure
- # should find library that does all this, including validation, preferably in the standard library
-
-        return
-
-def set_word(w):
-    if GRAMMAR: GRAMMAR.set_lists(dict(Transport=[w]))
-
-'''
-callback takes one argument, a string, the form data for the given field
-'''
-def on_field(field, callback, form):
-    if field in form:
-       return callback(form[field].value)
-
-'''
-Python threads are OS threads (not green threads),
-still, they are concurrent.
-
-catchAllGrammar.initialize takes about 75 ms
-
-contexts may change faster
-(e.g. rapidly switching between applications, rapidly posting the words in a buffer),
-so we should lock on the (re)initialization
-
-non-terminating.
-'''
-
-def start_narcissistic_thread():
-    server = HTTPServer((H_CLIENT_HOST, H_CLIENT_PORT), NarcissisticHandler)
-    thread = threading.Thread(target=lambda: server.serve_forever())
-    thread.daemon = True  # after natlink's main thread exits, this thread will not keep the natlink program alive
-    thread.start()
-    return (thread, server)
-
-
-
 # boilerplate
 
-GRAMMAR = None # mutable global, shared by threads
+GRAMMAR = None # mutable global
 
 def load():
     global GRAMMAR
     setCheckForGrammarChanges(1) # automatically reload on file change (not only when microphone toggles on)
     GRAMMAR = NarcissisticGrammar()
     GRAMMAR.initialize()
-    start_narcissistic_thread()
 
 def unload():
     global GRAMMAR
     if GRAMMAR:
         GRAMMAR.unload()
     GRAMMAR = None
-    # stop_narcissistic_thread()?
 
 load()
 |]

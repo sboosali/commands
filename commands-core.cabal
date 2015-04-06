@@ -97,6 +97,7 @@ library
   Commands.Plugins.Example
 
   Commands.Graph
+  Commands.Etc.Generics
   Control.Alternative.Free.Tree
 
  c-sources:        cbits/objc_actor.m

@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
+
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
@@ -10,7 +11,7 @@ import           Commands.Frontends.Dragon13
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding (( # ), (&))
+import           Control.Lens                    hiding (from, ( # ), (&))
 import           Control.Monad.Catch             (SomeException, catches)
 import           Data.Bifunctor                  (second)
 import           Data.Bitraversable
@@ -97,7 +98,7 @@ slot s = do
 
 munge :: Phrase -> String
 munge = spaceCase . mungePhrase
--- TODO spaces between words, not between letters and punctuation etc. what controls this?
+-- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
 
 data Edit = Edit Action Region deriving (Show,Eq,Ord)
 edit = 'edit <=> empty

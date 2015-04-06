@@ -81,6 +81,7 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Plugins.Example"
 
   , "Control.Alternative.Free.Tree"
+  , "Commands.Etc.Generics"
   , "Commands.Graph"
   ]
 

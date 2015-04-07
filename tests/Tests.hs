@@ -42,9 +42,6 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
   [ "Commands.Core"
 
-  , "Commands.Etc"
-  , "Commands.Instances"
-
   , "Commands.Grammar.Types"
   , "Commands.Grammar"
 
@@ -71,18 +68,23 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Backends.OSX.Execute"
   , "Commands.Backends.OSX.DSL"
 
+  , "Commands.Servers.Servant"
+  , "Commands.Servers.Servant.Types"
+  , "Commands.Servers.Servant.API"
+
   , "Commands.Command"
   , "Commands.Command.Types"
   , "Commands.Command.Sugar"
   , "Commands.Command.Combinator"
 
-  , "Commands.Munging"
-
   , "Commands.Plugins.Example"
 
-  , "Control.Alternative.Free.Tree"
+  , "Commands.Etc"
   , "Commands.Etc.Generics"
+  , "Commands.Instances"
+  , "Commands.Munging"
   , "Commands.Graph"
+  , "Control.Alternative.Free.Tree"
   ]
 
 main = do

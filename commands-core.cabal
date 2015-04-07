@@ -58,9 +58,6 @@ library
  exposed-modules:
   Commands.Core
 
-  Commands.Etc
-  Commands.Instances
-
   Commands.Grammar
   Commands.Grammar.Types
 
@@ -87,17 +84,22 @@ library
   Commands.Backends.OSX.Execute
   Commands.Backends.OSX.DSL
 
+  Commands.Servers.Servant
+  Commands.Servers.Servant.Types
+  Commands.Servers.Servant.API
+
   Commands.Command
   Commands.Command.Types
   Commands.Command.Sugar
   Commands.Command.Combinator
 
-  Commands.Munging
-
   Commands.Plugins.Example
 
-  Commands.Graph
+  Commands.Etc
   Commands.Etc.Generics
+  Commands.Instances
+  Commands.Munging
+  Commands.Graph
   Control.Alternative.Free.Tree
 
  c-sources:        cbits/objc_actor.m
@@ -143,6 +145,14 @@ library
 
   , bv  ==0.3.*
   , free  ==4.11.*
+
+  , aeson  ==0.8.*
+  , servant-server ==0.2.*
+  , servant ==0.2.*
+  , bytestring  ==0.10.*
+  , wai  ==3.0.*
+  , warp  ==3.0.*
+  , either  ==4.3.*
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

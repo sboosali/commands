@@ -1,8 +1,9 @@
 {-# LANGUAGE DeriveFunctor, QuasiQuotes, RankNTypes, RecordWildCards #-}
--- | (you should read the source to this module if you want to learn about it: just think of it as a config file)
+-- | (you should read the source for documentation: just think of this module as a config file)
 module Commands.Frontends.Dragon13.Shim where
 
 import           Commands.Etc
+-- import           Commands.Etc.Generics
 
 import           Control.Monad.Catch             (SomeException (..), throwM)
 import           Data.Text.Lazy                  (Text)
@@ -94,6 +95,8 @@ H_EXPORT = {__export__}
 H_SERVER_HOST = {__serverHost__}
 H_SERVER_PORT = {__serverPort__}
 
+server_address = "http://%s:%s/" % (H_SERVER_HOST, H_SERVER_PORT)
+
 # H_CLIENT_HOST = {__clientHost__}
 # H_CLIENT_PORT = {__clientPort__}
 
@@ -117,47 +120,110 @@ class NarcissisticGrammar(GrammarBase):
     gramSpec = H_RULES
 
     def initialize(self):
-        self.set_rules(H_RULES, H_EXPORT)
+        self.set_rules(H_RULES, [H_EXPORT])
         self.set_lists(H_LISTS)
+        # TODO self.doOnlyGotResultsObject = True
+
+    # called when speech is detected before recognition begins.
+    def gotBegin( moduleInfo ):
+        # handleDGNContextResponse(timeit("/context", urlopen, ("%s/context" % server_address), timeout=0.1))
+        # TODO parameterize " Context"
+
+        print
+        print
+        print "-  -  -  -  gotBegin  -  -  -  -"
+        print moduleInfo
 
     def gotHypothesis(self, words):
-        print ""
+        print
         print "-  -  -  -  gotHypothesis  -  -  -  -"
         print words
-
-    def gotResultsInit(self, words, results):
-        print ""
-        print "-  -  -  -  gotResultsInit  -  -  -  -"
-        print results
 
     def gotResultsObject(self, recognitionType, resultsObject):
         words = next(get_results(resultsObject), [])
         text  = munge_and_flatten(words)
+        url   = "%s/recognition/%s" % (server_address, text)
+        # TODO parameterize "recognition"
 
-        url      = "http://%s:%s/%s" % (H_SERVER_HOST, H_SERVER_PORT, text)
-        response = urlopen(url)
+        try:
+            response = timeit("/recognition/...", urlopen, url, timeout=0.1)
+            handleDGNSerializedResponse(self, response)
+        except Exception as e:
+            print "sending the request and/or handling the response threw:"
+            print e
 
-        # don't print until the request is sent
-        print "---------- gotResultsObject ----------"
-        print words
-        print (response.getcode(), list(response))
+        # don't print until the request is sent the response is handled
+        try:
+            print
+            print "---------- gotResultsObject ----------"
+            print "words  =", words
+            print "status =", response.getcode()
+            print "body   =", list(response)
+        except NameError:
+            pass
 
-    '''
-    must it reload the grammar?
-    '''
-    # non-override
-    def set_rules(self, rules, export):
+    def gotResultsInit(self, words, results):
+        print
+        print "-  -  -  -  gotResultsInit  -  -  -  -"
+        print results
+
+    # TODO    must it reload the grammar?
+    # TODO    should include export for safety?
+    def set_rules(self, rules, exports):
         self.gramSpec = rules
         self.load(rules, allResults=1, hypothesis=1)
-        self.activate(export, exclusive=1, noError=1)
+        self.set_exports(exports)
 
-    '''
-    must it reload the grammar?
-    '''
-    # non-override
+    # TODO must it reload the grammar?
     def set_lists(self, lists):
         for (lhs, rhs) in lists.items():
             self.setList(lhs, rhs)
+
+    # activateSet is idempotent, unlike activate
+    def set_exports(self, exports):
+        self.activateSet(exports, exclusive=1)
+
+
+# API
+
+def handleDGNSerializedResponse(self, response):
+    if response.getcode() != 200:
+        return
+
+    j = list(response)[0]
+    o = DGNSerializedResponse.fromJSON(j)
+
+    # TODO does order matter? Before/after loading?
+    if o is not None:
+        if o.dgnSerializedRules is not None and o.dgnSerializedExports is not None:
+            self.set_rules(o.dgnSerializedRules, o.dgnExport)
+        if o.dgnSerializedLists is not None:
+            self.set_lists(o.dgnSerializedLists)
+        if o.dgnSerializedRules is None and o.dgnSerializedExports is not None: # just switch context
+            self.set_exports(o.dgnSerializedExports)
+
+class DGNSerializedResponse(object):
+
+    @classmethod
+    def fromJSON(cls, j):
+        try:
+            d = json.load(j)
+            dgnSerializedRules = d["dgnSerializedRules"]
+            dgnSerializedExports = d["dgnSerializedExports"]
+            dgnSerializedLists = d["dgnSerializedLists"]
+            o = cls(dgnSerializedRules, dgnSerializedExports, dgnSerializedLists)
+            return o
+        except Exception:
+            return None
+
+    # TODO something dynamic using __dict__ and *args or something:
+    # generated code is less readable/debuggable, but the generating code is simpler
+    def __init__(self, dgnSerializedRules, dgnSerializedExports, dgnSerializedLists):
+        self.dgnSerializedRules = dgnSerializedRules
+        self.dgnSerializedExports = dgnSerializedExports
+        self.dgnSerializedLists = dgnSerializedLists
+
+    # def toJSON(self):
 
 
 
@@ -184,6 +250,15 @@ def munge_and_flatten(words):
     'spell A , a letter'
     '''
     return ' '.join(word.split(r'\\\\')[0] for word in words)
+
+# http://stackoverflow.com/questions/1685221/accurately-measure-time-python-function-takes
+def timeit(message, callback, *args, **kwargs):
+    before = time.clock()
+    result = callback(*args,**kwargs)
+    after = time.clock()
+    print message, ': ', (after - before) * 1000, 'ms'
+    return result
+
 
 
 

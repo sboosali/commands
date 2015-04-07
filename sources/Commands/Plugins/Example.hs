@@ -8,13 +8,16 @@ import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
 import           Commands.Core                   hiding (tab)
 import           Commands.Frontends.Dragon13
+import           Commands.Servers.Servant
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
 import           Control.Lens                    hiding (from, ( # ), (&))
 import           Control.Monad.Catch             (SomeException, catches)
+import qualified Data.Aeson                      as J
 import           Data.Bifunctor                  (second)
 import           Data.Bitraversable
+import qualified Data.ByteString.Lazy.Char8      as B
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
 import qualified Data.Text.Lazy                  as T
 import qualified Data.Text.Lazy.IO               as T
@@ -34,9 +37,11 @@ import           Data.Either                     (either)
 import           Data.Foldable                   (Foldable (..), asum,
                                                   traverse_)
 import           Data.List                       (intercalate)
+import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
 import           Prelude                         hiding (foldr)
 import           System.Timeout                  (timeout)
+-- import qualified Data.Map as Map (Map)
 
 
 data Root
@@ -47,6 +52,7 @@ data Root
  | Click_ Click
  | Phrase_ Phrase
  -- Roots [Root]
+-- TODO | Frozen freeze
  deriving (Show,Eq)
 
 root :: Command Root
@@ -60,7 +66,12 @@ root = set (comGrammar.gramExpand) 1 $ 'root
  <|> Edit_       # edit
  <|> Phrase_     # phrase
  -- <|> Roots       # (multipleC root)
+-- TODO <|> Frozen # "freeze" & root
  <%> \case
+
+-- TODO Frozen r -> \case
+--    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
+--  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
 
   ReplaceWith this that -> \case
    "emacs" -> do
@@ -71,7 +82,7 @@ root = set (comGrammar.gramExpand) 1 $ 'root
     press met r
     insert (munge this) >> press [] tab
     slot (munge that)
-   _ -> nothing
+   _ -> do nothing
 
   Undo -> \case
    _ -> press met z
@@ -564,9 +575,11 @@ main = do
  -- -- writeFile "_shim.py" (T.unpack pf)
 
 
- -- putStrLn ""
- -- -- attemptSerialize test
+ putStrLn ""
  -- attemptSerialize (view comGrammar root)
+
+ -- putStrLn ""
+ -- attemptSerialize test
  -- let Right sg = serialized test  -- TODO why does the unary Test fail? Optimization?
  -- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
  -- PythonFile pf <- shimmySerialization addresses sg
@@ -578,3 +591,8 @@ main = do
  -- attemptParse (view comGrammar root) "replace this and that with that and this"
  -- TODO verify phrase/munge with more tests
  attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)
+
+ putStrLn ""
+ putStrLn $ B.unpack $ J.encode $ (DGNUpdate Nothing Nothing Nothing :: DGNUpdate String)
+ putStrLn $ B.unpack $ J.encode $ DGNUpdate (Just "rule") (Just ["export one", "export two"]) (Just $ Map.fromList [("list one", ["a","b","c"]),("list two", ["a","b","c"])])
+

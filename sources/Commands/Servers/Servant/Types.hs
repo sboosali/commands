@@ -20,9 +20,9 @@ instance FromJSON Recognition
 
 >>> import qualified Data.ByteString.Lazy.Char8 as B
 >>> (putStr . B.unpack . 'encode') (DGNUpdate Nothing Nothing Nothing :: DGNUpdate String)
-{"dgnSerializedExports":null,"dgnSerializedRules":null,"dgnSerializedLists":null}
+{"dgnUpdateExports":null,"dgnUpdateRules":null,"dgnUpdateLists":null}
 >>> (putStr . B.unpack . 'encode') $ DGNUpdate (Just "rule") (Just ["export_one", "export_two"]) (Just $ Map.fromList [("list_one", ["a","b","c"]),("list_two", ["a","b","c"])])
-{"dgnSerializedExports":["export_one","export_two"],"dgnSerializedRules":"rule","dgnSerializedLists":{"list_two":["a","b","c"],"list_one":["a","b","c"]}}
+{"dgnUpdateExports":["export_one","export_two"],"dgnUpdateRules":"rule","dgnUpdateLists":{"list_two":["a","b","c"],"list_one":["a","b","c"]}}
 
 
 should be a sum type, but it must be a silly product type of Maybe\'s:
@@ -33,9 +33,9 @@ parameterized over your choice of string-like type (or any type at all).
 
 -}
 data DGNUpdate a = DGNUpdate
- { _dgnSerializedRules   :: Maybe a -- ^ serializes to a JSON String 'Value' or 'Null'
- , _dgnSerializedExports :: Maybe [a] -- ^ serializes to a JSON 'Array' or 'Null'
- , _dgnSerializedLists   :: Maybe (Map String [a]) -- ^ serializes to a JSON 'Object' or 'Null'
+ { _dgnUpdateRules   :: Maybe a -- ^ serializes to a JSON String 'Value' or 'Null'
+ , _dgnUpdateExports :: Maybe [a] -- ^ serializes to a JSON 'Array' or 'Null'
+ , _dgnUpdateLists   :: Maybe (Map String [a]) -- ^ serializes to a JSON 'Object' or 'Null'
  } deriving (Show,Eq,Ord,Generic)
 
 instance ToJSON a => ToJSON (DGNUpdate a) where

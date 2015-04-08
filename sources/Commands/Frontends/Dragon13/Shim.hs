@@ -76,6 +76,7 @@ the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with t
 -}
 getShim :: (IsString t, Monoid t) => ShimR t -> t
 getShim ShimR{..} = [qq|
+# _commands.py
 
 # natlink13 library
 from natlinkmain import (setCheckForGrammarChanges)
@@ -83,6 +84,7 @@ from natlinkutils import (GrammarBase)
 
 # standard library
 import time
+import json
 from urllib2 import urlopen
 
 
@@ -122,17 +124,17 @@ class NarcissisticGrammar(GrammarBase):
     def initialize(self):
         self.set_rules(H_RULES, [H_EXPORT])
         self.set_lists(H_LISTS)
-        # TODO self.doOnlyGotResultsObject = True
+        self.doOnlyGotResultsObject = True # aborts all processing after calling gotResultsObject
 
     # called when speech is detected before recognition begins.
-    def gotBegin( moduleInfo ):
+    def gotBegin(self, moduleInfo):
         # handleDGNContextResponse(timeit("/context", urlopen, ("%s/context" % server_address), timeout=0.1))
         # TODO parameterize " Context"
 
         print
         print
         print "-  -  -  -  gotBegin  -  -  -  -"
-        print moduleInfo
+        # print moduleInfo # moduleInfo is just the current window in Windows
 
     def gotHypothesis(self, words):
         print
@@ -141,14 +143,14 @@ class NarcissisticGrammar(GrammarBase):
 
     def gotResultsObject(self, recognitionType, resultsObject):
         words = next(get_results(resultsObject), [])
-        text  = munge_and_flatten(words)
-        url   = "%s/recognition/%s" % (server_address, text)
-        # TODO parameterize "recognition"
+        data  = munge_recognition(words)
+        url   = "%s/recognition/" % (server_address,)        # TODO parameterize "recognition"
 
         try:
-            response = timeit("/recognition/...", urlopen, url, timeout=0.1)
-            handleDGNSerializedResponse(self, response)
+            response = timeit(url, urlopen, url=url, data=json.dumps(data), timeout=0.1)
+            handleDGNUpdate(self, response)
         except Exception as e:
+            print
             print "sending the request and/or handling the response threw:"
             print e
 
@@ -158,14 +160,12 @@ class NarcissisticGrammar(GrammarBase):
             print "---------- gotResultsObject ----------"
             print "words  =", words
             print "status =", response.getcode()
-            print "body   =", list(response)
+            print "body   =", response
         except NameError:
-            pass
-
-    def gotResultsInit(self, words, results):
-        print
-        print "-  -  -  -  gotResultsInit  -  -  -  -"
-        print results
+            print
+        except Exception as e:
+            print
+            print e
 
     # TODO    must it reload the grammar?
     # TODO    should include export for safety?
@@ -186,42 +186,47 @@ class NarcissisticGrammar(GrammarBase):
 
 # API
 
-def handleDGNSerializedResponse(self, response):
+def handleDGNUpdate(self, response):
+    if not response: # had timed out
+        return
     if response.getcode() != 200:
         return
 
-    j = list(response)[0]
-    o = DGNSerializedResponse.fromJSON(j)
+    j = response.readline()
+    o = DGNUpdate.fromJSON(j)
 
     # TODO does order matter? Before/after loading?
     if o is not None:
-        if o.dgnSerializedRules is not None and o.dgnSerializedExports is not None:
-            self.set_rules(o.dgnSerializedRules, o.dgnExport)
-        if o.dgnSerializedLists is not None:
-            self.set_lists(o.dgnSerializedLists)
-        if o.dgnSerializedRules is None and o.dgnSerializedExports is not None: # just switch context
-            self.set_exports(o.dgnSerializedExports)
+        if o.dgnRules is not None and o.dgnExports is not None:
+            self.set_rules(o.dgnRules, o.dgnExport)
+        if o.dgnLists is not None:
+            self.set_lists(o.dgnLists)
+        if o.dgnRules is None and o.dgnExports is not None: # just switch context
+            self.set_exports(o.dgnExports)
 
-class DGNSerializedResponse(object):
+class DGNUpdate(object):
 
     @classmethod
     def fromJSON(cls, j):
         try:
-            d = json.load(j)
-            dgnSerializedRules = d["dgnSerializedRules"]
-            dgnSerializedExports = d["dgnSerializedExports"]
-            dgnSerializedLists = d["dgnSerializedLists"]
-            o = cls(dgnSerializedRules, dgnSerializedExports, dgnSerializedLists)
+            d = json.loads(j)
+            dgnUpdateRules = d["dgnUpdateRules"]
+            dgnUpdateExports = d["dgnUpdateExports"]
+            dgnUpdateLists = d["dgnUpdateLists"]
+            o = cls(dgnUpdateRules, dgnUpdateExports, dgnUpdateLists)
             return o
-        except Exception:
-            return None
+        except Exception as e:
+            print e
 
     # TODO something dynamic using __dict__ and *args or something:
     # generated code is less readable/debuggable, but the generating code is simpler
-    def __init__(self, dgnSerializedRules, dgnSerializedExports, dgnSerializedLists):
-        self.dgnSerializedRules = dgnSerializedRules
-        self.dgnSerializedExports = dgnSerializedExports
-        self.dgnSerializedLists = dgnSerializedLists
+    def __init__(self, dgnUpdateRules, dgnUpdateExports, dgnUpdateLists):
+        self.dgnUpdateRules = dgnUpdateRules
+        self.dgnUpdateExports = dgnUpdateExports
+        self.dgnUpdateLists = dgnUpdateLists
+
+    def __repr__(self):
+        return "%s(%r,%r,%r)" % (self.__class__.__name__, self.dgnUpdateRules, self.dgnUpdateExports, self.dgnUpdateLists)
 
     # def toJSON(self):
 
@@ -244,12 +249,12 @@ def get_results(resultsObject):
     except:
         return
 
-def munge_and_flatten(words):
+def munge_recognition(words):
     '''
-    >>> munge_and_flatten(['spell', r'a\\\\spelling-letter\\\\A', r',\\\\comma\\\\comma', r'a\\\\determiner', 'letter'])
-    'spell A , a letter'
+    >>> munge_recognition(['spell', r'a\\\\spelling-letter\\\\A', r',\\\\comma\\\\comma', r'a\\\\determiner', 'letter'])
+    ["spell", "A", ",", "a", "letter"]
     '''
-    return ' '.join(word.split(r'\\\\')[0] for word in words)
+    return [word.split(r'\\\\')[0] for word in words]
 
 # http://stackoverflow.com/questions/1685221/accurately-measure-time-python-function-takes
 def timeit(message, callback, *args, **kwargs):
@@ -258,7 +263,6 @@ def timeit(message, callback, *args, **kwargs):
     after = time.clock()
     print message, ': ', (after - before) * 1000, 'ms'
     return result
-
 
 
 

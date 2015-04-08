@@ -23,52 +23,69 @@ import           Control.Lens
 import qualified Text.Parsec                       as Parsec
 
 
--- ================================================================ --
-
--- | @= 'multipleC'@
-multiple :: Grammar a -> Grammar [a]
-multiple = multipleC
-
--- | @= 'manyC'@
-many :: Grammar a -> Grammar [a]
-many = manyC
-
--- | @= 'many0C'@
-many0 :: Grammar a -> Grammar [a]
-many0 = many0C
+-- |
+--
+-- e.g. @(rule-+)@, using @-XPostfixOperators@
+--
+-- @(-+) = manyG@
+(-+) :: Grammar a -> Grammar [a]
+(-+) = manyG
 
 -- |
-multipleC :: Grammar a -> Grammar [a]
-multipleC grammar = Grammar
+--
+-- e.g. @(rule-?)@, using @-XPostfixOperators@
+--
+-- @(-?) = optionalG@
+(-?) :: Grammar a -> Grammar (Maybe a)
+(-?) = optionalG
+
+
+-- ================================================================ --
+
+-- | @= 'multipleG'@
+multiple :: Grammar a -> Grammar [a]
+multiple = multipleG
+
+-- | @= 'manyG'@
+many :: Grammar a -> Grammar [a]
+many = manyG
+
+-- | @= 'many0G'@
+many0 :: Grammar a -> Grammar [a]
+many0 = many0G
+
+-- |
+multipleG :: Grammar a -> Grammar [a]
+multipleG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (\context -> (grammar ^. gramParser) context `manyUntil` context)
  where
- l = unsafeLHSFromName 'multipleC `appLHS` (grammar ^. gramLHS)
+ l = unsafeLHSFromName 'multipleG `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
- self = multipleC grammar
+ self = multipleG grammar
 
 -- |
-manyC :: Grammar a -> Grammar [a]
-manyC grammar = Grammar
+manyG :: Grammar a -> Grammar [a]
+manyG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (\context -> Parsec.many1 $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'manyC `appLHS` (grammar ^. gramLHS)
+ l = unsafeLHSFromName 'manyG `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
- self = manyC grammar
+ self = manyG grammar
 
 -- |
-many0C :: Grammar a -> Grammar [a]
-many0C grammar = Grammar
+many0G :: Grammar a -> Grammar [a]
+many0G grammar = Grammar
  (Rule l r)
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (\context -> Parsec.many $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'many0C `appLHS` (grammar ^. gramLHS)
+ l = unsafeLHSFromName 'many0G `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
- self = many0C grammar
+ self = many0G grammar
 
 -- -- |
 -- multipleRHS :: RHS a -> RHS [a]
@@ -92,36 +109,36 @@ zeroOrMoreDNSProduction = yankDNSProduction (DNSOptional . DNSMultiple)
 
 -- ================================================================ --
 
--- | @= 'optionalC'@
+-- | @= 'optionalG'@
 optional :: Grammar a -> Grammar (Maybe a)
-optional = optionalC
+optional = optionalG
 
--- | @= 'optionC'@
+-- | @= 'optionG'@
 option :: a -> Grammar a -> Grammar a
-option = optionC
+option = optionG
 
--- | @= 'optionC' 'enumDefault'@
+-- | @= 'optionG' 'enumDefault'@
 optionalEnum :: (Enum a) => Grammar a -> Grammar a
-optionalEnum = optionC enumDefault
+optionalEnum = optionG enumDefault
 
 -- |
-optionC :: a -> Grammar a -> Grammar a
-optionC theDefault grammar = Grammar
+optionG :: a -> Grammar a -> Grammar a
+optionG theDefault grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (\context -> Parsec.option theDefault $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'optionC `appLHS` (grammar ^. gramLHS)
+ l = unsafeLHSFromName 'optionG `appLHS` (grammar ^. gramLHS)
  r = optionRHS theDefault grammar
 
 -- |
-optionalC :: Grammar a -> Grammar (Maybe a)
-optionalC grammar = Grammar
+optionalG :: Grammar a -> Grammar (Maybe a)
+optionalG grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (\context -> Parsec.optionMaybe $ (grammar ^. gramParser) context)
  where
- l = unsafeLHSFromName 'optionalC `appLHS` (grammar ^. gramLHS)
+ l = unsafeLHSFromName 'optionalG `appLHS` (grammar ^. gramLHS)
  r = optionalRHS grammar
 
 -- -- |
@@ -151,7 +168,7 @@ optionalDNSProduction = yankDNSProduction DNSOptional
 -- |
 maybeAtomR :: RHS a -> Perms RHS (Maybe a)
 maybeAtomR
- = maybeAtomC
+ = maybeAtomG
  . set (gramGrammar .dnsProductionInfo .dnsInline) True
  . unsafeFellRHS
 
@@ -168,13 +185,13 @@ unsafeFellRHS rhs = genericGrammar (unsafeLHSFromRHS rhs) rhs
 -- 'runPerms' (not by this function) acting upon 'maybeAtom'.
 --
 --
-maybeAtomC :: Grammar a -> Perms RHS (Maybe a)
-maybeAtomC grammar = (maybeAtom . liftGrammar) $ Grammar
+maybeAtomG :: Grammar a -> Perms RHS (Maybe a)
+maybeAtomG grammar = (maybeAtom . liftGrammar) $ Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (grammar ^. gramParser)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomC `appLHS`) (const $ liftGrammar grammar) (grammar ^. gramRule)
+ Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomG `appLHS`) (const $ liftGrammar grammar) (grammar ^. gramRule)
 
 
 -- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',

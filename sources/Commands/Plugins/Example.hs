@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase         #-}
-{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RankNTypes, RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections          #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns, PatternSynonyms, PostfixOperators, RankNTypes #-}
+{-# LANGUAGE RecordWildCards, ScopedTypeVariables, TemplateHaskell         #-}
+{-# LANGUAGE TupleSections                                                 #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 
 module Commands.Plugins.Example where
@@ -55,6 +56,7 @@ data Root
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
+-- TODO currently throws "grammar too complex" :-(
 root :: Command Root
 root = set (comGrammar.gramExpand) 1 $ 'root
  <=> empty
@@ -125,17 +127,15 @@ phrase = set gramExpand 3 $ 'phrase
  <|> Escaped  # "lit" & keyword & phrase
  <|> Quoted   # "quote" & dictation & "unquote" & phrase
 
- -- <|> Pressed  # "press" & many key & optional phrase
- <|> Spelled  # "spell" & many character & optional phrase
- <|> Spelled  #           many character & optional phrase
- <|> Letter   # character & optional phrase
- <|> Cap      # "cap" & character & optional phrase
+ <|> Spelled  # "spell" & (character-+) & (phrase-?)
+ <|> Letter   # character & (phrase-?)
+ <|> Cap      # "cap" & character & (phrase-?)
 
  <|> Case     # casing   & phrase
  <|> Join     # joiner   & phrase
  <|> Surround # brackets & phrase
 
- <|> Dictated # dictation & optional phrase
+ <|> Dictated # dictation & (phrase-?)
 
 {- TODO
 "replace this and that with that and this" (line 1, column 41):
@@ -342,7 +342,7 @@ character = 'character <=> empty
 --
 -- so we can't embed the one into the other, but we'll just keep things simple with duplication.
 --
-key :: Grammar Key
+key :: Grammar Key -- TODO
 key = 'key <=> empty
 
 type Keyword = String -- TODO
@@ -599,14 +599,14 @@ main = do
 
  putStrLn ""
  -- attemptSerialize (view comGrammar root)
-
- -- putStrLn ""
  -- attemptSerialize test
- -- let Right sg = serialized test  -- TODO why does the unary Test fail? Optimization?
- -- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
- -- PythonFile pf <- shimmySerialization addresses sg
- -- runActions $ setClipboard (T.unpack pf)
- -- T.putStrLn $ pf
+
+ putStrLn ""
+ let Right sg = serialized (view comGrammar root)  -- TODO why does the unary Test fail? Optimization?
+ let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
+ PythonFile pf <- shimmySerialization addresses sg
+ runActions $ setClipboard (T.unpack pf)
+ T.putStrLn $ pf
 
 
  putStrLn ""
@@ -618,3 +618,4 @@ main = do
  attemptCompile root "emacs" "3 no"
  attemptCompile root "emacs" "replace this and that with that and this"
  attemptCompile root "emacs" "say par round grave camel with async action spell A B C"
+

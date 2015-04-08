@@ -64,7 +64,7 @@ root = set (comGrammar.gramExpand) 1 $ 'root
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      # click
  <|> Edit_       # edit
- <|> Phrase_     # phrase
+ <|> Phrase_     # "say" & phrase -- TODO remove prefix
  -- <|> Roots       # (multipleC root)
 -- TODO <|> Frozen # "freeze" & root
  <%> \case
@@ -82,7 +82,7 @@ root = set (comGrammar.gramExpand) 1 $ 'root
     press met r
     insert (munge this) >> press [] tab
     slot (munge that)
-   _ -> do nothing
+   _ -> nothing
 
   Undo -> \case
    _ -> press met z
@@ -92,47 +92,13 @@ root = set (comGrammar.gramExpand) 1 $ 'root
    _ -> nothing
 
   Repeat n c -> \case
-   _ -> replicateM_ (getPositive n) (root `compiles` c)
+   x -> replicateM_ (getPositive n) $ (root `compiles` c) x
+
+  Phrase_ p -> \case
+   _ -> insert (munge p)
 
   _ -> \case
-   _ -> nothing
-
-nothing = return ()
-press = sendKeyPress
-met = [OSX.Command]
-r = RKey
-z = ZKey
-tab = TabKey
-slot s = do
- insert s
- press [] ReturnKey
-
-munge :: Phrase -> String
-munge = spaceCase . mungePhrase
--- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
-
-data Edit = Edit Action Region deriving (Show,Eq,Ord)
-edit = 'edit <=> empty
--- TODO defaults <|> Edit # action & region
- <|> Edit undefined # region
- <|> flip Edit undefined # action
- <|> Edit # action & region
--- TODO ensure no alternative is empty
--- <|> (\a -> Edit a undefined) # action
-
-data Action = Copy | Delete | Next deriving (Show,Eq,Ord,Enum,Typeable)
-action = enumGrammar
-
-data Region = Char | Word | Line deriving (Show,Eq,Ord,Enum,Typeable)
-region = enumGrammar
-
--- Action = Pick | Go |
--- Region = Selection |
--- Direction = Whole | Backwards | Forwards
-
-
-editEmacs :: Edit -> Actions ()
-editEmacs = undefined
+   _ -> do nothing
 
 
 
@@ -170,6 +136,55 @@ phrase = set gramExpand 3 $ 'phrase
  <|> Surround # brackets & phrase
 
  <|> Dictated # dictation & optional phrase
+
+{- TODO
+"replace this and that with that and this" (line 1, column 41):
+unexpected end of input
+expecting a space, optionalC__Commands.Command.Combinator__commands-core-0.0.0____phrase__Commands.Plugins.Example__commands-core-0.0.0 or "with"
+
+does Phrase need a special parser?
+
+-}
+
+
+
+
+nothing = return ()
+press = sendKeyPress
+met = [OSX.Command]
+r = RKey
+z = ZKey
+tab = TabKey
+slot s = do
+ insert s
+ press [] ReturnKey
+
+munge :: Phrase -> String
+munge = spaceCase . mungePhrase
+-- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
+
+data Edit = Edit Action Region deriving (Show,Eq,Ord)
+edit = 'edit <=> empty
+-- TODO defaults <|> Edit # action & region
+ <|> Edit undefined # region
+ <|> flip Edit undefined # action
+ <|> Edit # action & region
+-- TODO ensure no alternative is empty
+-- <|> (\a -> Edit a undefined) # action
+
+data Action = Copy | Delete | Next deriving (Show,Eq,Ord,Enum,Typeable)
+action = enumGrammar
+
+data Region = Char | Word | Line deriving (Show,Eq,Ord,Enum,Typeable)
+region = enumGrammar
+
+-- Action = Pick | Go |
+-- Region = Selection |
+-- Direction = Whole | Backwards | Forwards
+
+
+editEmacs :: Edit -> Actions ()
+editEmacs = undefined
 
 speech = phrase -- TODO
 
@@ -471,6 +486,13 @@ printSerializedGrammar SerializedGrammar{..} = do
  putStrLn ""
  T.putStrLn $ display serializedLists
 
+attemptCompile c x s = case r `parses` s of
+  Left  e -> print e
+  Right a -> do
+   putStrLn ""
+   print a
+   putStrLn $ showActions $ (c `compiles` a) x
+ where r = c ^. comGrammar
 
 
 main = do
@@ -593,6 +615,6 @@ main = do
  attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)
 
  putStrLn ""
- putStrLn $ B.unpack $ J.encode $ (DGNUpdate Nothing Nothing Nothing :: DGNUpdate String)
- putStrLn $ B.unpack $ J.encode $ DGNUpdate (Just "rule") (Just ["export one", "export two"]) (Just $ Map.fromList [("list one", ["a","b","c"]),("list two", ["a","b","c"])])
-
+ attemptCompile root "emacs" "3 no"
+ attemptCompile root "emacs" "replace this and that with that and this"
+ attemptCompile root "emacs" "say par round grave camel with async action spell A B C"

@@ -31,23 +31,33 @@ type (:+:) = Sum
 --
 -- @('Of' a) :: (* -> *) -> *@
 --
--- backwards application, as '&' to '$'.
+-- (read that as "something of @a@")
+--
+-- it's just backwards type-level application, like @'&' = flip ($)@.
+--
+-- (@data@ because Haskell can't (?) have a "type-level @Flip@" function as a type alias).
 data Of a f = Of (f a)
 
--- | 
--- allows the type synonyms Command and NonTerminal to share the same partially applied type constructor (RecOf), and avoids these type synonyms from being partially, which is illegal in Haskell (for decideability).
-data RecOf fs a = RecOf { getRec :: Rec (Of a) fs }
+-- | the "complement" of the 'Rec'ord, where we have one "noun" (i.e. type value) and many "verb"s (i.e. type constructor).
+--
+-- 
+--
+-- it's a type constructor, rather than a type alias, letting us partially apply it.
+--
+-- it flips the type parameters, letting us partially apply on the @fs@
+--
+newtype RecOf fs a = RecOf { getRec :: Rec (Of a) fs }
 
 -- type Command' (c,xc) g (p,xp) r a = RecOf a [ ... ] -- no: can't pattern match on type aliases
 -- type CommandL c xc g p xp =
---  [ "compiler" ::$ c xc
---  , "grammar"  ::$ Const g
---  , "parser"   ::$ p xp
---  , "rhs"      ::$ RHS' g p xp
---  , "lhs"      ::$ Const LHS
+--  [ "compiler" :::: c xc
+--  , "grammar"  :::: Const g
+--  , "parser"   :::: p xp
+--  , "rhs"      :::: RHS' g p xp
+--  , "lhs"      :::: Const LHS
 --  ]
-type CommandL c xc g p xp = ("compiler" ::$ c xc) ': (NonTerminalL g p xp)
-type Command' c xc g p xp = RecOf (CommandL c xc g p xp)
+type CommandI c xc g p xp = ("compiler" :::: c xc) ': (NonTerminalI g p xp)
+type Command' c xc g p xp = RecOf (CommandI c xc g p xp)
 
 -- data RHS'' g p xp a = RHS'' (Alt (Either Terminal (NonTerminal'' g p xp a))) -- no: Either must be fully applied, but Alt takes a partially applied type constructor
 
@@ -55,20 +65,21 @@ type Command' c xc g p xp = RecOf (CommandL c xc g p xp)
 -- type Alt'' f a = Alt f a
 -- data RHS'' g p xp a = RHS'' (Alt'' (Const Terminal :+: NonTerminal'' g p xp) a)
 -- type NonTerminal'' g p xp = RecOf'' -- after all the crazy types, must be a {Rec _ _}
---  [ "grammar"  ::$ Const g
---  , "parser"   ::$ p xp
---  , "rhs"      ::$ RHS'' g p xp
+--  [ "grammar"  :::: Const g
+--  , "parser"   :::: p xp
+--  , "rhs"      :::: RHS'' g p xp
 --  ]
 -- type RecOf'' fs a = Rec (Of a) fs
 
 data RHS' g p xp a = RHS (Alt (Const Terminal :+: NonTerminal g p xp) a)
 type Terminal = String
-type NonTerminal g p xp = RecOf (NonTerminalL g p xp)
-type NonTerminalL g p xp =
- [ "grammar"  ::$ Const g
- , "parser"   ::$ p xp
- , "rhs"      ::$ RHS' g p xp
- , "lhs"      ::$ Const LHS
+type NonTerminal g p xp = RecOf (NonTerminalI g p xp)
+type NonTerminalI g p xp =
+ [ "grammar"  :::: Const g
+ , "parser"   :::: p xp
+ , "rhs"      :::: RHS' g p xp
+ , "lhs"      :::: Const LHS
+ -- , "rule"      :::: Rule g p xp self?  -- TODO
  ]
 
 {- I want to be able to mix NonTerminal with Command:
@@ -88,34 +99,36 @@ exampleNonTerminal = undefined
 
  -- TODO I don't know if naming the field with a equality constraint affects unification, since field's only used in another constraint
 getGrammar
- :: forall fs a g field. (field ~ ("grammar" ::$ Const g), field ∈ fs)
+ :: forall fs a g field. (field ~ ("grammar" :::: Const g), field ∈ fs)
  => RecOf fs a -> g
 getGrammar (RecOf record) = case rget (Proxy :: Proxy field) record of
  Of (FieldOf (Field (Const g))) -> g
--- getGrammar = getConst . getOf . getField . asField . rget (Proxy :: Proxy ("grammar" ::$ Const g)) -- GADTs need case
--- getGrammar = rget (Nothing :: Maybe ("grammar" ::$ Const g)) -- a type of kind (* -> *) needs polykinded proxy like Proxy
+-- getGrammar = getConst . getOf . getField . asField . rget (Proxy :: Proxy ("grammar" :::: Const g)) -- GADTs need case
+-- getGrammar = rget (Nothing :: Maybe ("grammar" :::: Const g)) -- a type of kind (* -> *) needs polykinded proxy like Proxy
 
 getParser
- :: forall fs a p xp field. (field ~ ("parser" ::$ p xp), field ∈ fs)
+ :: forall fs a p xp field. (field ~ ("parser" :::: p xp), field ∈ fs)
  => RecOf fs a -> p xp a
 getParser (RecOf record) = case rget (Proxy :: Proxy field) record of
  Of (FieldOf (Field p)) -> p
 
 getCompiler
- :: forall fs a c xc field. (field ~ ("compiler" ::$ c xc), field ∈ fs)
+ :: forall fs a c xc field. (field ~ ("compiler" :::: c xc), field ∈ fs)
  => RecOf fs a -> c xc a
 getCompiler (RecOf record) = case rget (Proxy :: Proxy field) record of
  Of (FieldOf (Field c)) -> c
 
--- | specialized label for type constructors as elements in a 'RecOf'
-data (s ::$ f) a = FieldOf (ElField '(s, f a))
--- type k ::$ v = ElField '(k,v)
+-- | specialized labeled 'Field' for type constructors, for example as elements of a 'RecOf'
+--
+-- like @:::@, the key is the same but the value is a type constructor that takes one type argument. (Hence the extra @:@? lol.)
+data (s :::: f) a = FieldOf (ElField '(s, f a))
+-- type k :::: v = ElField '(k,v)
 
 data Command a = Command
  { _comGrammar  :: Grammar a
  , _comCompiler :: Compiler a
  }
--- TODO  profunctor? does it matter?
+-- TODO  profunctor? does it matter? probably, I like thinking about it like a class: a class method to introduce, an instance method to eliminate.
 
 -- newtype Compiler' a = Compiler' (a -> ReaderT CompilerContext Actions ())
 newtype Compiler' x a = Compiler' (Compiler a)
@@ -125,7 +138,7 @@ newtype Parser' x a = Parser' (Parser a)
 
 -- |
 type Compiler a = a -> CompilerContext -> Actions ()
--- the unit (Actions ()) may cause hard to read type errors when using "copy", but avoids existential quantification
+-- the unit (Actions ()) may cause hard to read type errors when using "copy", but avoids existential quantification.
 -- can cache, when both arguments instantiate Eq?
 
 type CompilerContext = Application

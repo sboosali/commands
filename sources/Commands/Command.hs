@@ -99,9 +99,11 @@ handleParse grammar s = do
  (print =<< (grammar `parses` s)) `catches` parseHandlers
 
 
-compiles :: Command a -> a -> Actions ()
-c `compiles` a = (c^.comCompiler) a globalContext
-
+compiles :: Command a -> a -> CompilerContext -> Actions ()
+(c `compiles` a) x = (c^.comCompiler) a x
+-- c `compiles` a `with` x
+-- compiles :: Command a -> a -> Actions ()
+-- c `compiles` a = (c^.comCompiler) a globalContext
 
 
 -- |

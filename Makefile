@@ -21,6 +21,9 @@ build: configure
 run:
 	cabal run
 
+serve:
+	cabal run serve
+
 test:
 # cabal install ../commands-core --force-reinstall --enable-tests
 # cabal exec -- ghc-pkg unregister commands-core-0.0.0

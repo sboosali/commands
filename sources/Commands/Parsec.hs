@@ -1,6 +1,16 @@
 {-# LANGUAGE FlexibleContexts, RankNTypes #-}
--- |
--- wraps "Text.Parsec"
+{- | wrapper module.
+
+TODO remove reexport
+Usage:
+
+@
+import qualified Commands.Parsec as Parsec
+import qualified "Text.Parsec" as Parsec  -- simulate reexport
+import           Control.Applicative  -- operators like '(<|>)' and combinators like 'many'
+@
+
+-}
 module Commands.Parsec
  ( module Text.Parsec
  -- |

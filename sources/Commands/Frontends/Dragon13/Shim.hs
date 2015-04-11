@@ -70,12 +70,14 @@ getShim :: ShimR Doc    -> Doc
 
 = Implementation
 
-inside the 'qq', besides escaping backslashes (@r'\\\\'@ renders as r'\\') and interpolating between bracesa(@{...}@), "what you see is what you get".
+inside the 'qc', besides escaping backslashes (@r'\\\\'@ renders as r'\\') and interpolating between bracesa(@{...}@), "what you see is what you get".
 
 the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with the quasiquoter's interpolation syntax.
 -}
 getShim :: (IsString t, Monoid t) => ShimR t -> t
-getShim ShimR{..} = [qq|
+getShim ShimR{..} = [qc|
+
+
 # _commands.py
 
 # natlink13 library
@@ -101,7 +103,6 @@ server_address = "http://%s:%s/" % (H_SERVER_HOST, H_SERVER_PORT)
 
 # H_CLIENT_HOST = {__clientHost__}
 # H_CLIENT_PORT = {__clientPort__}
-
 
 
 # the grammar
@@ -134,7 +135,8 @@ class NarcissisticGrammar(GrammarBase):
         print
         print
         print "-  -  -  -  gotBegin  -  -  -  -"
-        # print moduleInfo # moduleInfo is just the current window in Windows
+        # moduleInfo is just the current window in Windows
+        # print moduleInfo
 
     def gotHypothesis(self, words):
         print
@@ -167,6 +169,13 @@ class NarcissisticGrammar(GrammarBase):
             print
             print e
 
+    # for debugging only, shows whether specific rules (rather than the generic dgndictation) are matching the recognition
+    # not called when (self.doOnlyGotResultsObject=True)
+    def gotResults(self, words, fullResults):
+        print
+        print "---------- gotResultsObject ----------"
+        print "fullResults =", fullResults
+
     # TODO    must it reload the grammar?
     # TODO    should include export for safety?
     def set_rules(self, rules, exports):
@@ -182,6 +191,7 @@ class NarcissisticGrammar(GrammarBase):
     # activateSet is idempotent, unlike activate
     def set_exports(self, exports):
         self.activateSet(exports, exclusive=1)
+
 
 
 # API

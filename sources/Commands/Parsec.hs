@@ -61,6 +61,10 @@ parse p s = either throwM return $ Parsec.parse p s s
 manyUntil :: Parsec a -> Some Parsec -> Parsec [a]
 manyUntil p (Some q) = (:) <$> p <*> p `manyTill` (try . lookAhead) q
 
+-- | like 'manyUntil', but can match nothing and succeed.
+many0Until :: Parsec a -> Some Parsec -> Parsec [a]
+many0Until p (Some q) = p `manyTill` (try . lookAhead) q
+
 -- |
 --
 -- >>> parse anyWord "one-word"

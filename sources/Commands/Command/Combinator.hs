@@ -6,6 +6,9 @@
 
 'optionalC' and 'optionC' share the same 'grammar' ('optionalDNSGrammar'), but different in 'parser' ('Parsec.option' versus 'Parsec.optionMaybe' respectively).
 
+every Grammar must have a unique name. asthese combinators are pure,
+they must output a unique LHS from the LHSs of their input.
+hence, 'LHSApp'.
 
 -}
 module Commands.Command.Combinator where
@@ -23,21 +26,37 @@ import           Control.Lens
 import qualified Text.Parsec                       as Parsec
 
 
--- |
+-- | one or more of the grammar.
 --
 -- e.g. @(rule-+)@, using @-XPostfixOperators@
 --
--- @(-+) = manyG@
+-- @(-+) = 'multipleG'@
 (-+) :: Grammar a -> Grammar [a]
-(-+) = manyG
+(-+) = multipleG
 
--- |
+-- | zero or more of the grammar.
+--
+-- e.g. @(rule-*)@, using @-XPostfixOperators@
+--
+-- @(-*) = 'multiple0G'@
+(-*) :: Grammar a -> Grammar [a]
+(-*) = multiple0G
+
+-- | zero or one of the grammar.
 --
 -- e.g. @(rule-?)@, using @-XPostfixOperators@
 --
--- @(-?) = optionalG@
+-- @(-?) = 'optionalG'@
 (-?) :: Grammar a -> Grammar (Maybe a)
 (-?) = optionalG
+
+-- | either one grammar or the other.
+--
+-- e.g. @(rule-|)@, using @-XPostfixOperators@
+--
+-- @(-|) = 'eitherG'@
+(-|) :: Grammar a -> Grammar b -> Grammar (Either a b)
+(-|) = eitherG
 
 
 -- ================================================================ --
@@ -64,6 +83,17 @@ multipleG grammar = Grammar
  l = unsafeLHSFromName 'multipleG `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
  self = multipleG grammar
+
+-- |
+multiple0G :: Grammar a -> Grammar [a]
+multiple0G grammar = Grammar
+ (Rule l r)
+ (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
+ (\context -> (grammar ^. gramParser) context `many0Until` context)
+ where
+ l = unsafeLHSFromName 'multiple0G `appLHS` (grammar ^. gramLHS)
+ r = multipleRHS grammar self
+ self = multiple0G grammar
 
 -- |
 manyG :: Grammar a -> Grammar [a]
@@ -204,3 +234,15 @@ yankDNSProduction f n (DNSProduction i l _) = DNSProduction
  (DNSRule n)
  (f (DNSNonTerminal (SomeDNSLHS l)))
 
+
+-- ================================================================ --
+
+-- |
+eitherG :: Grammar a -> Grammar b -> Grammar (Either a b)
+eitherG a b  = set (gramGrammar .dnsProductionInfo .dnsInline) True $ genericGrammar
+ (unsafeLHSFromName 'eitherG `LHSApp` [(a^.gramLHS),(b^.gramLHS)])
+ (Left <$> liftGrammar a  <|>  Right <$> liftGrammar b)
+
+-- TODO generalize to oneOfG, that takes a Record, and is implicitly
+-- No, a Co-record! Google "CoRec" in the frames library.
+-- (:&) won't look like (&) after the latter is renamed. It's a logical-or though, and (:&) looks like logical-and. We should probably just make another alias involving "|".

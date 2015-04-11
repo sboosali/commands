@@ -105,37 +105,44 @@ root = set (comGrammar.gramExpand) 1 $ 'root
 
 
 data Phrase
- = Verbatim   Dictation
- | Escaped    Keyword Phrase
- | Quoted     Dictation Phrase
-
- -- TODO | Pressed [Key] (Maybe Phrase)
- | Spelled [Char] (Maybe Phrase)
- | Letter  Char (Maybe Phrase)
- | Cap     Char (Maybe Phrase)
-
- | Case     Casing   Phrase
- | Join     Joiner   Phrase
- | Surround Brackets Phrase
-
- | Dictated Dictation (Maybe Phrase)
+ = Phrase [Either Phrase11 Phrase01] (Either Phrase00 Phrase01)
  deriving (Show,Eq,Ord)
 
-phrase = set gramExpand 3 $ 'phrase
+-- | a sub-phrase where a phrase to the right is certain.
+data Phrase11
+ = Escaped  Keyword
+ | Quoted   Dictation
+ | Case     Casing
+ | Join     Joiner
+ | Surround Brackets
+ deriving (Show,Eq,Ord)
 
- <=> Verbatim # "say" & dictation
- <|> Escaped  # "lit" & keyword & phrase
- <|> Quoted   # "quote" & dictation & "unquote" & phrase
+-- | a sub-phrase where a phrase to the right is possible.
+data Phrase01
+ = Spelled [Char]
+ | Cap     Char
+ | Dictated Dictation
+ deriving (Show,Eq,Ord)
 
- <|> Spelled  # "spell" & (character-+) & (phrase-?)
- <|> Letter   # character & (phrase-?)
- <|> Cap      # "cap" & character & (phrase-?)
+-- | a sub-phrase where a phrase to the right is impossible.
+data Phrase00
+ = Verbatim Dictation
+ deriving (Show,Eq,Ord)
 
- <|> Case     # casing   & phrase
- <|> Join     # joiner   & phrase
- <|> Surround # brackets & phrase
-
- <|> Dictated # dictation & (phrase-?)
+phrase = 'phrase
+ <=> Phrase # ((eitherG phrase11 phrase01) -*) & (eitherG phrase00 phrase01)
+phrase11 = 'phrase11 <=> empty
+ <|> Escaped  # "lit" & keyword
+ <|> Quoted   # "quote" & dictation & "unquote"
+ <|> Case     # casing
+ <|> Join     # joiner
+ <|> Surround # brackets
+phrase01 = 'phrase01 <=> empty
+ <|> Spelled  # "spell" & (character-+)
+ <|> Cap      # "cap" & character
+ <|> Dictated # dictation
+phrase00 = 'phrase00 <=> empty
+ <|> Verbatim # "say" & dictation
 
 {- TODO
 "replace this and that with that and this" (line 1, column 41):
@@ -144,8 +151,8 @@ expecting a space, optionalC__Commands.Command.Combinator__commands-core-0.0.0__
 
 does Phrase need a special parser?
 
--}
 
+-}
 
 
 
@@ -221,22 +228,23 @@ bracket c = Brackets [c] [c]
 
 
 mungePhrase :: Phrase -> [String]
-mungePhrase = \case
- Verbatim   (Dictation ws) -> ws
- Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
- Quoted     (Dictation ws) p -> ws <> mungePhrase p
+mungePhrase = error "mungePhrase"
+-- mungePhrase = \case
+ -- Verbatim   (Dictation ws) -> ws
+ -- Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
+ -- Quoted     (Dictation ws) p -> ws <> mungePhrase p
 
- Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
- Letter  c  mp -> [c]              : maybe [] mungePhrase mp
- Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
+ -- Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
+ -- Letter  c  mp -> [c]              : maybe [] mungePhrase mp
+ -- Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
 
- -- TODO inside-out or outside-in? I.e. forwards or backwards?
- -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
- Case     casing   p -> caseWith casing <$> mungePhrase p
- Join     joiner   p -> [joinWith joiner $ mungePhrase p]
- Surround brackets p -> surroundWith brackets $ mungePhrase p
+ -- -- TODO inside-out or outside-in? I.e. forwards or backwards?
+ -- -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
+ -- Case     casing   p -> caseWith casing <$> mungePhrase p
+ -- Join     joiner   p -> [joinWith joiner $ mungePhrase p]
+ -- Surround brackets p -> surroundWith brackets $ mungePhrase p
 
- Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
+ -- Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
 
 caseWith :: Casing -> (String -> String)
 caseWith = \case
@@ -379,15 +387,23 @@ dictation = dragonGrammar 'dictation
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
  (\context -> Dictation <$> anyBlack `manyUntil` context)
 
-newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
-letters = dragonGrammar 'letters
+word_ = dragonGrammar 'word_
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
+ (\_ -> anyWord)
+
+letter_ :: Grammar Char
+letter_ = dragonGrammar 'letter_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (\context -> Letters <$> anyLetter `manyUntil` context) -- TODO greedy (many) versus non-greedy (manyUntil)
+ (\_ -> anyLetter)
+
+-- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
+-- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
+--  Letters # (letter-+)
+ -- TODO greedy (many) versus non-greedy (manyUntil)
 
 -- |
 -- TODO spacing, casing, punctuation; are all weird when letters are recognized by Dragon NaturallySpeaking.
 anyLetter = anyChar
-
 
 
 
@@ -411,7 +427,6 @@ directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
  -- <$> maybeAtomR ("from" &> dictation)
  -- <*> maybeAtomR ("to"   &> dictation)
  -- <*> maybeAtomR ("by"   &> dictation))
-
 
 newtype Place = Place String deriving (Show,Eq)
 place = 'place <=> Place # vocabulary ["here","there"]
@@ -493,6 +508,14 @@ attemptCompile c x s = case r `parses` s of
    print a
    putStrLn $ showActions $ (c `compiles` a) x
  where r = c ^. comGrammar
+
+attemptPython g = do
+ let Right sg = serialized g
+ let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
+ PythonFile pf <- shimmySerialization addresses sg
+ runActions $ setClipboard (T.unpack pf)
+ T.putStrLn $ pf
+ -- TODO why does the unary Test fail? Optimization?
 
 
 main = do
@@ -602,20 +625,20 @@ main = do
  -- attemptSerialize test
 
  putStrLn ""
- let Right sg = serialized (view comGrammar root)  -- TODO why does the unary Test fail? Optimization?
- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
- PythonFile pf <- shimmySerialization addresses sg
- runActions $ setClipboard (T.unpack pf)
- T.putStrLn $ pf
+ attemptPython phrase
 
+ -- putStrLn ""
+ -- -- attemptParse (view comGrammar root) "replace this and that with that and this"
+ -- -- TODO verify phrase/munge with more tests
+ -- attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)
+
+ -- putStrLn ""
+ -- attemptCompile root "emacs" "3 no"
+ -- attemptCompile root "emacs" "replace this and that with that and this"
+ -- attemptCompile root "emacs" "say par round grave camel with async action spell A B C"
 
  putStrLn ""
- -- attemptParse (view comGrammar root) "replace this and that with that and this"
- -- TODO verify phrase/munge with more tests
- attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)
-
- putStrLn ""
- attemptCompile root "emacs" "3 no"
- attemptCompile root "emacs" "replace this and that with that and this"
- attemptCompile root "emacs" "say par round grave camel with async action spell A B C"
+ -- attemptParse root "3 no"
+ -- attemptParse root "replace this and that with that and this"
+ attemptParse phrase "par round grave camel with async action spell A B C"
 

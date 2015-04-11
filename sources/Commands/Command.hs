@@ -124,7 +124,7 @@ specialGrammar name r g p = Grammar (Rule l r) g p
  where
  Just l = lhsFromName name
 
--- | helper function for conveniently defined Dragon NaturallySpeaking built-ins.
+-- | helper function for conveniently using Dragon NaturallySpeaking built-ins.
 dragonGrammar :: Name -> DNSCommandRHS -> Parser a -> Grammar a
 dragonGrammar name rhs p = Grammar
  (Rule l empty)

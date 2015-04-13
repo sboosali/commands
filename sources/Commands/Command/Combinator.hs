@@ -30,17 +30,17 @@ import qualified Text.Parsec                       as Parsec
 --
 -- e.g. @(rule-+)@, using @-XPostfixOperators@
 --
--- @(-+) = 'multipleG'@
+-- @(-+) = 'manyG'@
 (-+) :: Grammar a -> Grammar [a]
-(-+) = multipleG
+(-+) = manyG
 
 -- | zero or more of the grammar.
 --
 -- e.g. @(rule-*)@, using @-XPostfixOperators@
 --
--- @(-*) = 'multiple0G'@
+-- @(-*) = 'many0G'@
 (-*) :: Grammar a -> Grammar [a]
-(-*) = multiple0G
+(-*) = many0G
 
 -- | zero or one of the grammar.
 --

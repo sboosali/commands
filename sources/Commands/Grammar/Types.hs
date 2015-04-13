@@ -1,5 +1,7 @@
-{-# LANGUAGE DeriveFunctor, DeriveGeneric, NamedFieldPuns, PackageImports #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell, TypeOperators, DataKinds, PolyKinds, GeneralizedNewtypeDeriving, KindSignatures, FlexibleContexts, ScopedTypeVariables, GADTs                               #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DeriveGeneric, FlexibleContexts #-}
+{-# LANGUAGE GADTs, GeneralizedNewtypeDeriving, KindSignatures         #-}
+{-# LANGUAGE NamedFieldPuns, PackageImports, PolyKinds, RankNTypes     #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TypeOperators       #-}
 module Commands.Grammar.Types where
 -- import Commands.Command.Types
 import Commands.Backends.OSX.Types       (Actions, Application)
@@ -12,117 +14,135 @@ import Control.Alternative.Free.Tree
 import Control.Lens
 import Data.Hashable                     (Hashable)
 import Numeric.Natural                   (Natural)
-import Data.Vinyl
+-- import Data.Vinyl  -- TODO
 
 import Data.Functor.Constant
 import "transformers-compat" Data.Functor.Sum
 import GHC.Generics                      (Generic)
-import Data.Proxy (Proxy(..))
+-- import Data.Proxy (Proxy(..))  -- TODO
 -- import           Control.Applicative
 -- import Control.Monad.Trans.Reader
 -- import GHC.TypeLits (Symbol)
 
 
-type (:+:) = Sum
+-- type (:+:) = Sum
 
--- | to partially apply a type constructor upon a type argument.
---
--- e.g.
---
--- @('Of' a) :: (* -> *) -> *@
---
--- (read that as "something of @a@")
---
--- it's just backwards type-level application, like @'&' = flip ($)@.
---
--- (@data@ because Haskell can't (?) have a "type-level @Flip@" function as a type alias).
-data Of a f = Of (f a)
+-- newtype Fix f = Fix (f (Fix f))
 
--- | the "complement" of the 'Rec'ord, where we have one "noun" (i.e. type value) and many "verb"s (i.e. type constructor).
---
--- 
---
--- it's a type constructor, rather than a type alias, letting us partially apply it.
---
--- it flips the type parameters, letting us partially apply on the @fs@
---
-newtype RecOf fs a = RecOf { getRec :: Rec (Of a) fs }
+-- -- | to partially apply a type constructor upon a type argument.
+-- --
+-- -- e.g.
+-- --
+-- -- @('Of' a) :: (* -> *) -> *@
+-- --
+-- -- (read that as "something of @a@")
+-- --
+-- -- it's just backwards type-level application, like @'&' = flip ($)@.
+-- --
+-- -- (@data@ because Haskell can't (?) have a "type-level @Flip@" function as a type alias).
+-- data Of a f = Of (f a)
 
--- type Command' (c,xc) g (p,xp) r a = RecOf a [ ... ] -- no: can't pattern match on type aliases
--- type CommandL c xc g p xp =
---  [ "compiler" :::: c xc
---  , "grammar"  :::: Const g
---  , "parser"   :::: p xp
---  , "rhs"      :::: RHS' g p xp
---  , "lhs"      :::: Const LHS
---  ]
-type CommandI c xc g p xp = ("compiler" :::: c xc) ': (NonTerminalI g p xp)
-type Command' c xc g p xp = RecOf (CommandI c xc g p xp)
+-- -- | the "complement" of the 'Rec'ord, where we have one "noun" (i.e. type value) and many "verb"s (i.e. type constructor).
+-- --
+-- --
+-- --
+-- -- it's a type constructor, rather than a type alias, letting us partially apply it.
+-- --
+-- -- it flips the type parameters, letting us partially apply on the @fs@
+-- --
+-- newtype RecOf fs a = RecOf { getRec :: Rec (Of a) fs }
 
--- data RHS'' g p xp a = RHS'' (Alt (Either Terminal (NonTerminal'' g p xp a))) -- no: Either must be fully applied, but Alt takes a partially applied type constructor
+-- -- type Command' (c,xc) g (p,xp) r a = RecOf a [ ... ] -- no: can't pattern match on type aliases
+-- -- type CommandL c xc g p xp =
+-- --  [ "compiler" :::: c xc
+-- --  , "grammar"  :::: Const g
+-- --  , "parser"   :::: p xp
+-- --  , "rhs"      :::: RHS' g p xp
+-- --  , "lhs"      :::: Const LHS
+-- --  ]
 
--- When LiberalTypeSynonyms is enabled, GHC only type-checks a signature after all type synonyms have been expanded, outermost first. You can now partially apply a type synonym, as long as it's surrounded by another type synonym such that the obvious outermost-first expansion will cause the partially-applied synonym to become fully applied.
--- type Alt'' f a = Alt f a
--- data RHS'' g p xp a = RHS'' (Alt'' (Const Terminal :+: NonTerminal'' g p xp) a)
--- type NonTerminal'' g p xp = RecOf'' -- after all the crazy types, must be a {Rec _ _}
+-- -- data RHS'' g p xp a = RHS'' (Alt (Either Terminal (NonTerminal'' g p xp a))) -- no: Either must be fully applied, but Alt takes a partially applied type constructor
+
+-- -- When LiberalTypeSynonyms is enabled, GHC only type-checks a signature after all type synonyms have been expanded, outermost first. You can now partially apply a type synonym, as long as it's surrounded by another type synonym such that the obvious outermost-first expansion will cause the partially-applied synonym to become fully applied.
+-- -- type Alt'' f a = Alt f a
+-- -- data RHS'' g p xp a = RHS'' (Alt'' (Const Terminal :+: NonTerminal'' g p xp) a)
+-- -- type NonTerminal'' g p xp = RecOf'' -- after all the crazy types, must be a {Rec _ _}
+-- --  [ "grammar"  :::: Const g
+-- --  , "parser"   :::: p xp
+-- --  , "rhs"      :::: RHS'' g p xp
+-- --  ]
+-- -- type RecOf'' fs a = Rec (Of a) fs
+
+-- -- data RHS' g p xp a = RHS (Alt (Const Terminal :+: NonTerminal g p xp) a)
+-- -- type Terminal = String
+-- -- type NonTerminal g p xp = RecOf (NonTerminalI g p xp)
+-- -- type NonTerminalI g p xp =
+-- --  [ "grammar"  :::: Const g
+-- --  , "parser"   :::: p xp
+-- --  , "rhs"      :::: RHS' g p xp
+-- --  , "lhs"      :::: Const LHS
+-- --  -- , "rule"      :::: Rule g p xp self?  -- TODO
+-- --  ]
+
+-- type Command'  c xc g p xp a      = Fix (CommandF c xc g p xp a)
+-- data CommandF c xc g p xp a self = CommandF { getCommandF :: RecOf (CommandI g p xp self) a }
+-- type CommandI c xc g p xp   self = ("compiler" :::: c xc) ': (NonTerminalI g p xp self)
+
+-- type NonTerminal  g p xp a      = Fix (NonTerminalF g p xp a)
+-- data NonTerminalF g p xp a self = NonTerminalF { getNonTerminalF :: RecOf (NonTerminalI g p xp self) a }
+-- type NonTerminalI g p xp   self =
 --  [ "grammar"  :::: Const g
 --  , "parser"   :::: p xp
---  , "rhs"      :::: RHS'' g p xp
+--  , "rule"     :::: Rule' self
 --  ]
--- type RecOf'' fs a = Rec (Of a) fs
 
-data RHS' g p xp a = RHS (Alt (Const Terminal :+: NonTerminal g p xp) a)
-type Terminal = String
-type NonTerminal g p xp = RecOf (NonTerminalI g p xp)
-type NonTerminalI g p xp =
- [ "grammar"  :::: Const g
- , "parser"   :::: p xp
- , "rhs"      :::: RHS' g p xp
- , "lhs"      :::: Const LHS
- -- , "rule"      :::: Rule g p xp self?  -- TODO
- ]
+-- data Rule' self a = Rule' LHS (Alt (Const Terminal :+: self) a)
+-- -- data Rule' g p xp a self = Rule' LHS (Alt (Either Terminal (NonTerminalF g p xp a self)))
+-- -- data Rule' g p xp a self = Rule' LHS (RHS' g p xp a self)
+-- -- data RHS'  g p xp a self = RHS' (Alt (Const Terminal :+: NonTerminalF g p xp a self) a)
+-- type Terminal = String
 
-{- I want to be able to mix NonTerminal with Command:
- project a command to a non-terminal e.g.  (&) sugar
- extend a non-terminal with a command e.g.  (<%>)
--}
+-- {- I want to be able to mix NonTerminal with Command:
+--  project a command to a non-terminal e.g.  (&) sugar
+--  extend a non-terminal with a command e.g.  (<%>)
+-- -}
 -- type OSXDGNCommand  a = Command'    Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext a
 -- type DGNNonTerminal a = NonTerminal                           DNSCommandGrammar Parser' ParserContext a
-type OSXDGNCommand  = Command'    Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext
-type DGNNonTerminal = NonTerminal                           DNSCommandGrammar Parser' ParserContext
--- TODO can we support the user easily extending/exchanging the parser/compiler contexts, without hoisting out this extra type everywhere?
+-- -- type OSXDGNCommand  = Command'    Compiler' CompilerContext DNSCommandGrammar Parser' ParserContext
+-- -- type DGNNonTerminal = NonTerminal                           DNSCommandGrammar Parser' ParserContext
+-- -- TODO can we support the user easily extending/exchanging the parser/compiler contexts, without hoisting out this extra type everywhere?
 
-exampleCommand :: OSXDGNCommand () -- yes: can totally apply
-exampleCommand = undefined
-exampleNonTerminal :: DGNNonTerminal () -- yes: can totally apply
-exampleNonTerminal = undefined
+-- exampleCommand :: OSXDGNCommand () -- yes: can totally apply
+-- exampleCommand = undefined
+-- exampleNonTerminal :: DGNNonTerminal () -- yes: can totally apply
+-- exampleNonTerminal = undefined
 
- -- TODO I don't know if naming the field with a equality constraint affects unification, since field's only used in another constraint
-getGrammar
- :: forall fs a g field. (field ~ ("grammar" :::: Const g), field ∈ fs)
- => RecOf fs a -> g
-getGrammar (RecOf record) = case rget (Proxy :: Proxy field) record of
- Of (FieldOf (Field (Const g))) -> g
--- getGrammar = getConst . getOf . getField . asField . rget (Proxy :: Proxy ("grammar" :::: Const g)) -- GADTs need case
--- getGrammar = rget (Nothing :: Maybe ("grammar" :::: Const g)) -- a type of kind (* -> *) needs polykinded proxy like Proxy
+--  -- TODO I don't know if naming the field with a equality constraint affects unification, since field's only used in another constraint
+-- getGrammar
+--  :: forall fs a g field. (field ~ ("grammar" :::: Const g), field ∈ fs)
+--  => RecOf fs a -> g
+-- getGrammar (RecOf record) = case rget (Proxy :: Proxy field) record of
+--  Of (FieldOf (Field (Const g))) -> g
+-- -- getGrammar = getConst . getOf . getField . asField . rget (Proxy :: Proxy ("grammar" :::: Const g)) -- GADTs need case
+-- -- getGrammar = rget (Nothing :: Maybe ("grammar" :::: Const g)) -- a type of kind (* -> *) needs polykinded proxy like Proxy
 
-getParser
- :: forall fs a p xp field. (field ~ ("parser" :::: p xp), field ∈ fs)
- => RecOf fs a -> p xp a
-getParser (RecOf record) = case rget (Proxy :: Proxy field) record of
- Of (FieldOf (Field p)) -> p
+-- getParser
+--  :: forall fs a p xp field. (field ~ ("parser" :::: p xp), field ∈ fs)
+--  => RecOf fs a -> p xp a
+-- getParser (RecOf record) = case rget (Proxy :: Proxy field) record of
+--  Of (FieldOf (Field p)) -> p
 
-getCompiler
- :: forall fs a c xc field. (field ~ ("compiler" :::: c xc), field ∈ fs)
- => RecOf fs a -> c xc a
-getCompiler (RecOf record) = case rget (Proxy :: Proxy field) record of
- Of (FieldOf (Field c)) -> c
+-- getCompiler
+--  :: forall fs a c xc field. (field ~ ("compiler" :::: c xc), field ∈ fs)
+--  => RecOf fs a -> c xc a
+-- getCompiler (RecOf record) = case rget (Proxy :: Proxy field) record of
+--  Of (FieldOf (Field c)) -> c
 
--- | specialized labeled 'Field' for type constructors, for example as elements of a 'RecOf'
---
--- like @:::@, the key is the same but the value is a type constructor that takes one type argument. (Hence the extra @:@? lol.)
-data (s :::: f) a = FieldOf (ElField '(s, f a))
--- type k :::: v = ElField '(k,v)
+-- -- | specialized labeled 'Field' for type constructors, for example as elements of a 'RecOf'
+-- --
+-- -- like @:::@, the key is the same but the value is a type constructor that takes one type argument. (Hence the extra @:@? lol.)
+-- data (s :::: f) a = FieldOf (ElField '(s, f a))
+-- -- type k :::: v = ElField '(k,v)
 
 data Command a = Command
  { _comGrammar  :: Grammar a

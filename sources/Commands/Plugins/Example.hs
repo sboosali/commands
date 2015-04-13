@@ -25,6 +25,7 @@ import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
 import           Language.Python.Version2.Parser (parseModule)
 import           Numeric.Natural                 ()
+import qualified Text.Parsec                     as Parsec
 import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
                                                   (<$>), (<>))
 
@@ -37,7 +38,7 @@ import           Data.Char                       (toUpper)
 import           Data.Either                     (either)
 import           Data.Foldable                   (Foldable (..), asum,
                                                   traverse_)
-import           Data.List                       (intercalate)
+import qualified Data.List                       as List
 import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
 import           Prelude                         hiding (foldr)
@@ -61,7 +62,8 @@ root :: Command Root
 root = set (comGrammar.gramExpand) 1 $ 'root
  <=> empty
  <|> Repeat      # positive & root -- recursive is okay, only left recursion causes non-termination
- <|> ReplaceWith # "replace" & phrase & "with" & phrase
+ <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
+ -- TODO <|> ReplaceWith # "replace" & phrase & "with" & (phrase <|>? "blank")
  <|> Undo        # "no"         -- order matters..
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      # click
@@ -86,74 +88,16 @@ root = set (comGrammar.gramExpand) 1 $ 'root
     slot (munge that)
    _ -> nothing
 
-  Undo -> \case
-   _ -> press met z
+  Undo -> always $ press met z
 
-  Edit_ e -> \case
-   "emacs" -> editEmacs e
-   _ -> nothing
+  Edit_ e -> onlyWhen "emacs" $ editEmacs e
 
-  Repeat n c -> \case
-   x -> replicateM_ (getPositive n) $ (root `compiles` c) x
+  Repeat n c ->
+   \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
 
-  Phrase_ p -> \case
-   _ -> insert (munge p)
+  Phrase_ p -> always $ insert (munge p)
 
-  _ -> \case
-   _ -> do nothing
-
-
-
-data Phrase
- = Phrase [Either Phrase11 Phrase01] (Either Phrase00 Phrase01)
- deriving (Show,Eq,Ord)
-
--- | a sub-phrase where a phrase to the right is certain.
-data Phrase11
- = Escaped  Keyword
- | Quoted   Dictation
- | Case     Casing
- | Join     Joiner
- | Surround Brackets
- deriving (Show,Eq,Ord)
-
--- | a sub-phrase where a phrase to the right is possible.
-data Phrase01
- = Spelled [Char]
- | Cap     Char
- | Dictated Dictation
- deriving (Show,Eq,Ord)
-
--- | a sub-phrase where a phrase to the right is impossible.
-data Phrase00
- = Verbatim Dictation
- deriving (Show,Eq,Ord)
-
-phrase = 'phrase
- <=> Phrase # ((eitherG phrase11 phrase01) -*) & (eitherG phrase00 phrase01)
-phrase11 = 'phrase11 <=> empty
- <|> Escaped  # "lit" & keyword
- <|> Quoted   # "quote" & dictation & "unquote"
- <|> Case     # casing
- <|> Join     # joiner
- <|> Surround # brackets
-phrase01 = 'phrase01 <=> empty
- <|> Spelled  # "spell" & (character-+)
- <|> Cap      # "cap" & character
- <|> Dictated # dictation
-phrase00 = 'phrase00 <=> empty
- <|> Verbatim # "say" & dictation
-
-{- TODO
-"replace this and that with that and this" (line 1, column 41):
-unexpected end of input
-expecting a space, optionalC__Commands.Command.Combinator__commands-core-0.0.0____phrase__Commands.Plugins.Example__commands-core-0.0.0 or "with"
-
-does Phrase need a special parser?
-
-
--}
-
+  _ -> always nothing
 
 
 nothing = return ()
@@ -165,6 +109,90 @@ tab = TabKey
 slot s = do
  insert s
  press [] ReturnKey
+always = const
+when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
+when theseContexts thisAction = \theContext -> do
+ if theContext `List.elem` theseContexts
+ then thisAction
+ else nothing
+onlyWhen = when . (:[])
+whenEmacs = onlyWhen "emacs"
+
+
+
+data Phrase = Phrase [Either PhraseA PhraseB]
+ deriving (Show,Eq,Ord)
+
+-- | a sub-phrase where a phrase to the right is certain.
+data PhraseA
+ = Escaped  Keyword
+ | Quoted   Dictation
+ | Cased     Casing
+ | Joined     Joiner
+ | Surrounded Brackets
+ | Broken
+ | Pasted
+ deriving (Show,Eq,Ord)
+
+-- | a sub-phrase where a phrase to the right is possible.
+data PhraseB
+ = Spelled [Char]
+ | Capped     Char
+ | Dictated Dictation
+ deriving (Show,Eq,Ord)
+
+-- | a sub-phrase where a phrase to the right is impossible.
+data PhraseC
+ = Verbatim Dictation
+ deriving (Show,Eq,Ord)
+
+-- | the custom parser threads the context differently
+phrase = 'phrase
+ -- <=> Phrase # ((phraseA-|phraseB-|word_)-*) & (phraseB -| word_ -| ("say" & dictation))
+ <=> Phrase # ((phraseA-|phraseB)-*)
+ `withParser` (\(context) -> Phrase <$> pP (context))
+ where
+ pP context
+    = ([] <$ (case context of Some q -> (try . lookAhead) q *> pure undefined))
+  <|> ((:) <$> pAB <*> pP context)
+  <|> (((:[]) . Right) <$> pC context) -- terminate. Won't work: can't escape "say"with "lit"
+  <|> ((:) <$> (pDxAB context) <*> pP context)  -- continue
+ -- pP context = Parsec.many (pAB <|> pDxAB context)
+ p <||> q = Left <$> p <|> Right <$> q
+ pAB = pA <||> pB
+ pDxAB context = (Right . Dictated) <$> pD (case context of Some q -> Some (pAB <|> (q *> pure undefined)))
+ -- pAB context = (pA context <||> pB context)
+ -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
+ pA = try $ phraseA ^. gramParser $ undefined -- context free
+ pB = try $ phraseB ^. gramParser $ undefined -- context free
+ pC context = try $ phraseC ^. gramParser $ context             -- context-sensitive
+ pD context = try $ dictation ^. gramParser$ context            -- context-sensitive
+ -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
+phraseA = 'phraseA <=> empty
+ <|> Escaped    # "lit" & keyword
+ <|> Quoted     # "quote" & dictation & "unquote"
+ <|> Cased      # casing
+ <|> Joined     # joiner
+ <|> Surrounded # brackets
+ <|> Broken     # "break"
+ <|> Pasted     # "paste"
+phraseB = 'phraseB <=> empty
+ <|> Spelled  # "spell" & (character-+)
+ -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
+ <|> Capped   # "cap" & character
+phraseC = 'phraseC <=> Dictated # "say" & dictation
+-- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
+
+{- TODO
+"replace this and that with that and this" (line 1, column 41):
+unexpected end of input
+expecting a space, optionalC__Commands.Command.Combinator__commands-core-0.0.0____phrase__Commands.Plugins.Example__commands-core-0.0.0 or "with"
+
+does Phrase need a special parser?
+
+
+-}
+
 
 munge :: Phrase -> String
 munge = spaceCase . mungePhrase
@@ -254,7 +282,7 @@ caseWith = \case
 
 joinWith :: Joiner -> ([String] -> String)
 joinWith = \case
- Joiner s -> intercalate s
+ Joiner s -> List.intercalate s
  CamelJoiner -> camelCase
  ClassJoiner -> classCase
 
@@ -315,6 +343,9 @@ character = 'character <=> empty
  <|> 'a' # "A"  -- TODO What can we get back from Dragon anyway?
  <|> 'b' # "B"
  <|> 'c' # "C"
+ <|> 'm' # "M"
+ <|> 't' # "T"
+ <|> 'a' # "A"
 
  <|> 'a' # "ay"
  <|> 'b' # "bee"
@@ -342,10 +373,11 @@ character = 'character <=> empty
  <|> 'x' # "ex"
  <|> 'y' # "why"
  <|> 'z' # "zee"
+-- TODO alphabet
 
 -- | 'Key's and 'Char'acters are "incomparable":
 --
--- * many modifiers are keys that aren't characters (e.g. 'GrammarKey')
+-- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
 -- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
 --
 -- so we can't embed the one into the other, but we'll just keep things simple with duplication.
@@ -355,10 +387,9 @@ key = 'key <=> empty
 
 type Keyword = String -- TODO
 keyword :: Grammar Keyword
-keyword = 'keyword <=> empty
+keyword = 'keyword <=>id#word_
 
 type Separator = String -- TODO
-
 
 
 data Click = Click Times Button deriving (Show,Eq)
@@ -406,62 +437,6 @@ letter_ = dragonGrammar 'letter_
 anyLetter = anyChar
 
 
-
--- | context-sensitive grammars (like 'dictation') work (?) with 'atom'
-data Directions = Directions Dictation Dictation Dictation deriving (Show,Eq)
-directions = 'directions <=> "directions" &> (runPerms $ Directions
- <$> atom ("from" &> dictation)
- <*> atom ("to"   &> dictation)
- <*> atom ("by"   &> dictation))
-
--- | context-free grammars (like from 'twig' or 'anyWord') can use 'maybeAtomR'
-data Directions_ = Directions_ (Maybe Place) (Maybe Place) (Maybe Transport) deriving (Show,Eq)
-directions_ = 'directions_ <=> "directions" &> (runPerms $ Directions_
- <$> maybeAtomR ("from" &> place)
- <*> maybeAtomR ("to"   &> place)
- <*> maybeAtomR ("by"   &> transport))
-
--- data Directions__ = Directions__ (Maybe Dictation) (Maybe Dictation) (Maybe Dictation) deriving (Show,Eq)
--- directions__ :: Grammar Directions__
--- directions__ = 'directions__ <=> "directions" &> (runPerms $ Directions__
- -- <$> maybeAtomR ("from" &> dictation)
- -- <*> maybeAtomR ("to"   &> dictation)
- -- <*> maybeAtomR ("by"   &> dictation))
-
-newtype Place = Place String deriving (Show,Eq)
-place = 'place <=> Place # vocabulary ["here","there"]
-
-data Transport = Foot | Bike | PublicTransit | Car deriving (Show,Ord,Eq,Enum,Typeable)
-transport = enumGrammar
-
-exampleDirections = fmap (unwords . words)
- [ "directions from here to there  by bike"
- , "directions from here by bike   to there"
- , "directions to there  from here by bike"
- , "directions to there  by bike   from here"
- , "directions by bike   from here to there"
- , "directions by bike   to there  from here"
- ]
-
-
-
-data Even = Even (Maybe Odd)  deriving Show
-data Odd  = Odd  (Maybe Even) deriving Show
-odd_  = set gramExpand 1 $ 'odd_  <=> Odd  # "odd"  & optional even_
-even_ = set gramExpand 1 $ 'even_ <=> Even # "even" & optional odd_
-
-
-data Even2 = Even2 [Odd2]  deriving Show
-data Odd2  = Odd2  [Even2] deriving Show
-odd2  = set gramExpand 1 $ 'odd2  <=> Odd2  # "odd"  & multiple even2
-even2 = set gramExpand 1 $ 'even2 <=> Even2 # "even" & multiple odd2
-
--- data Test = Test deriving (Show,Eq,Enum,Typeable)
--- test = enumGrammar
-test = 'test <=> id # multiple transport
-
-
-
 -- it seems to be synchronous, even with threaded I guess?
 attemptAsynchronously :: Int -> IO () -> IO ()
 attemptAsynchronously seconds action = do
@@ -477,9 +452,7 @@ attempt = attemptAsynchronously 1
 --  a <- attemptParse (view comGrammar root) text
 --  return $ (view comCompiler root) a
 
-attemptMunge' text = do
- let a = phrase `parses` text :: Either SomeException Phrase
- print $ second munge a
+attemptMunge_ = attemptParse phrase
 
 attemptMunge text = do
  case phrase `parses` text :: Either SomeException Phrase of
@@ -489,7 +462,9 @@ attemptMunge text = do
    print p
    print $ munge p
 
-attemptParse grammar = attempt . handleParse grammar
+attemptParse grammar s = do
+ putStrLn ""
+ attempt $ handleParse grammar s
 
 attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
 
@@ -625,7 +600,7 @@ main = do
  -- attemptSerialize test
 
  putStrLn ""
- attemptPython phrase
+ -- attemptPython phrase
 
  -- putStrLn ""
  -- -- attemptParse (view comGrammar root) "replace this and that with that and this"
@@ -640,5 +615,21 @@ main = do
  putStrLn ""
  -- attemptParse root "3 no"
  -- attemptParse root "replace this and that with that and this"
- attemptParse phrase "par round grave camel with async action spell A B C"
+ -- attemptParse phrase "par round grave camel with async action spell A B C"
+
+--  , ""
+ putStrLn ""
+ traverse_ attemptMunge_
+  [ "par round grave camel with async break break action"  -- (`withAsync` action)
+  , "lore grave camel with async grave space action roar"  -- (`withAsync` action)
+  , "camel quote double greater spaced equal unquote equals par double greater equal"  -- doubleGreaterEquals = (>>=)
+  , "class unit test spell M T A"  -- UnitTestMTA
+  , "class spell M T A bid optimization"  -- MTABidOptimization
+  , "lit say camel say some words"  -- say someWords
+  ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+ putStrLn ""
+ traverse_ (attemptParse $ root^.comGrammar)
+  [ "replace this and that with that and this"  -- "this and that" -> "that and this"
+  , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
+  ]
 

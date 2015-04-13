@@ -174,6 +174,7 @@ type Actions = Free OSXAction
 data OSXAction k
  = SendKeyPress    [Modifier] Key                   k
  | SendMouseClick  [Modifier] Positive MouseButton  k
+ -- TODO   | SendText  String k: a common grouping for possible optimizing and debugging
 
  | GetClipboard                                     (Contents -> k)
  | SetClipboard    Contents                         k

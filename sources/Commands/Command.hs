@@ -29,6 +29,9 @@ import           GHC.Generics                          (Generic)
 import           Language.Haskell.TH.Syntax            (Name)
 
 
+infix 1 `withParser` -- binds more loosely than <=>
+infix 1 `withGrammar`
+
 -- |
 --
 -- 'DNSImport's all 'DNSBuiltinRules', whether used or not.
@@ -192,3 +195,10 @@ epsilon = Grammar (Rule l r) g p
  r = empty
  g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) unitDNSRHS  -- TODO def method
  p = \_ -> parserUnit
+
+withParser :: Grammar a -> Parser a -> Grammar a
+withParser = flip (set gramParser)
+-- g `withParser` p = set gramParser p g
+
+withGrammar :: Grammar a -> DNSCommandGrammar -> Grammar a
+withGrammar = flip (set gramGrammar)

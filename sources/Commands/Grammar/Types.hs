@@ -187,6 +187,9 @@ type DNSCommandGrammar = DNSCommandProduction
 
 type DNSCommandProduction = DNSProduction DNSInfo DNSCommandName DNSCommandToken
 
+defaultDNSCommandProduction :: LHS -> DNSCommandRHS -> DNSCommandProduction
+defaultDNSCommandProduction l r = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) r
+
 type DNSCommandRHS = DNSRHS DNSCommandName DNSCommandToken
 
 type DNSCommandName = DNSExpandedName LHS

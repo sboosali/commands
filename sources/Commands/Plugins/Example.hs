@@ -20,6 +20,7 @@ import           Data.Bifunctor                  (second)
 import           Data.Bitraversable
 import qualified Data.ByteString.Lazy.Char8      as B
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
+import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Text.Lazy                  as T
 import qualified Data.Text.Lazy.IO               as T
 import           Data.Typeable
@@ -41,7 +42,7 @@ import           Data.Foldable                   (Foldable (..), asum,
 import qualified Data.List                       as List
 import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
-import           Prelude                         hiding (foldr)
+import           Prelude                         hiding (foldl, foldr1)
 import           System.Timeout                  (timeout)
 -- import qualified Data.Map as Map (Map)
 
@@ -120,83 +121,199 @@ whenEmacs = onlyWhen "emacs"
 
 
 
-data Phrase = Phrase [Either PhraseA PhraseB]
+
+
+
+
+-- | like the tokens of an s-expression.
+data Phrase_
+ = Escaped_  Keyword -- ^ atom-like.
+ | Quoted_   Dictation -- ^ list-like.
+ | Pasted_ -- ^ atom-like.
+ | Blank_ -- ^ atom-like.
+ | Broken_ -- ^ like a close paren.
+ | Cased_      Casing -- ^ function-like (and an "open paren").
+ | Joined_     Joiner -- ^ function-like (and an "open paren").
+ | Surrounded_ Brackets -- ^ function-like (and an "open paren").
+ | Capped_   [Char] -- ^ atom-like.
+ | Spelled_  [Char] -- ^ list-like.
+ | Dictated_ Dictation -- ^ list-like.
  deriving (Show,Eq,Ord)
 
--- | a sub-phrase where a phrase to the right is certain.
-data PhraseA
- = Escaped  Keyword
- | Quoted   Dictation
- | Cased     Casing
- | Joined     Joiner
- | Surrounded Brackets
- | Broken
- | Pasted
- deriving (Show,Eq,Ord)
+-- | its custom parser and grammar are implemented differently, but should behave consistently.
+--
+-- (its special parser threads the context differently than the generic parser would.)
+--
+-- TODO erase this horror from time
+--
+-- transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
+phrase = pPhrase <$> phrase_
+phrase_ = Grammar
+ (Rule l dependencies)
+ (defaultDNSCommandProduction l gP)
+ (\context -> pP context)
 
--- | a sub-phrase where a phrase to the right is possible.
-data PhraseB
- = Spelled [Char]
- | Capped     Char
- | Dictated Dictation
- deriving (Show,Eq,Ord)
-
--- | a sub-phrase where a phrase to the right is impossible.
-data PhraseC
- = Verbatim Dictation
- deriving (Show,Eq,Ord)
-
--- | the custom parser threads the context differently
-phrase = 'phrase
- -- <=> Phrase # ((phraseA-|phraseB-|word_)-*) & (phraseB -| word_ -| ("say" & dictation))
- <=> Phrase # ((phraseA-|phraseB)-*)
- `withParser` (\(context) -> Phrase <$> pP (context))
  where
- pP context
-    = ([] <$ (case context of Some q -> (try . lookAhead) q *> pure undefined))
-  <|> ((:) <$> pAB <*> pP context)
-  <|> (((:[]) . Right) <$> pC context) -- terminate. Won't work: can't escape "say"with "lit"
-  <|> ((:) <$> (pDxAB context) <*> pP context)  -- continue
- -- pP context = Parsec.many (pAB <|> pDxAB context)
- p <||> q = Left <$> p <|> Right <$> q
- pAB = pA <||> pB
- pDxAB context = (Right . Dictated) <$> pD (case context of Some q -> Some (pAB <|> (q *> pure undefined)))
+ Just l = lhsFromName 'phrase
+ dependencies = [] <$ liftGrammar (phraseA `eitherG` phraseB `eitherG` phraseC `eitherG` dictation)
+ -- TODO the RHS of special grammars are ignored (so the eithers don't matter), except for extracting dependencies for serialization
+
+ pP context                     -- merges the context-free Parsec.many the context-sensitive manyUntil
+    = ([]    <$  (case context of Some q -> (try . lookAhead) q *> pure undefined)) -- terminate.
+  <|> ((:)   <$> pAB             <*> pP context)  -- continue. e.g. can escape "say" with "lit"
+  <|> ((:[]) <$> pC context) -- terminate.
+  <|> ((:)   <$> (pDxAB context) <*> pP context)  -- continue
+ pAB = pA <|> pB
+ pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure undefined)))
  -- pAB context = (pA context <||> pB context)
  -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
- pA = try $ phraseA ^. gramParser $ undefined -- context free
- pB = try $ phraseB ^. gramParser $ undefined -- context free
- pC context = try $ phraseC ^. gramParser $ context             -- context-sensitive
- pD context = try $ dictation ^. gramParser$ context            -- context-sensitive
+ pA         = try $ phraseA   ^. gramParser $ undefined -- context free
+ pB         = try $ phraseB   ^. gramParser $ undefined -- context free
+ pC context = try $ phraseC   ^. gramParser $ context             -- context-sensitive
+ pD context = try $ dictation ^. gramParser $ context            -- context-sensitive
  -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
+
+ gP = (DNSSequence $ fromList
+  [ (DNSOptional . DNSMultiple) (DNSAlternatives $ fromList [gA, gB, gD])
+  ,                              DNSAlternatives $ fromList [gC, gB, gD]
+  ])
+ gA = (DNSNonTerminal . SomeDNSLHS) $ phraseA   ^. gramGrammar.dnsProductionLHS
+ gB = (DNSNonTerminal . SomeDNSLHS) $ phraseB   ^. gramGrammar.dnsProductionLHS
+ gC = (DNSNonTerminal . SomeDNSLHS) $ phraseC   ^. gramGrammar.dnsProductionLHS
+ gD = (DNSNonTerminal . SomeDNSLHS) $ dictation ^. gramGrammar.dnsProductionLHS
+
+-- | a sub-phrase where a phrase to the right is certain.
 phraseA = 'phraseA <=> empty
- <|> Escaped    # "lit" & keyword
- <|> Quoted     # "quote" & dictation & "unquote"
- <|> Cased      # casing
- <|> Joined     # joiner
- <|> Surrounded # brackets
- <|> Broken     # "break"
- <|> Pasted     # "paste"
+ <|> (Spelled_ . (:[])) # letter_
+ <|> Escaped_    # "lit" & keyword
+ <|> Quoted_     # "quote" & dictation & "unquote"
+ <|> Pasted_     # "paste"
+ <|> Blank_      # "blank"
+ <|> Broken_     # "break"
+ <|> Cased_      # casing
+ <|> Joined_     # joiner
+ <|> Surrounded_ # brackets
+-- | a sub-phrase where a phrase to the right is possible.
 phraseB = 'phraseB <=> empty
- <|> Spelled  # "spell" & (character-+)
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
- <|> Capped   # "cap" & character
-phraseC = 'phraseC <=> Dictated # "say" & dictation
+ <|> Spelled_  # "spell" & (character-+)
+ <|> Capped_   # "caps" & (character-+)
+ -- <$> alphabetRHS
+-- | a sub-phrase where a phrase to the right is impossible.
+phraseC = 'phraseC <=> Dictated_ # "say" & dictation
 -- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
 
-{- TODO
-"replace this and that with that and this" (line 1, column 41):
-unexpected end of input
-expecting a space, optionalC__Commands.Command.Combinator__commands-core-0.0.0____phrase__Commands.Plugins.Example__commands-core-0.0.0 or "with"
-
-does Phrase need a special parser?
 
 
--}
 
+
+
+-- | atom-like phrases.
+data PAtom
+ = Pasted
+ | PWord String
+ | Acronym [Char]
+ deriving (Show,Eq,Ord)
+
+-- | function-like phrases.
+data PFunc
+ = PList
+ | Cased      Casing
+ | Joined     Joiner
+ | Surrounded Brackets
+ deriving (Show,Eq,Ord)
+
+-- | s-expression-like data.
+--
+-- 'Phrase_' is like the concrete syntax (tokens, parentheses), while 'Phrase' is like the abstract syntax (s-expressions).
+data Phrase
+ = PAtom PAtom
+ | PSexp PFunc [Phrase]
+ -- TODO | PList [Phrase]
+ deriving (Show,Eq,Ord)
+
+emptyPhrase :: Phrase
+emptyPhrase = PAtom (PWord "")
+-- TODO pattern EmptyPhrase, to preserve laws in appendPhrase by pattern matching, under Equality not just Observationally
+
+appendPhrase :: Phrase -> Phrase -> Phrase
+appendPhrase x y = PSexp PList [x, y]
+
+-- | a stack over an inlined 'PSexp'. used by 'pPhrase'.
+type PStack = NonEmpty (PFunc, [Phrase])
+
+pPhrase :: [Phrase_] -> Phrase
+pPhrase = fromStack . foldl' go ((PList, []) :| [])
+ -- (PSexp (PList [PAtom (PWord "")]))
+ where
+ go :: PStack -> Phrase_ -> PStack
+ go ps = \case
+  (Escaped_  (x)) -> update ps $ PAtom (PWord x)
+  (Quoted_   (Dictation xs)) -> update ps $ PSexp PList ((PAtom . PWord) <$> xs)
+  (Dictated_ (Dictation xs)) -> update ps $ PSexp PList ((PAtom . PWord) <$> xs)
+  (Capped_   cs) -> update ps $ PAtom (Acronym cs)
+  (Spelled_  cs) -> update ps $ PAtom (Acronym cs)
+  Pasted_ -> update ps $ PAtom Pasted
+  Blank_  -> update ps $ PAtom (PWord "")
+  Broken_ -> pop ps
+  (Cased_     f)  -> push ps (Cased f)
+  (Joined_    f)  -> push ps (Joined f)
+  (Surrounded_ f) -> push ps (Surrounded f)
+ pop :: PStack -> PStack
+ pop ((f,ps):|(q:qs)) = update (q:|qs) (PSexp f ps) -- break from the innermost PFunc, it becomes an argument to the outer PFunc
+ pop stack            = stack  -- if too many breaks, just ignore
+ push :: PStack -> PFunc -> PStack
+ push (p:|ps) f = (f, []) :| (p:ps)
+ update :: PStack -> Phrase -> PStack
+ update ((f,ps):|qs) p = (f, ps <> [p]) :| qs
+ fromStack :: PStack -> Phrase
+ fromStack = uncurry PSexp . foldr1 (\(f,ps) (g,qs) -> (f, ps <> [PSexp g qs])) . NonEmpty.reverse
+ -- conceptually, right-associate the PFunc's.
 
 munge :: Phrase -> String
-munge = spaceCase . mungePhrase
+munge = undefined
+-- munge = spaceCase . mungePhrase
+
 -- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
+mungePhrase :: Phrase -> [String]
+mungePhrase = error "mungePhrase"
+-- mungePhrase = \case
+--  Verbatim   (Dictation ws) -> ws
+--  Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
+--  Quoted     (Dictation ws) p -> ws <> mungePhrase p
+
+--  Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
+--  Letter  c  mp -> [c]              : maybe [] mungePhrase mp
+--  Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
+
+--  -- TODO inside-out or outside-in? I.e. forwards or backwards?
+--  -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
+--  Case     casing   p -> caseWith casing <$> mungePhrase p
+--  Join     joiner   p -> [joinWith joiner $ mungePhrase p]
+--  Surround brackets p -> surroundWith brackets $ mungePhrase p
+
+--  Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
+
+caseWith :: Casing -> (String -> String)
+caseWith = \case
+ Upper  -> upper
+ Lower  -> lower
+ Capper -> capitalize
+
+joinWith :: Joiner -> ([String] -> String)
+joinWith = \case
+ Joiner s -> List.intercalate s
+ CamelJoiner -> camelCase
+ ClassJoiner -> classCase
+
+surroundWith :: Brackets -> ([String] -> [String])
+surroundWith (Brackets l r) ss = [l] <> ss <> [r]
+
+
+
+
+
+
 
 data Edit = Edit Action Region deriving (Show,Eq,Ord)
 edit = 'edit <=> empty
@@ -255,39 +372,6 @@ bracket c = Brackets [c] [c]
 
 
 
-mungePhrase :: Phrase -> [String]
-mungePhrase = error "mungePhrase"
--- mungePhrase = \case
- -- Verbatim   (Dictation ws) -> ws
- -- Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
- -- Quoted     (Dictation ws) p -> ws <> mungePhrase p
-
- -- Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
- -- Letter  c  mp -> [c]              : maybe [] mungePhrase mp
- -- Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
-
- -- -- TODO inside-out or outside-in? I.e. forwards or backwards?
- -- -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
- -- Case     casing   p -> caseWith casing <$> mungePhrase p
- -- Join     joiner   p -> [joinWith joiner $ mungePhrase p]
- -- Surround brackets p -> surroundWith brackets $ mungePhrase p
-
- -- Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
-
-caseWith :: Casing -> (String -> String)
-caseWith = \case
- Upper  -> upper
- Lower  -> lower
- Capper -> capitalize
-
-joinWith :: Joiner -> ([String] -> String)
-joinWith = \case
- Joiner s -> List.intercalate s
- CamelJoiner -> camelCase
- ClassJoiner -> classCase
-
-surroundWith :: Brackets -> ([String] -> [String])
-surroundWith (Brackets l r) ss = [l] <> ss <> [r]
 
 
 character :: Grammar Char
@@ -340,13 +424,6 @@ character = 'character <=> empty
  <|> '8' # "eight"
  <|> '9' # "nine"
 
- <|> 'a' # "A"  -- TODO What can we get back from Dragon anyway?
- <|> 'b' # "B"
- <|> 'c' # "C"
- <|> 'm' # "M"
- <|> 't' # "T"
- <|> 'a' # "A"
-
  <|> 'a' # "ay"
  <|> 'b' # "bee"
  <|> 'c' # "sea"
@@ -373,7 +450,22 @@ character = 'character <=> empty
  <|> 'x' # "ex"
  <|> 'y' # "why"
  <|> 'z' # "zee"
--- TODO alphabet
+ <|> alphabetRHS
+
+
+{- | equivalent to:
+
+@
+ <|> 'a' # "A"
+ <|> 'b' # "B"
+ <|> 'c' # "C"
+ <|> ...
+ <|> 'z' # "Z"
+@
+
+-}
+alphabetRHS = (asum . List.map (\c -> c <$ liftString [toUpper c]) $ ['a'..'z'])
+-- TODO What will we get back from Dragon anyway?
 
 -- | 'Key's and 'Char'acters are "incomparable":
 --
@@ -413,6 +505,8 @@ positive = 'positive
 
 
 
+
+
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = dragonGrammar 'dictation
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
@@ -425,7 +519,7 @@ word_ = dragonGrammar 'word_
 letter_ :: Grammar Char
 letter_ = dragonGrammar 'letter_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (\_ -> anyLetter)
+ (\_ -> spaced anyLetter)
 
 -- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
@@ -434,7 +528,16 @@ letter_ = dragonGrammar 'letter_
 
 -- |
 -- TODO spacing, casing, punctuation; are all weird when letters are recognized by Dragon NaturallySpeaking.
-anyLetter = anyChar
+anyLetter = oneOf ['A'..'Z']
+-- anyLetter = anyChar
+-- anyLetter = (\c -> c <$ [toUpper c]) <$> ['a'..'z'])
+
+
+
+
+
+
+
 
 
 -- it seems to be synchronous, even with threaded I guess?
@@ -452,7 +555,16 @@ attempt = attemptAsynchronously 1
 --  a <- attemptParse (view comGrammar root) text
 --  return $ (view comCompiler root) a
 
-attemptMunge_ = attemptParse phrase
+attemptMunge_ s = do
+ putStrLn ""
+ print s
+ case phrase_ `parses` s of
+  Left e  -> print e
+  Right p_ -> do
+   let p = pPhrase p_
+   print $ p_
+   print $ p
+   -- print $ munge "<<pasted>>" p
 
 attemptMunge text = do
  case phrase `parses` text :: Either SomeException Phrase of
@@ -577,18 +689,15 @@ main = do
  -- attemptParse even_ "even odd even"
  -- attemptSerialize even_
 
- -- putStrLn ""
+
  -- attemptParse even2 "even odd even"
  -- attemptSerialize even2
-
- -- attemptSerialize root
 
  -- putStrLn ""
  -- let theShim = ShimR "'''_'''" "{'_':'_'}" "'_'" "'_'"
  -- putStrLn $ getShim theShim
  -- writeShim "shim.py" theShim
  -- print $ take 30 $ show $ parseModule (getShim theShim) ""
-
 
  -- PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
  -- T.putStrLn $ pf
@@ -597,7 +706,7 @@ main = do
 
  putStrLn ""
  -- attemptSerialize (view comGrammar root)
- -- attemptSerialize test
+ attemptSerialize phrase
 
  putStrLn ""
  -- attemptPython phrase
@@ -624,7 +733,9 @@ main = do
   , "lore grave camel with async grave space action roar"  -- (`withAsync` action)
   , "camel quote double greater spaced equal unquote equals par double greater equal"  -- doubleGreaterEquals = (>>=)
   , "class unit test spell M T A"  -- UnitTestMTA
-  , "class spell M T A bid optimization"  -- MTABidOptimization
+  , "class spell M T A bid optimization"  -- MtaBidOptimization?
+  , "spell M T A class bid optimization"  -- MTABidOptimization
+  , "class M T A bid optimization"  -- MTABidOptimization
   , "lit say camel say some words"  -- say someWords
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
  putStrLn ""

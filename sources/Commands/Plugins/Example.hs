@@ -1,7 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns, PatternSynonyms, PostfixOperators, RankNTypes #-}
-{-# LANGUAGE RecordWildCards, ScopedTypeVariables, TemplateHaskell         #-}
-{-# LANGUAGE TupleSections                                                 #-}
+{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, ImplicitParams      #-}
+{-# LANGUAGE LambdaCase, NamedFieldPuns, PatternSynonyms, PostfixOperators #-}
+{-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables              #-}
+{-# LANGUAGE TemplateHaskell, TupleSections                                #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 
 module Commands.Plugins.Example where
@@ -34,6 +34,7 @@ import           Control.Applicative             hiding (many, optional)
 import           Control.Concurrent
 import           Control.Monad                   (replicateM_, void, (<=<),
                                                   (>=>))
+import           Control.Monad.Reader            (asks)
 import           Control.Parallel
 import           Data.Char                       (toUpper)
 import           Data.Either                     (either)
@@ -81,13 +82,14 @@ root = set (comGrammar.gramExpand) 1 $ 'root
   ReplaceWith this that -> \case
    "emacs" -> do
     press met r
-    slot (munge this)
-    slot (munge that)
+    slot =<< munge this
+    slot =<< munge that
    "intellij" -> do
     press met r
-    insert (munge this) >> press [] tab
-    slot (munge that)
+    (insert =<< munge this) >> press [] tab
+    slot =<< munge that
    _ -> nothing
+
 
   Undo -> always $ press met z
 
@@ -96,7 +98,8 @@ root = set (comGrammar.gramExpand) 1 $ 'root
   Repeat n c ->
    \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
 
-  Phrase_ p -> always $ insert (munge p)
+  Phrase_ p -> always $ do
+   insert =<< munge p
 
   _ -> always nothing
 
@@ -131,7 +134,7 @@ data Phrase_
  | Quoted_   Dictation -- ^ list-like.
  | Pasted_ -- ^ atom-like.
  | Blank_ -- ^ atom-like.
- | Broken_ -- ^ like a close paren.
+ | Separated_ Separator -- ^ like a close paren.
  | Cased_      Casing -- ^ function-like (and an "open paren").
  | Joined_     Joiner -- ^ function-like (and an "open paren").
  | Surrounded_ Brackets -- ^ function-like (and an "open paren").
@@ -185,11 +188,12 @@ phrase_ = Grammar
 -- | a sub-phrase where a phrase to the right is certain.
 phraseA = 'phraseA <=> empty
  <|> (Spelled_ . (:[])) # letter_
+ <|> (Spelled_ . (:[])) # character
  <|> Escaped_    # "lit" & keyword
  <|> Quoted_     # "quote" & dictation & "unquote"
  <|> Pasted_     # "paste"
  <|> Blank_      # "blank"
- <|> Broken_     # "break"
+ <|> Separated_  # separator
  <|> Cased_      # casing
  <|> Joined_     # joiner
  <|> Surrounded_ # brackets
@@ -203,16 +207,18 @@ phraseB = 'phraseB <=> empty
 phraseC = 'phraseC <=> Dictated_ # "say" & dictation
 -- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
 
-
-
-
-
+newtype Separator = Separator String  deriving (Show,Eq,Ord)
+separator = 'separator <=> empty
+ <|> Separator ""  # "break"
+ <|> Separator " " # "space"
+ <|> Separator "," # "comma"
 
 -- | atom-like phrases.
 data PAtom
  = Pasted
  | PWord String
  | Acronym [Char]
+ | PSep String
  deriving (Show,Eq,Ord)
 
 -- | function-like phrases.
@@ -242,8 +248,16 @@ appendPhrase x y = PSexp PList [x, y]
 -- | a stack over an inlined 'PSexp'. used by 'pPhrase'.
 type PStack = NonEmpty (PFunc, [Phrase])
 
+joinSpelled :: [Phrase_] -> [Phrase_]
+joinSpelled = foldr' go []
+ where
+ go :: Phrase_ -> [Phrase_] -> [Phrase_]
+ go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
+ go p ps = p:ps
+
+
 pPhrase :: [Phrase_] -> Phrase
-pPhrase = fromStack . foldl' go ((PList, []) :| [])
+pPhrase = fromStack . foldl' go ((PList, []) :| []) . joinSpelled
  -- (PSexp (PList [PAtom (PWord "")]))
  where
  go :: PStack -> Phrase_ -> PStack
@@ -255,7 +269,8 @@ pPhrase = fromStack . foldl' go ((PList, []) :| [])
   (Spelled_  cs) -> update ps $ PAtom (Acronym cs)
   Pasted_ -> update ps $ PAtom Pasted
   Blank_  -> update ps $ PAtom (PWord "")
-  Broken_ -> pop ps
+  Separated_ (Separator x) -> update (pop ps) $ PAtom (PSep x)
+  -- Separated_ Broken -> update (pop ps)
   (Cased_     f)  -> push ps (Cased f)
   (Joined_    f)  -> push ps (Joined f)
   (Surrounded_ f) -> push ps (Surrounded f)
@@ -270,45 +285,87 @@ pPhrase = fromStack . foldl' go ((PList, []) :| [])
  fromStack = uncurry PSexp . foldr1 (\(f,ps) (g,qs) -> (f, ps <> [PSexp g qs])) . NonEmpty.reverse
  -- conceptually, right-associate the PFunc's.
 
-munge :: Phrase -> String
-munge = undefined
--- munge = spaceCase . mungePhrase
+-- | "E" for environment, that 'munge' needs.
+data MungeE = MungeE { clipboard :: String }
+-- data MungeE = MungeE { clipboard :: String, spacing :: Map String String }
+type Munged a = MungeE -> a
+
+munge :: Phrase -> Actions String
+munge p = (mungePhrase p . MungeE) <$> getClipboard
+
+mungePhrase :: Phrase -> Munged String
+mungePhrase p = do
+ as <- atomizePhrase p
+ x <- traverse mungeAtom as
+ return $ spaceCase x
 
 -- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
-mungePhrase :: Phrase -> [String]
-mungePhrase = error "mungePhrase"
--- mungePhrase = \case
---  Verbatim   (Dictation ws) -> ws
---  Escaped    kw p -> kw : mungePhrase p  -- TODO can a keyword be multiple words?
---  Quoted     (Dictation ws) p -> ws <> mungePhrase p
+-- mungePhrase :: Phrase -> String -> [String]
+-- mungePhrase (PAtom a) clipboard = case a of
 
---  Spelled cs mp -> (:[]) `fmap` cs <> maybe [] mungePhrase mp  -- TODO singleton or grouped?
---  Letter  c  mp -> [c]              : maybe [] mungePhrase mp
---  Cap     c  mp -> [toUpper c]      : maybe [] mungePhrase mp
+mungeAtom :: PAtom -> Munged String
+mungeAtom = \case
+ Pasted -> asks clipboard
+ PWord w -> pure w
+ Acronym cs -> pure cs
+ PSep s -> pure s -- TODO remove
 
---  -- TODO inside-out or outside-in? I.e. forwards or backwards?
---  -- outside-in is easier to implement, inside-out is perhaps more intuitive to speak.
---  Case     casing   p -> caseWith casing <$> mungePhrase p
---  Join     joiner   p -> [joinWith joiner $ mungePhrase p]
---  Surround brackets p -> surroundWith brackets $ mungePhrase p
+-- |  splats the 'PList' into the @['PAtom']@
+atomizePhrase :: Phrase -> Munged [PAtom]
+atomizePhrase (PAtom a)   _ = [a]
+atomizePhrase (PSexp PList ps) e = concatMap (\p -> atomizePhrase p e) ps
+-- atomizePhrase (PSexp PList ps) = do? concatMap (\p -> atomizePhrase p e) ps
+atomizePhrase (PSexp f ps) e = [PWord $ applyPhrase ps f e]
 
---  Dictated (Dictation ws) mp -> ws <> maybe [] mungePhrase mp
+-- TODO PSexp (Joined CamelJoiner) [PSexp PList [PAtom (PWord "some"),PAtom (PWord "words")]]]
+-- don't collapse PList
+applyPhrase :: [Phrase] -> PFunc -> Munged String
+applyPhrase ps _f = do
+ as <- concat <$> traverse atomizePhrase ps
+ case _f of
+  PList        -> spaceCase <$> traverse mungeAtom as
+  Cased f      -> spaceCase <$> traverse (caseWith f) as
+  Joined f     ->                     joinWith f as
+  Surrounded f -> squeezeCase <$> surroundWith f as
 
-caseWith :: Casing -> (String -> String)
+ -- :: (a -> f b) -> f (t a) -> f (t b)
+
+caseWith :: Casing -> (PAtom -> Munged String)
 caseWith = \case
- Upper  -> upper
- Lower  -> lower
- Capper -> capitalize
+ Upper  -> (pure.upper) <=< mungeAtom
+ Lower  -> (pure.lower) <=< mungeAtom
+ Capper -> (pure.capitalize) <=< mungeAtom
 
-joinWith :: Joiner -> ([String] -> String)
+joinWith :: Joiner -> ([PAtom] -> Munged String)
 joinWith = \case
- Joiner s -> List.intercalate s
- CamelJoiner -> camelCase
- ClassJoiner -> classCase
+ Joiner s    -> (\as e -> List.intercalate s $ fmap (\a -> mungeAtom a e) as)
+ CamelJoiner -> camelAtoms
+ ClassJoiner -> classAtoms
 
-surroundWith :: Brackets -> ([String] -> [String])
-surroundWith (Brackets l r) ss = [l] <> ss <> [r]
+camelAtoms :: [PAtom] -> Munged String
+camelAtoms [] = pure []
+camelAtoms (x:xs) = do
+ y <- mungeAtom x
+ ys <- classAtoms xs
+ return $ lower y <> ys
+ -- (<>) <$> lower y <*> ys
 
+classAtoms :: [PAtom] -> Munged String
+classAtoms = (pure.squeezeCase) <=< (traverse $ \case
+ Pasted     -> capitalize <$> asks clipboard
+ PWord w    -> pure $ capitalize w
+ Acronym cs -> pure $ upper cs
+ PSep s -> pure $ s)
+-- TODO distinguish Capped from Acronym to preserve capitalization?
+
+surroundWith :: Brackets -> ([PAtom] -> Munged [String])
+surroundWith (Brackets l r) as = do
+ xs <- traverse mungeAtom as
+ return $ [l] <> xs <> [r]
+-- TODO generalize by renaming surround to transform: it shares the type with Interleave
+-- e.g. "par thread comma 123" -> (1,2,3)
+
+-- TODO  function that acts on 'PAtom's, lifted to act on Phrases
 
 
 
@@ -400,7 +457,7 @@ character = 'character <=> empty
  <|> '\\' # "stroke"
  <|> '|' # "pipe"
  <|> ';' # "sem"
- <|> ':' # "colon"
+ <|> ':' # "coal"
  <|> '\'' # "tick"
  <|> '"' # "quote"
  <|> ',' # "com"
@@ -481,7 +538,9 @@ type Keyword = String -- TODO
 keyword :: Grammar Keyword
 keyword = 'keyword <=>id#word_
 
-type Separator = String -- TODO
+
+
+
 
 
 data Click = Click Times Button deriving (Show,Eq)
@@ -564,15 +623,7 @@ attemptMunge_ s = do
    let p = pPhrase p_
    print $ p_
    print $ p
-   -- print $ munge "<<pasted>>" p
-
-attemptMunge text = do
- case phrase `parses` text :: Either SomeException Phrase of
-  Left e  -> print e
-  Right p -> do
-   putStrLn ""
-   print p
-   print $ munge p
+   print $ mungePhrase p (MungeE "clipboard contents")
 
 attemptParse grammar s = do
  putStrLn ""
@@ -729,18 +780,23 @@ main = do
 --  , ""
  putStrLn ""
  traverse_ attemptMunge_
-  [ "par round grave camel with async break break action"  -- (`withAsync` action)
-  , "lore grave camel with async grave space action roar"  -- (`withAsync` action)
-  , "camel quote double greater spaced equal unquote equals par double greater equal"  -- doubleGreaterEquals = (>>=)
+  [ "par round grave camel with async break break action"  -- (`withAsync` action) -- "(`withAsync`action)"
+  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
+  , "coal server space tick local"  -- :server 'local --
+  , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
   , "class unit test spell M T A"  -- UnitTestMTA
-  , "class spell M T A bid optimization"  -- MtaBidOptimization?
-  , "spell M T A class bid optimization"  -- MTABidOptimization
+  , "class spell M T A bid optimization"  -- MTABidOptimization
+  , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
   , "class M T A bid optimization"  -- MTABidOptimization
+  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
   , "lit say camel say some words"  -- say someWords
+  , "upper paste"
+  , "camel paste" -- "clipboard contents"
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
  putStrLn ""
  traverse_ (attemptParse $ root^.comGrammar)
-  [ "replace this and that with that and this"  -- "this and that" -> "that and this"
-  , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
+  [
+  -- , "replace this and that with that and this"  -- "this and that" -> "that and this"
+  -- , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
   ]
 

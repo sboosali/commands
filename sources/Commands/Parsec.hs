@@ -118,6 +118,7 @@ word = spaced . string
 spaced :: Parsec a -> Parsec a
 -- spaced = between (many space) (many space)
 -- spaced = between (optional space) (optional space)
+-- spaced p = p <* many space
 spaced p = p <* optional space
 
 -- | matches only the space character

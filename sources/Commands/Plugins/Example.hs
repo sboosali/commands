@@ -135,16 +135,18 @@ munge p = do
 
 -- |
 --
--- 'Phrase_' is like the concrete syntax (tokens, parentheses), while 'Phrase' is like the abstract syntax (s-expressions).
+-- 'Phrase_' is the unassociated concrete syntax list
+-- (e.g. tokens, parentheses),
+-- while 'Phrase' is the associated abstract syntax tree (e.g. s-expressions).
 data Phrase_
  = Escaped_  Keyword -- ^ atom-like.
  | Quoted_   Dictation -- ^ list-like.
  | Pasted_ -- ^ atom-like.
  | Blank_ -- ^ atom-like.
- | Separated_ Separator -- ^ like a close paren.
- | Cased_      Casing -- ^ function-like (and an "open paren").
- | Joined_     Joiner -- ^ function-like (and an "open paren").
- | Surrounded_ Brackets -- ^ function-like (and an "open paren").
+ | Separated_ Separator -- ^ like a "close paren".
+ | Cased_      Casing -- ^ function-like (/ "open paren").
+ | Joined_     Joiner -- ^ function-like (/ "open paren").
+ | Surrounded_ Brackets -- ^ function-like (/ "open paren").
  | Capped_   [Char] -- ^ atom-like.
  | Spelled_  [Char] -- ^ list-like.
  | Dictated_ Dictation -- ^ list-like.
@@ -193,13 +195,16 @@ phrase_ = Grammar
  gD = (DNSNonTerminal . SomeDNSLHS) $ dictation ^. gramGrammar.dnsProductionLHS
 
 -- | a sub-phrase where a phrase to the right is certain.
+--
+-- this ordering prioritizes the escaping Escaped_/Quoted_ over the
+-- escaped, e.g. "quote greater equal unquote".
 phraseA = 'phraseA <=> empty
- <|> (Spelled_ . (:[])) # letter_
- <|> (Spelled_ . (:[])) # character
  <|> Escaped_    # "lit" & keyword
  <|> Quoted_     # "quote" & dictation & "unquote"
  <|> Pasted_     # "paste"
  <|> Blank_      # "blank"
+ <|> (Spelled_ . (:[])) # letter_
+ <|> (Spelled_ . (:[])) # character
  <|> Separated_  # separator
  <|> Cased_      # casing
  <|> Joined_     # joiner

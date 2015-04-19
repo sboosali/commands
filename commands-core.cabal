@@ -217,6 +217,28 @@ executable example
 
 
 
+benchmark command
+ hs-source-dirs:   bench
+ main-is:          Main.hs
+
+ type:             exitcode-stdio-1.0
+ default-language: Haskell2010
+ ghc-options:      -O2
+                   -fmax-simplifier-iterations=10
+                   -fdicts-cheap
+                   -fspec-constr-count=6
+
+ build-depends:
+  commands-core,
+
+  lens,
+  deepseq,
+  criterion,
+
+  base
+
+
+
 -- sources/Commands/Parsec.hs:34:49:
 --     Couldn't match type ‘Identity’
 --                   with ‘transformers-0.3.0.0:Data.Functor.Identity.Identity’

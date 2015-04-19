@@ -313,10 +313,12 @@ edit = 'edit <=> empty
 -- TODO ensure no alternative is empty
 -- <|> (\a -> Edit a undefined) # action
 
-data Action = Copy | Delete | Next deriving (Show,Eq,Ord,Enum,Typeable)
+data Action = Copy | Delete | Next
+ deriving (Show,Eq,Ord,Enum,Typeable)
 action = enumGrammar
 
-data Region = Char | Word | Line deriving (Show,Eq,Ord,Enum,Typeable)
+data Region = Char | Word | Line
+ deriving (Show,Eq,Ord,Enum,Typeable)
 region = enumGrammar
 
 -- Action = Pick | Go |
@@ -580,6 +582,9 @@ attemptPython g = do
  T.putStrLn $ pf
  -- TODO why does the unary Test fail? Optimization?
 
+attemptInterpret = ()
+
+
 
 main = do
 
@@ -705,24 +710,29 @@ main = do
 --  , ""
  putStrLn ""
  traverse_ attemptMunge_
-  [ "par round grave camel with async break break action"  -- (`withAsync` action) -- "(`withAsync`action)"
-  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
-  , "coal server space tick local"  -- :server 'local --
+  [ "coal server space tick local"  -- :server 'local --
+-- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
+ -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
   , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
   , "class unit test spell M T A"  -- UnitTestMTA
+  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
   , "class spell M T A bid optimization"  -- MTABidOptimization
   , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
   , "class M T A bid optimization"  -- MTABidOptimization
-  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
+  , "class spell M TA bid optimization"  -- MTABidOptimization
   , "lit say camel say some words"  -- say someWords
   , "upper paste"
   , "camel paste" -- "clipboard contents"
   , "class paste" -- "clipboard contents"
+  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
+  , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
+  , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
  putStrLn ""
  traverse_ (attemptParse $ root^.comGrammar)
-  [
-  -- , "replace this and that with that and this"  -- "this and that" -> "that and this"
-  -- , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
+  [ "no"
+  , "replace this and that with that and this"  -- "this and that" -> "that and this"
+  , "replace paste with blank"                  --  ~ delete the clipboard between here and the end of the buffer
+  , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
   ]
 

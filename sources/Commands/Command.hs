@@ -32,6 +32,12 @@ import           Language.Haskell.TH.Syntax            (Name)
 infix 1 `withParser` -- binds more loosely than <=>
 infix 1 `withGrammar`
 
+interpret :: Command a -> CompilerContext -> String -> Either SomeException (Actions ())
+-- TODO EitherT?
+interpret c x s = case (c^.comGrammar) `parses` s of
+ Left  e -> Left e
+ Right a -> Right $ (c `compiles` a) x
+
 -- |
 --
 -- 'DNSImport's all 'DNSBuiltinRules', whether used or not.

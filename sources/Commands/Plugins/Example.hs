@@ -1,7 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable, ExtendedDefaultRules, ImplicitParams      #-}
-{-# LANGUAGE LambdaCase, NamedFieldPuns, PatternSynonyms, PostfixOperators #-}
-{-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables              #-}
-{-# LANGUAGE TemplateHaskell, TupleSections                                #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules     #-}
+{-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
+{-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards               #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
 
 module Commands.Plugins.Example where
@@ -9,6 +9,7 @@ import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
 import           Commands.Core                   hiding (tab)
 import           Commands.Frontends.Dragon13
+import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
 
 import           Control.Applicative.Permutation
@@ -121,6 +122,10 @@ when theseContexts thisAction = \theContext -> do
  else nothing
 onlyWhen = when . (:[])
 whenEmacs = onlyWhen "emacs"
+munge :: Phrase -> Actions String
+munge p = do
+ q <- splatPasted p <$> getClipboard
+ return $ mungePhrase q defSpacing
 
 
 
@@ -128,7 +133,9 @@ whenEmacs = onlyWhen "emacs"
 
 
 
--- | like the tokens of an s-expression.
+-- |
+--
+-- 'Phrase_' is like the concrete syntax (tokens, parentheses), while 'Phrase' is like the abstract syntax (s-expressions).
 data Phrase_
  = Escaped_  Keyword -- ^ atom-like.
  | Quoted_   Dictation -- ^ list-like.
@@ -209,44 +216,23 @@ phraseC = 'phraseC <=> Dictated_ # "say" & dictation
 
 newtype Separator = Separator String  deriving (Show,Eq,Ord)
 separator = 'separator <=> empty
- <|> Separator ""  # "break"
+ <|> Separator ""  # "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
  <|> Separator " " # "space"
  <|> Separator "," # "comma"
 
--- | atom-like phrases.
-data PAtom
- = Pasted
- | PWord String
- | Acronym [Char]
- | PSep String
- deriving (Show,Eq,Ord)
 
--- | function-like phrases.
-data PFunc
- = PList
- | Cased      Casing
- | Joined     Joiner
- | Surrounded Brackets
- deriving (Show,Eq,Ord)
 
--- | s-expression-like data.
+-- | used by 'pPhrase'.
 --
--- 'Phrase_' is like the concrete syntax (tokens, parentheses), while 'Phrase' is like the abstract syntax (s-expressions).
-data Phrase
- = PAtom PAtom
- | PSexp PFunc [Phrase]
- -- TODO | PList [Phrase]
- deriving (Show,Eq,Ord)
+--
+type PStack = NonEmpty PItem
+-- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
+-- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
 
-emptyPhrase :: Phrase
-emptyPhrase = PAtom (PWord "")
--- TODO pattern EmptyPhrase, to preserve laws in appendPhrase by pattern matching, under Equality not just Observationally
-
-appendPhrase :: Phrase -> Phrase -> Phrase
-appendPhrase x y = PSexp PList [x, y]
-
--- | a stack over an inlined 'PSexp'. used by 'pPhrase'.
-type PStack = NonEmpty (PFunc, [Phrase])
+-- | an inlined subset of 'Sexp'.
+--
+-- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
+type PItem = (Maybe PFunc, [Phrase])
 
 joinSpelled :: [Phrase_] -> [Phrase_]
 joinSpelled = foldr' go []
@@ -255,117 +241,58 @@ joinSpelled = foldr' go []
  go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
  go p ps = p:ps
 
-
+-- | parses "tokens" into an "Sexp". a total function.
 pPhrase :: [Phrase_] -> Phrase
-pPhrase = fromStack . foldl' go ((PList, []) :| []) . joinSpelled
+pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
  -- (PSexp (PList [PAtom (PWord "")]))
  where
  go :: PStack -> Phrase_ -> PStack
  go ps = \case
-  (Escaped_  (x)) -> update ps $ PAtom (PWord x)
-  (Quoted_   (Dictation xs)) -> update ps $ PSexp PList ((PAtom . PWord) <$> xs)
-  (Dictated_ (Dictation xs)) -> update ps $ PSexp PList ((PAtom . PWord) <$> xs)
-  (Capped_   cs) -> update ps $ PAtom (Acronym cs)
-  (Spelled_  cs) -> update ps $ PAtom (Acronym cs)
-  Pasted_ -> update ps $ PAtom Pasted
-  Blank_  -> update ps $ PAtom (PWord "")
-  Separated_ (Separator x) -> update (pop ps) $ PAtom (PSep x)
+  (Escaped_  (x))            -> update ps $ fromPAtom (PWord x)
+  (Quoted_   (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
+  (Dictated_ (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
+  (Capped_   cs)             -> update ps $ fromPAtom (PAcronym cs)
+  (Spelled_  cs)             -> update ps $ fromPAtom (PAcronym cs)
+  Pasted_                    -> update ps $ fromPasted
+  Blank_                     -> update ps $ fromPAtom (PWord "")
+  Separated_ (Separator x) -> update (pop ps) $ fromPAtom (PWord x)
   -- Separated_ Broken -> update (pop ps)
   (Cased_     f)  -> push ps (Cased f)
   (Joined_    f)  -> push ps (Joined f)
   (Surrounded_ f) -> push ps (Surrounded f)
+
  pop :: PStack -> PStack
- pop ((f,ps):|(q:qs)) = update (q:|qs) (PSexp f ps) -- break from the innermost PFunc, it becomes an argument to the outer PFunc
- pop stack            = stack  -- if too many breaks, just ignore
+ -- break from the innermost PFunc, it becomes an argument to the outer PFunc
+ pop ((Nothing,ps):|(q:qs)) = update (q:|qs) (List ps)
+ pop ((Just f ,ps):|(q:qs)) = update (q:|qs) (Sexp f ps)
+ -- if too many breaks, just ignore
+ pop stack = stack
+
  push :: PStack -> PFunc -> PStack
- push (p:|ps) f = (f, []) :| (p:ps)
+ push (p:|ps) f = (Just f, []) :| (p:ps)
+
  update :: PStack -> Phrase -> PStack
  update ((f,ps):|qs) p = (f, ps <> [p]) :| qs
+
+ -- right-associate the PFunc's.
  fromStack :: PStack -> Phrase
- fromStack = uncurry PSexp . foldr1 (\(f,ps) (g,qs) -> (f, ps <> [PSexp g qs])) . NonEmpty.reverse
- -- conceptually, right-associate the PFunc's.
+ fromStack = fromItem . foldr1 associateItem . NonEmpty.reverse
 
--- | "E" for environment, that 'munge' needs.
-data MungeE = MungeE { clipboard :: String }
--- data MungeE = MungeE { clipboard :: String, spacing :: Map String String }
-type Munged a = MungeE -> a
+ associateItem :: PItem -> PItem -> PItem
+ associateItem (f,ps) = \case
+  (Nothing,qs) -> (f, ps <> [List   qs])
+  (Just g ,qs) -> (f, ps <> [Sexp g qs])
 
-munge :: Phrase -> Actions String
-munge p = (mungePhrase p . MungeE) <$> getClipboard
+ fromItem :: PItem -> Phrase
+ fromItem (Nothing, ps) = List   ps
+ fromItem (Just f,  ps) = Sexp f ps
 
-mungePhrase :: Phrase -> Munged String
-mungePhrase p = do
- as <- atomizePhrase p
- x <- traverse mungeAtom as
- return $ spaceCase x
+ fromPasted :: Phrase
+ fromPasted = Atom . Left $ Pasted
 
--- TODO spaces between wor ds, not between letters and punctuation etc. what controls this?
--- mungePhrase :: Phrase -> String -> [String]
--- mungePhrase (PAtom a) clipboard = case a of
+ fromPAtom :: PAtom -> Phrase
+ fromPAtom = Atom . Right
 
-mungeAtom :: PAtom -> Munged String
-mungeAtom = \case
- Pasted -> asks clipboard
- PWord w -> pure w
- Acronym cs -> pure cs
- PSep s -> pure s -- TODO remove
-
--- |  splats the 'PList' into the @['PAtom']@
-atomizePhrase :: Phrase -> Munged [PAtom]
-atomizePhrase (PAtom a)   _ = [a]
-atomizePhrase (PSexp PList ps) e = concatMap (\p -> atomizePhrase p e) ps
--- atomizePhrase (PSexp PList ps) = do? concatMap (\p -> atomizePhrase p e) ps
-atomizePhrase (PSexp f ps) e = [PWord $ applyPhrase ps f e]
-
--- TODO PSexp (Joined CamelJoiner) [PSexp PList [PAtom (PWord "some"),PAtom (PWord "words")]]]
--- don't collapse PList
-applyPhrase :: [Phrase] -> PFunc -> Munged String
-applyPhrase ps _f = do
- as <- concat <$> traverse atomizePhrase ps
- case _f of
-  PList        -> spaceCase <$> traverse mungeAtom as
-  Cased f      -> spaceCase <$> traverse (caseWith f) as
-  Joined f     ->                     joinWith f as
-  Surrounded f -> squeezeCase <$> surroundWith f as
-
- -- :: (a -> f b) -> f (t a) -> f (t b)
-
-caseWith :: Casing -> (PAtom -> Munged String)
-caseWith = \case
- Upper  -> (pure.upper) <=< mungeAtom
- Lower  -> (pure.lower) <=< mungeAtom
- Capper -> (pure.capitalize) <=< mungeAtom
-
-joinWith :: Joiner -> ([PAtom] -> Munged String)
-joinWith = \case
- Joiner s    -> (\as e -> List.intercalate s $ fmap (\a -> mungeAtom a e) as)
- CamelJoiner -> camelAtoms
- ClassJoiner -> classAtoms
-
-camelAtoms :: [PAtom] -> Munged String
-camelAtoms [] = pure []
-camelAtoms (x:xs) = do
- y <- mungeAtom x
- ys <- classAtoms xs
- return $ lower y <> ys
- -- (<>) <$> lower y <*> ys
-
-classAtoms :: [PAtom] -> Munged String
-classAtoms = (pure.squeezeCase) <=< (traverse $ \case
- Pasted     -> capitalize <$> asks clipboard
- PWord w    -> pure $ capitalize w
- Acronym cs -> pure $ upper cs
- PSep s -> pure $ s)
--- TODO distinguish Capped from Acronym to preserve capitalization?
-
-surroundWith :: Brackets -> ([PAtom] -> Munged [String])
-surroundWith (Brackets l r) as = do
- xs <- traverse mungeAtom as
- return $ [l] <> xs <> [r]
--- TODO generalize by renaming surround to transform: it shares the type with Interleave
--- e.g. "par thread comma 123" -> (1,2,3)
-
--- TODO  function that acts on 'PAtom's, lifted to act on Phrases
 
 
 
@@ -397,13 +324,7 @@ editEmacs = undefined
 
 speech = phrase -- TODO
 
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
 casing = enumGrammar
-
-data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
--- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
--- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
--- maybe some type from data.split package, that both supports decidable equality and that can build functions
 joiner = 'joiner
  <=> (\c -> Joiner [c]) # "join" & character
  <|> Joiner "_" # "snake"
@@ -412,8 +333,6 @@ joiner = 'joiner
  <|> Joiner ""  # "squeeze"
  <|> CamelJoiner # "camel"
  <|> ClassJoiner # "class"
-
-data Brackets = Brackets String String deriving (Show,Eq,Ord,Typeable)
 brackets = 'brackets
  <=> bracket          # "round" & character
  <|> Brackets "(" ")" # "par"
@@ -424,8 +343,6 @@ brackets = 'brackets
  <|> bracket '\''     # "ticked"
  <|> bracket '|'      # "norm"
  -- <|> Brackets "**" "**" # "bold"
-
-bracket c = Brackets [c] [c]
 
 
 
@@ -619,11 +536,14 @@ attemptMunge_ s = do
  print s
  case phrase_ `parses` s of
   Left e  -> print e
-  Right p_ -> do
-   let p = pPhrase p_
-   print $ p_
-   print $ p
-   print $ mungePhrase p (MungeE "clipboard contents")
+  Right raw_p -> do
+   let pasted_p   = pPhrase raw_p
+   let splatted_p = splatPasted pasted_p ("clipboard contents")
+   let munged_p   = mungePhrase splatted_p defSpacing
+   print $ raw_p
+   print $ pasted_p
+   print $ splatted_p
+   print $ munged_p
 
 attemptParse grammar s = do
  putStrLn ""
@@ -792,6 +712,7 @@ main = do
   , "lit say camel say some words"  -- say someWords
   , "upper paste"
   , "camel paste" -- "clipboard contents"
+  , "class paste" -- "clipboard contents"
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
  putStrLn ""
  traverse_ (attemptParse $ root^.comGrammar)

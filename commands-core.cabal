@@ -94,6 +94,7 @@ library
   Commands.Command.Combinator
 
   Commands.Plugins.Example
+  Commands.Plugins.Example.Phrase
 
   Commands.Etc
   Commands.Etc.Generics

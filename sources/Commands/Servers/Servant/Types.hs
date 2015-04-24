@@ -1,20 +1,35 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Commands.Servers.Servant.Types where
+import Commands.Grammar.Types
 
 import Data.Aeson
-import Data.Aeson.Types
+-- import Data.Aeson.Types
 
-import Data.Map         (Map)
-import GHC.Generics     (Generic)
+-- import Data.Map         (Map)
+import GHC.Generics           (Generic)
 
+
+{- | the Commands Model.
+
+State that configures the server's handlers, and may be updated by clients.
+
+
+-}
+data CModel a = CModel
+ { _modCommand :: Command a
+ , _modDefault :: String -> a
+ , _modContext :: CompilerContext
+ -- , _mod ::
+ }
+ -- deriving (Show,Eq,Ord) no?
 
 {- |
 
 
 
 -}
-newtype Recognition = Recognition [String]  deriving (Show,Eq,Ord,Generic)
-instance FromJSON Recognition
+newtype DGNRecognition = DGNRecognition [String]  deriving (Show,Eq,Ord,Generic)
+instance FromJSON DGNRecognition
 
 {- |
 
@@ -32,13 +47,13 @@ should be a sum type, but it must be a silly product type of Maybe\'s:
 parameterized over your choice of string-like type (or any type at all).
 
 -}
-data DGNUpdate a = DGNUpdate
- { _dgnUpdateRules   :: Maybe a -- ^ serializes to a JSON String 'Value' or 'Null'
- , _dgnUpdateExports :: Maybe [a] -- ^ serializes to a JSON 'Array' or 'Null'
- , _dgnUpdateLists   :: Maybe (Map String [a]) -- ^ serializes to a JSON 'Object' or 'Null'
- } deriving (Show,Eq,Ord,Generic)
+-- data DGNUpdate a = DGNUpdate
+--  { _dgnUpdateRules   :: Maybe a -- ^ serializes to a JSON String 'Value' or 'Null'
+--  , _dgnUpdateExports :: Maybe [a] -- ^ serializes to a JSON 'Array' or 'Null'
+--  , _dgnUpdateLists   :: Maybe (Map String [a]) -- ^ serializes to a JSON 'Object' or 'Null'
+--  } deriving (Show,Eq,Ord,Generic)
 
-instance ToJSON a => ToJSON (DGNUpdate a) where
- toJSON = genericToJSON defaultOptions{ fieldLabelModifier = stripUnderscorePrefix }
-  where stripUnderscorePrefix = (\case ('_':xs) -> xs; xs -> xs)
+-- instance ToJSON a => ToJSON (DGNUpdate a) where
+--  toJSON = genericToJSON defaultOptions{ fieldLabelModifier = stripUnderscorePrefix }
+--   where stripUnderscorePrefix = (\case ('_':xs) -> xs; xs -> xs)
 

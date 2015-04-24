@@ -71,9 +71,11 @@ root = set (comGrammar.gramExpand) 1 $ 'root
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      # click
  <|> Edit_       # edit
- <|> Phrase_     # "say" & phrase -- TODO remove prefix
+ <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has prefix
+ <|> Phrase_     # phrase
  -- <|> Roots       # (multipleC root)
 -- TODO <|> Frozen # "freeze" & root
+
  <%> \case
 
 -- TODO Frozen r -> \case
@@ -112,6 +114,7 @@ r = RKey
 z = ZKey
 tab = TabKey
 slot s = do
+ -- delay 30
  insert s
  press [] ReturnKey
 always = const
@@ -212,6 +215,7 @@ phraseA = 'phraseA <=> empty
 -- | a sub-phrase where a phrase to the right is possible.
 phraseB = 'phraseB <=> empty
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
+ -- <|> Spelled_  # "spell" & letters -- only, not characters
  <|> Spelled_  # "spell" & (character-+)
  <|> Capped_   # "caps" & (character-+)
  -- <$> alphabetRHS
@@ -268,11 +272,12 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
  pop :: PStack -> PStack
  -- break from the innermost PFunc, it becomes an argument to the outer PFunc
+ -- i.e. close the S expression with a right parenthesis "...)"
  pop ((Nothing,ps):|(q:qs)) = update (q:|qs) (List ps)
  pop ((Just f ,ps):|(q:qs)) = update (q:|qs) (Sexp f ps)
  -- if too many breaks, just ignore
  pop stack = stack
-
+ -- i.e. open a left parenthesis with some function "(f ..."
  push :: PStack -> PFunc -> PStack
  push (p:|ps) f = (Just f, []) :| (p:ps)
 
@@ -304,14 +309,30 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
 
 
-data Edit = Edit Action Region deriving (Show,Eq,Ord)
-edit = 'edit <=> empty
+data Edit = Edit Action Direction Region deriving (Show,Eq,Ord)
+edit = 'edit
+ <=> editing # (action-?) & (direction-?) & (region-?)
+ <|> Edit # action & (direction -?- Whole) & region
+
+-- TODO ensure no alternative is empty, necessary?
+
+-- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
+-- editWith editing = 'edit <=> editing # (direction-?) & (action-?) & (region-?)
+-- edit = editWith defEditing
+-- TODO
+-- maybe RHS should have access to a configuration environment? Oh my.
+-- could also provide the keyword (i.e. only literals) feature, rather than forcing it on the parser.
+-- if it were State not Reader, it could also support contextual (mutable) vocabularies;
+ -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
+editing :: Maybe Action -> Maybe Direction -> Maybe Region -> Edit
+editing = undefined
 -- TODO defaults <|> Edit # action & region
- <|> Edit undefined # region
- <|> flip Edit undefined # action
- <|> Edit # action & region
--- TODO ensure no alternative is empty
--- <|> (\a -> Edit a undefined) # action
+ -- <|> Edit undefined # region
+ -- <|> flip Edit undefined # action
+
+data Direction = Back | Whole | For
+ deriving (Show,Eq,Ord,Enum,Typeable)
+direction = enumGrammar
 
 data Action = Copy | Delete | Next
  deriving (Show,Eq,Ord,Enum,Typeable)
@@ -325,9 +346,17 @@ region = enumGrammar
 -- Region = Selection |
 -- Direction = Whole | Backwards | Forwards
 
-
 editEmacs :: Edit -> Actions ()
 editEmacs = undefined
+
+
+
+
+
+
+
+
+
 
 speech = phrase -- TODO
 
@@ -350,10 +379,6 @@ brackets = 'brackets
  <|> bracket '\''     # "ticked"
  <|> bracket '|'      # "norm"
  -- <|> Brackets "**" "**" # "bold"
-
-
-
-
 
 character :: Grammar Char
 character = 'character <=> empty
@@ -448,7 +473,7 @@ character = 'character <=> empty
 alphabetRHS = (asum . List.map (\c -> c <$ liftString [toUpper c]) $ ['a'..'z'])
 -- TODO What will we get back from Dragon anyway?
 
--- | 'Key's and 'Char'acters are "incomparable":
+-- | 'Key's and 'Char'acters are "incomparable sets":
 --
 -- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
 -- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
@@ -588,124 +613,19 @@ attemptInterpret = ()
 
 main = do
 
- -- putStrLn ""
- -- attemptParse positive "9"
- -- attemptParse dictation "this and that"
- -- attemptParse root "no"
- -- attemptParse root "no way"
- -- attemptParse root "replace this and that with that and this"
- -- attemptParse root "1 1 no"
- -- attemptParse root "say 638 Pine St., Redwood City 94063"
- -- attemptParse root "no BAD"     -- prefix succeeds, but the whole should fail
-
- -- attemptParse (multipleC root) "no no 1 replace this and that with that and this"
-
- -- putStrLn ""
- -- attemptParse click "single left click"
- -- attemptParse click "left click"
- -- attemptParse click "single click"
- -- attemptParse click "click"
-
- -- putStrLn ""
- -- attemptParse phrase
-
-
-
- -- putStrLn ""
- -- attemptNameRHS ("from" &> place)
- -- attemptNameRHS ("to"   &> place)
- -- attemptNameRHS ("by"   &> transport)
-
-
-
- -- putStrLn ""
- -- attemptSerialize directions
- -- putStrLn ""
- -- traverse_ (attemptParse directions) exampleDirections
- -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
-
- -- putStrLn ""
- -- attemptSerialize directions_
- -- putStrLn ""
- -- traverse_ (attemptParse directions_) exampleDirections
-
- -- putStrLn ""
- -- print (getWords . _gramGrammar $ button)
-
- -- putStrLn ""
- -- print $ cycles $
- --  [ ("non recursive",        "N", [])
- --  , ("self recursive",       "S", ["S"])
- --  , ("mutually recursive A", "A", ["B"])
- --  , ("mutually recursive B", "B", ["A","C"])
- --  , ("mutually recursive C", "C", ["A","S","N"])
- --  ]
-
- -- putStrLn ""
- -- print $ SomeDNSLHS (DNSList "n")
- -- print $ DNSNonTerminal (SomeDNSLHS (DNSList "n"))
- -- print $ DNSOptional (DNSNonTerminal (SomeDNSLHS (DNSList "n")))
-
- -- putStrLn ""
- -- let name = DNSNonTerminal (SomeDNSLHS (DNSList "A"))
- -- let rhs = DNSAlternatives $ fromList [ name, DNSSequence $ fromList [DNSTerminal (DNSToken "t"), DNSNonTerminal (SomeDNSLHS (DNSList "B")), DNSOptional (DNSMultiple name)] ]
- -- print $ transform (\case
- --   DNSNonTerminal ((== (SomeDNSLHS (DNSList "A"))) -> True) -> DNSNonTerminal (SomeDNSLHS (DNSList "XXX"))
- --   r -> r)
- --  rhs
-
- -- putStrLn ""
- -- attemptParse phrase "parens snake upper some words" -- lol "ens"
- -- attemptParse phrase "par snake upper some words"
- -- attemptParse phrase "say some words"
- -- attemptParse phrase "par quote par snake unquote snake some words"
- -- attemptParse phrase "spell grave zero ay bee sea some words"
- -- attemptParse phrase "spell grave zero ay bee sea"
- -- attemptParse phrase "string some words"
-
- -- putStrLn ""
- -- attemptParse speech "lore some words roar"
-
- -- putStrLn ""
- -- attemptParse even_ "even odd even"
- -- attemptSerialize even_
-
-
- -- attemptParse even2 "even odd even"
- -- attemptSerialize even2
-
- -- putStrLn ""
- -- let theShim = ShimR "'''_'''" "{'_':'_'}" "'_'" "'_'"
- -- putStrLn $ getShim theShim
- -- writeShim "shim.py" theShim
- -- print $ take 30 $ show $ parseModule (getShim theShim) ""
-
- -- PythonFile pf <- shimmySerialization (T.pack "'http://192.168.56.1:8080'") sg
- -- T.putStrLn $ pf
- -- -- writeFile "_shim.py" (T.unpack pf)
-
-
  putStrLn ""
- -- attemptSerialize (view comGrammar root)
+ -- attemptSerialize rootG
  attemptSerialize phrase
+ attemptParse phraseC "say 638 Pine St., Redwood City 94063"
 
  putStrLn ""
- -- attemptPython phrase
-
- -- putStrLn ""
- -- -- attemptParse (view comGrammar root) "replace this and that with that and this"
- -- -- TODO verify phrase/munge with more tests
- -- attemptMunge "par round grave camel with async action spell A B C"  -- (`withAsyncActionABC`)
-
- -- putStrLn ""
- -- attemptCompile root "emacs" "3 no"
- -- attemptCompile root "emacs" "replace this and that with that and this"
- -- attemptCompile root "emacs" "say par round grave camel with async action spell A B C"
-
- putStrLn ""
- -- attemptParse root "3 no"
- -- attemptParse root "replace this and that with that and this"
- -- attemptParse phrase "par round grave camel with async action spell A B C"
+ let rootG = (root^.comGrammar)
+ attemptParse rootG "say 638 Pine St., Redwood City 94063"  -- ? (line 1, column 1): unexpected 's'
+ attemptParse rootG "no BAD"     -- prefix succeeds, but the whole should fail
+ attemptParse (multipleG rootG) "no no 1 replace this and that with that and this"
+ attemptParse click "click"
+ -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
+ print $ getWords (rootG ^. gramGrammar)
 
 --  , ""
  putStrLn ""
@@ -728,6 +648,7 @@ main = do
   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+
  putStrLn ""
  traverse_ (attemptParse $ root^.comGrammar)
   [ "no"

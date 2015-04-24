@@ -50,6 +50,16 @@ import qualified Text.Parsec                       as Parsec
 (-?) :: Grammar a -> Grammar (Maybe a)
 (-?) = optionalG
 
+-- | zero or one of the grammar.
+--
+-- you can enrich your grammar with optionality, without polluting your datatype with Maybe's.
+--
+-- e.g. @(rule -?- default)@
+--
+-- @(-?-) = flip 'optionG'@
+(-?-) :: Grammar a -> a -> Grammar a
+(-?-) = flip optionG
+
 -- | either one grammar or the other.
 --
 -- e.g. @(rule-|)@, using @-XPostfixOperators@

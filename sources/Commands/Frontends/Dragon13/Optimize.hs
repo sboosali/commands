@@ -61,7 +61,7 @@ type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList (DNSExpandedNa
 optimizeGrammar :: (Eq t) => DNSGrammar DNSInfo (DNSExpandedName LHS) t -> DNSGrammar DNSInfo Text t
 optimizeGrammar
  = first renderDNSExpandedName
- . compactGrammar
+ . tidyupGrammar
  . expandGrammar
  . vocabularizeGrammar
  . inlineGrammar
@@ -294,17 +294,17 @@ rules2lists ls = transformOn dnsProductionRHS $ \case
 
 -- ================================================================ --
 
--- |
-compactGrammar :: (Functor f) => DNSGrammar i (f LHS) t -> DNSGrammar i (f Text) t
-compactGrammar = first (fmap (T.pack . showLHS . compactLHS))
--- compactGrammar = first (fmap (T.pack . showLHS))
+-- | Tidy up the grammar by contacting the left-hand sides, without collisions.
+tidyupGrammar :: (Functor f) => DNSGrammar i (f LHS) t -> DNSGrammar i (f Text) t
+tidyupGrammar = first (fmap (T.pack . showLHS . tidyupLHS))
+-- tidyupGrammar = first (fmap (T.pack . showLHS))
 
 -- |
-compactLHS :: LHS -> LHS
-compactLHS (LHS (GUI (Package _) (Module _) (Identifier occ))) = LHS (GUI (Package "") (Module "") (Identifier occ))
-compactLHS (l `LHSApp` ls) = compactLHS l `LHSApp` fmap compactLHS ls
-compactLHS l = l
--- TODO safely compact i.e. unambiguously. compare each against all, with getNames. Build a Trie?
+tidyupLHS :: LHS -> LHS
+tidyupLHS (LHS (GUI (Package _) (Module _) (Identifier occ))) = LHS (GUI (Package "") (Module "") (Identifier occ))
+tidyupLHS (l `LHSApp` ls) = tidyupLHS l `LHSApp` fmap tidyupLHS ls
+tidyupLHS l = l
+-- TODO safely tidyup i.e. unambiguously. compare each against all, with getNames. Build a Trie?
 
 -- |
 renderDNSExpandedName :: DNSExpandedName Text -> Text

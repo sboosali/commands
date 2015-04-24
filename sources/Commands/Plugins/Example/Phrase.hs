@@ -232,11 +232,10 @@ type Spaced a = Spacing -> a
 
 -- |
 --
--- e.g.:
+-- we should put spaces:
 --
--- * we should put spaces between words, but not between
--- punctuation
--- * only after a comma, but both before/after an equals sign.
+-- * between words, but not between punctuation
+-- * after a comma, but both before/after an equals sign.
 --
 defSpacing :: Spacing
 defSpacing = Spacing $ \(l,r) -> if
@@ -259,6 +258,9 @@ type Phrase  = PhraseF (Either Pasted PAtom)
 -- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
 type MPhrase = PhraseF [PAtom]
 type PhraseF = Sexp PFunc
+
+asPhrase :: String -> Phrase
+asPhrase = Atom . Right . PWord
 
 -- | "Phrase Function".
 data PFunc

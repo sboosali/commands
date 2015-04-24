@@ -169,9 +169,10 @@ data Key
  deriving (Show,Eq,Ord)
 
 
-type Actions = Free OSXAction
+type Actions = Free ActionF
 
-data OSXAction k
+-- | the "Action Functor".
+data ActionF k
  = SendKeyPress    [Modifier] Key                   k
  | SendMouseClick  [Modifier] Positive MouseButton  k
  -- TODO   | SendText  String k: a common grouping for possible optimizing and debugging

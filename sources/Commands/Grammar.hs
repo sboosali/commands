@@ -15,7 +15,6 @@ import           Control.Alternative.Free.Tree
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad.State
-import           Data.Char
 import           Data.Foldable                 (asum, traverse_)
 import           Data.Hashable
 import           Data.List                     (intercalate)
@@ -36,15 +35,17 @@ str s = s <$ liftString s
 chr :: Char -> RHS Char
 chr c = c <$ liftString [c]
 
-con :: (Show a) => a -> RHS a
-con c = c <$ (liftString . intercalate " " . unCamelCase . show) c
-
+-- | a specialization, @int = 'con'@, because integer literals are 'Num'-constrained polymorphic types.
+-- in the context we will be using it, we need a concrete type for type inference.
 int :: Int -> RHS Int
 int = con
 
--- |
-qualifiedCon :: (Show a) => String -> a -> RHS a
-qualifiedCon q c = c <$ (liftString . intercalate " " . filter (/= fmap toLower q) . unCamelCase . show) c
+con :: (Show a) => a -> RHS a
+con = transformedCon (intercalate " " . unCamelCase)
+
+-- | transform a 'Show'n constructor, before making it a 'Terminal'.
+transformedCon :: (Show a) => (String -> String) -> a -> RHS a
+transformedCon f c = c <$ (liftString . f . show) c
 
 lhsOfType :: (Typeable a) => proxy a -> LHS
 lhsOfType = LHS . guiOf

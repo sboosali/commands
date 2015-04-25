@@ -309,10 +309,10 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
 
 
-data Edit = Edit Action Direction Region deriving (Show,Eq,Ord)
+data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 edit = 'edit
- <=> editing # (action-?) & (direction-?) & (region-?)
- <|> Edit # action & (direction -?- Whole) & region
+ <=> editing # (action-?) & (slice-?) & (region-?)
+ <|> Edit # action & (slice -?- Whole) & region
 
 -- TODO ensure no alternative is empty, necessary?
 
@@ -324,30 +324,87 @@ edit = 'edit
 -- could also provide the keyword (i.e. only literals) feature, rather than forcing it on the parser.
 -- if it were State not Reader, it could also support contextual (mutable) vocabularies;
  -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
-editing :: Maybe Action -> Maybe Direction -> Maybe Region -> Edit
+editing :: Maybe Action -> Maybe Slice -> Maybe Region -> Edit
 editing = undefined
 -- TODO defaults <|> Edit # action & region
  -- <|> Edit undefined # region
  -- <|> flip Edit undefined # action
 
-data Direction = Back | Whole | For
- deriving (Show,Eq,Ord,Enum,Typeable)
-direction = enumGrammar
 
-data Action = Copy | Delete | Next
+data Slice = Back | Whole | For
  deriving (Show,Eq,Ord,Enum,Typeable)
-action = enumGrammar
+-- "for" is homophone with "four".
+-- and both Positive and Slice can be the prefix (i.e. competing for the same recognition).
+slice = enumGrammar
 
-data Region = Char | Word | Line
+
+data Action
+ = Select
+ | Beginning
+ | End
+ | Copy
+ | Cut
+ | Delete
+ | Transpose
+ | Google
+ deriving (Show,Eq,Ord,Typeable)
+-- action = enumGrammar
+action = 'action <=> empty
+ <|> Select      # "sell"
+ <|> Beginning   # "beg"
+ <|> End         # "end"
+ <|> Copy        # "save"
+ <|> Cut         # "kill"
+ <|> Delete      # "del"
+ <|> Transpose   # "trans"
+ <|> Google      # "google"
+
+data Direction = UpD | DownD | LeftD | RightD | InD | OutD  deriving (Show,Eq,Ord,Enum,Typeable)
+direction = qualifiedGrammarWith "D"
+
+-- | TODO mutable, represents the previous recognition.
+-- That is, the words (thought to be) spoken in the recognition, not any words (compiled into actions and) inserted by the recognition. Unless the command is a insertion-like command, hmm... Should we undo the command induced by the previous recognition, if it is undoable?
+newtype Recognized = Recognized [String] deriving (Show,Eq,Ord)
+recognized = 'recognized <=> empty
+
+data Region
+ = That
+ | Character
+ | WordR
+ | Token
+ | Group
+ | Line
+ | Rectangle
+ | Block
+ | Page
+ | Screen
+ | Everything
+ | Definition
+ | FunctionR
+ | Reference
+ | Structure
  deriving (Show,Eq,Ord,Enum,Typeable)
-region = enumGrammar
-
--- Action = Pick | Go |
--- Region = Selection |
--- Direction = Whole | Backwards | Forwards
+-- region = enumGrammar
+region = 'region
+ <=> That       # "that"
+ <|> Character  # "char"
+ <|> WordR      # "word"
+ <|> Token      # "toke"
+ <|> Group      # "group"
+ <|> Line       # "line"
+ <|> Rectangle  # "wreck"
+ <|> Block      # "block"
+ <|> Page       # "page"
+ <|> Screen     # "screen"
+ <|> Everything # "all"
+ <|> Definition # "def"
+ <|> FunctionR  # "fun"
+ <|> Reference  # "ref"
+ <|> Structure  # "struct"
 
 editEmacs :: Edit -> Actions ()
-editEmacs = undefined
+editEmacs = \case
+ _ -> undefined
 
 
 
@@ -355,8 +412,8 @@ editEmacs = undefined
 
 
 
-
-
+-- correction = 'correction <=> Correction  # "fix" & recognized
+-- data Correction = Correction Recognized  deriving (Show,Eq,Ord)
 
 speech = phrase -- TODO
 

@@ -9,6 +9,7 @@ import           Commands.Frontends.Dragon13.Serialize
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Munging
 import           Commands.Parse
 import           Commands.Parse.Types
 import           Commands.Parsec                       (parserUnit)
@@ -18,6 +19,7 @@ import           Control.Lens
 import           Control.Monad.Catch                   (SomeException (..),
                                                         catches)
 import           Data.Bifunctor                        (second)
+import           Data.Char
 import           Data.Foldable                         (asum)
 import qualified Data.List                             as List
 import           Data.List.NonEmpty                    (NonEmpty (..))
@@ -25,7 +27,7 @@ import qualified Data.Map                              as Map
 import           Data.Proxy
 import qualified Data.Text.Lazy                        as T
 import           Data.Typeable                         (Typeable)
-import           GHC.Generics                          (Generic)
+import           GHC.Exts                              (IsString (..))
 import           Language.Haskell.TH.Syntax            (Name)
 
 
@@ -150,9 +152,7 @@ dragonGrammar name rhs p = Grammar
 --
 --
 enumGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
-enumGrammar = genericGrammar
- (lhsOfType (Proxy :: Proxy a))
- (asum . fmap con $ constructors)
+enumGrammar = transformedGrammar (underCamelCase id)
 
 -- | a default 'Grammar' for simple ADTs.
 --
@@ -162,6 +162,8 @@ enumGrammar = genericGrammar
 -- useful when you want your @grammars@-DSL terminals to be
 -- unqualified (for convenience), but you want your Haskell
 -- identifiers to be qualified (to avoid conflicts). e.g.:
+--
+-- e.g. avoids naming conflicts with @Either@:
 --
 -- >>> :set -XDeriveDataTypeable
 -- >>> data Button = LeftButton | ButtonMiddleButton | ButtonRight deriving (Show,Eq,Enum,Typeable)
@@ -179,18 +181,63 @@ enumGrammar = genericGrammar
 --
 --
 qualifiedGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
-qualifiedGrammar = genericGrammar
- (lhsOfType (Proxy :: Proxy a))
- (asum . fmap (qualifiedCon occ) $ constructors)
+qualifiedGrammar = qualifiedGrammarWith occ
  where
  GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
 
+-- | a default 'Grammar' for simple ADTs.
+--
+-- elides the given <http://en.wikipedia.org/wiki/Affix affix> from any part of any constructor.
+--
+-- e.g. avoids naming conflicts with @Either@. without making either the data type name too short, or the data constructor names too long:
+--
+-- >>> :set -XDeriveDataTypeable
+-- >>> data Direction = UpD | DownD | LeftD | RightD  deriving (Show,Eq,Enum,Typeable)
+-- >>> qualifiedGrammarWith "D" :: Grammar Direction
+-- ["up","down","left","right"]
+--
+--
+qualifiedGrammarWith :: forall a. (Typeable a, Enum a, Show a) => String -> Grammar a
+qualifiedGrammarWith affix = transformedGrammar (underCamelCase (filter (/= fmap toLower affix)))
+
+-- | strips out data typename like 'qualifiedGrammar', and @_@'s, and numbers.
+-- makes it easy to generate generic terminals (like @"left"@),
+-- without conflicting with.common symbols (like 'Left').
+tidyGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
+tidyGrammar = transformedGrammar (underCamelCase (filter (/= fmap toLower occ) . filter (/= "_")))
+ where
+ GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
+
+-- | automatically generated a grammar from a type: the left-hand side comes from the type, and the right-hand side comes from the 'Show'n and transformed 'constructors'.
+transformedGrammar :: forall a. (Typeable a, Enum a, Show a) => (String -> String) -> Grammar a
+transformedGrammar f = genericGrammar
+ (lhsOfType (Proxy :: Proxy a))
+ (asum . fmap (transformedCon f) $ constructors)
+
 -- | a default 'Grammar' for 'String' @newtype@s.
 --
--- e.g. @newtype Place = Place String deriving (Show,Eq)@
+-- the user might want to parse/recognize an arbitrary but dynamic/large subset of all possible strings.
+-- For example:
 --
-vocabularyGrammar :: (Generic a) => [String] -> RHS a
-vocabularyGrammar = undefined vocabulary
+-- * a mutable grammer whose contents depend on some context,
+-- like the current buffer, or the previous recognition.
+-- * a huge list of custom words, that sound like more common words,
+-- that aren't being recognized, even after using Dragon's Vocabulary Builder.
+-- * even a few static words, which don't need to be a sum typo,
+-- to not increase boilerplate, while still increasing type safety.
+--
+-- e.g.
+--
+-- @
+-- newtype Place = Place String deriving (Show,Eq)
+-- instance IsString Place where fromString = Place
+-- @
+--
+--
+vocabularyGrammar :: (IsString a) => [String] -> RHS a
+vocabularyGrammar = fmap fromString . vocabulary
+
+-- vocabularyGrammar :: (Generic a) => [String] -> RHS a
 -- (Newtype a String) => [String] -> RHS a
 
 -- | the empty grammar. See 'unitDNSRHS'.

@@ -34,6 +34,7 @@ tested-with: GHC == 7.8.3
 extra-source-files:
  README.md
  cbits/objc_actor.h
+ cbits/Makefile
 
 -- extra files to be distributed with the package
 -- access with: {getDataFileName :: FilePath -> IO FilePath}
@@ -109,6 +110,9 @@ library
  install-includes: cbits/objc_actor.h
  ld-options: -ObjC
  frameworks: Cocoa
+ cc-options: -Wno-deprecated-declarations
+ -- launchedApplications/activeApplication are deprecated,
+ -- but runningApplications/frontmostApplication don't return application info, which has the application path
 
  build-depends:
 

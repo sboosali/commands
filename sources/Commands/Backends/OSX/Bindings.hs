@@ -30,14 +30,14 @@ clickMouse = undefined
 -- clickMouse (MouseClick (encodeModifiers -> flags) (encodePositive -> n) (encodeButton -> button)) = objc_clickMouse
 
 -- |
-getClipboard :: IO Contents
+getClipboard :: IO ClipboardContents
 getClipboard = objc_getClipboard >>= peekCString
 
 -- |
 --
 -- note: unlike the keyboard shortcuts of 'copy',
 -- contents don't show up in Alfred's clipboard history.
-setClipboard :: Contents -> IO ()
+setClipboard :: ClipboardContents -> IO ()
 setClipboard s = withCString s objc_setClipboard
 
 -- |

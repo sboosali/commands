@@ -116,9 +116,10 @@ met = [OSX.Command]
 r = RKey
 z = ZKey
 tab = TabKey
+insert = sendText
 slot s = do
  -- delay 30
- insert s
+ sendText s
  press [] ReturnKey
 always = const
 when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
@@ -733,3 +734,5 @@ main = do
   , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
   ]
 
+ putStrLn ""
+ attemptCompile root "emacs" "replace clipboard contents with paste"

@@ -8,14 +8,20 @@ import Control.Monad.Trans.State
 
 import Control.Applicative
 import Control.Concurrent             (threadDelay)
+
+import Data.Foldable                  (traverse_)
 import Data.List                      (intercalate)
 import Data.Monoid                    ((<>))
 
 
 runActions :: Actions a -> IO a
 runActions = iterM $ \case
+ -- iterM :: (Monad m, Functor f) => (f (m a) -> m a) -> Free f a -> m a
 
  SendKeyPress    flags key k      -> ObjC.pressKey flags key >> k
+ SendText        s k              -> runActions (sendTextAsKeypresses s) >> k
+ -- terminates because sendTextAsKeypresses is exclusively a sequence of SendKeyPress'es
+
  SendMouseClick  flags n button k -> ObjC.clickMouse flags n button >> k
 
  GetClipboard    f                -> ObjC.getClipboard >>= f
@@ -28,7 +34,13 @@ runActions = iterM $ \case
  Delay           t k              -> threadDelay (t*1000) >> k
  -- 1,000 µs is 1ms
 
--- iterM :: (Monad m, Functor f) => (f (m a) -> m a) -> Free f a -> m a
+
+-- | returns a sequence of 'SendKeyPress'es.
+sendTextAsKeypresses :: String -> Actions ()
+sendTextAsKeypresses
+ = traverse_ (\(modifiers, key) -> liftF $ SendKeyPress modifiers key ())
+ . concatMap char2keypress
+ -- liftF :: ActionF () -> Free ActionF ()
 
 
 {- | shows the "static" data flow of some 'Actions', by showing its primitive operations, in @do-notation@.
@@ -77,10 +89,16 @@ showActions as = "do\n" <> evalState (showActions_ as) 1
  showAction_ = \case
   SendKeyPress    flags key k -> ((" sendKeyPress "    <> showArgs [show flags, show key]) <>)       <$> showActions_ k
   SendMouseClick  flags n b k -> ((" sendMouseClick "  <> showArgs [show flags, show n, show b]) <>) <$> showActions_ k
+  SendText        s k         -> ((" sendText "        <> showArgs [show s]) <>)                     <$> showActions_ k
+
   SetClipboard    s k         -> ((" setClipboard "    <> showArgs [show s]) <>)                     <$> showActions_ k
   OpenApplication app k       -> ((" openApplication " <> showArgs [show app]) <>)                   <$> showActions_ k
   OpenURL         url k       -> ((" openURL "         <> showArgs [show url]) <>)                   <$> showActions_ k
   Delay           t k         -> ((" delay "           <> showArgs [show t]) <>)                     <$> showActions_ k
+
+ -- TODO distinguish between strings and variables to avoid:
+ -- x2 <- getClipboard
+ -- sendText ("x2")
 
   GetClipboard f -> do
    x <- gensym
@@ -102,4 +120,3 @@ gensym = do
  i <- get
  put $ i + 1
  return $ "x" <> show i
-

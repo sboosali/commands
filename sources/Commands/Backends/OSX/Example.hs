@@ -21,7 +21,7 @@ testDerived = do
  delay 100
  paste
 
-testDSL :: Actions Contents
+testDSL :: Actions ClipboardContents
 testDSL = do
 
  -- delay 30

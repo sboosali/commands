@@ -63,9 +63,8 @@ data Root
 
 -- TODO currently throws "grammar too complex" :-(
 root :: Command Root
-root = set (comGrammar.gramExpand) 1 $ 'root
- <=> empty
- <|> Repeat      # positive & root -- recursive is okay, only left recursion causes non-termination
+root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
+ <|> Repeat      # positive & root -- recursive is okay for parsec, only left recursion causes non-termination
  <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
  -- TODO <|> ReplaceWith # "replace" & phrase & "with" & (phrase <|>? "blank")
  <|> Undo        # "no"         -- order matters..
@@ -170,7 +169,7 @@ phrase = pPhrase <$> phrase_
 phrase_ = Grammar
  (Rule l dependencies)
  (defaultDNSCommandProduction l gP)
- (\context -> pP context)
+ (\context -> try (pP context <?> showLHS l))
 
  where
  Just l = lhsFromName 'phrase
@@ -178,16 +177,16 @@ phrase_ = Grammar
  -- TODO the RHS of special grammars are ignored (so the eithers don't matter), except for extracting dependencies for serialization
 
  pP context                     -- merges the context-free Parsec.many the context-sensitive manyUntil
-    = ([]    <$  (case context of Some q -> (try . lookAhead) q *> pure undefined)) -- terminate.
+    = ([]    <$  (case context of Some q -> (try . lookAhead) q *> pure (error "pP"))) -- terminate.
   <|> ((:)   <$> pAB             <*> pP context)  -- continue. e.g. can escape "say" with "lit"
   <|> ((:[]) <$> pC context) -- terminate.
   <|> ((:)   <$> (pDxAB context) <*> pP context)  -- continue
  pAB = pA <|> pB
- pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure undefined)))
+ pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure (error "pDxAB"))))
  -- pAB context = (pA context <||> pB context)
  -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
- pA         = try $ phraseA   ^. gramParser $ undefined -- context free
- pB         = try $ phraseB   ^. gramParser $ undefined -- context free
+ pA         = try $ phraseA   ^. gramParser $ (error "pA") -- context free
+ pB         = try $ phraseB   ^. gramParser $ (error "pB") -- context free
  pC context = try $ phraseC   ^. gramParser $ context             -- context-sensitive
  pD context = try $ dictation ^. gramParser $ context            -- context-sensitive
  -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
@@ -329,11 +328,13 @@ direction = qualifiedGrammarWith "D"
 
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
-edit = 'edit
- <=> editing # (action-?) & (slice-?) & (region-?)
+edit = 'edit <=> empty
  <|> Edit # action & (slice -?- WholeSlice) & region
-
--- TODO ensure no alternative is empty, necessary?
+ -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
+ -- <|> editing # (action-?) & (slice-?) & (region-?)
+ -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
+ -- I don't know why the alternatives following the black hole didn't show up in the "expecting: ..." error though
+-- TODO ensure no alternative is empty, necessary? yes it is
 
 -- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
 -- editWith editing = 'edit <=> editing # (direction-?) & (action-?) & (region-?)
@@ -655,6 +656,17 @@ attemptParse grammar s = do
  putStrLn ""
  attempt $ handleParse grammar s
 
+failingParse grammar s = do
+ putStrLn ""
+ attempt $ case grammar `parses` s of
+  Left e  -> do
+   putStrLn "should fail, and it did:"
+   putStrLn $ "error = " <> show e
+  Right a -> do
+   putStrLn "should fail, but succeeded:"
+   putStrLn $ "input  = " <> show s
+   putStrLn $ "output = " <> show a
+
 attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
 
 attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
@@ -688,14 +700,29 @@ attemptInterpret = ()
 main = do
 
  putStrLn ""
- -- attemptSerialize rootG
- attemptSerialize phrase
+ let rootG = (root^.comGrammar)
+ attemptSerialize rootG
+ -- attemptSerialize phrase
+
+ putStrLn ""
  attemptParse phraseC "say 638 Pine St., Redwood City 94063"
 
  putStrLn ""
- let rootG = (root^.comGrammar)
- attemptParse rootG "say 638 Pine St., Redwood City 94063"  -- ? (line 1, column 1): unexpected 's'
- attemptParse rootG "no BAD"     -- prefix succeeds, but the whole should fail
+ -- Error (line 1, column 1): unexpected 's'
+ -- expecting positive__Commands.Plugins.Example__commands-core-0.0.0, "replace", "no", "no way", click__Commands.Plugins.Example__commands-core-0.0.0, edit__Commands.Plugins.Example__commands-core-0.0.0 or end of input
+ attemptParse rootG "say 638 Pine St., Redwood City 94063"
+ -- when we remove the alternatives which are listed in the error above:
+ -- Phrase_ (List [List [Atom (Right (PWord "638")),Atom (Right (PWord "Pine")),Atom (Right (PWord "St.,")),Atom (Right (PWord "Redwood")),Atom (Right (PWord "City")),Atom (Right (PWord "94063"))]])
+
+ -- prefix succeeds, but the whole should fail
+ -- should it fail? If it backtracks sufficiently, the wildcard (dictation in phrase, a later alternative) can match it
+ -- Otherwise, any prefix must be escaped (e.g. by "lit")
+ failingParse rootG "no bad"
+ -- when we remove the alternatives which are listed in the error above:
+ -- should fail, but succeeded:
+ -- "input  = \"no BAD\""
+ -- "output = Phrase_ (List [List [Atom (Right (PWord \"no\"))],Atom (Right (PAcronym \"BAD\"))])"
+
  attemptParse (multipleG rootG) "no no 1 replace this and that with that and this"
  attemptParse click "click"
  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
@@ -736,3 +763,8 @@ main = do
 
  putStrLn ""
  attemptCompile root "emacs" "replace clipboard contents with paste"
+
+ attemptParse move  "back word"
+ attemptParse move  "up line"
+ attemptParse rootG "back word"
+ attemptParse rootG "up line"

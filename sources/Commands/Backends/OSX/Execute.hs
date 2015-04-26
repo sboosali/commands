@@ -34,7 +34,6 @@ runActions = iterM $ \case
  Delay           t k              -> threadDelay (t*1000) >> k
  -- 1,000 µs is 1ms
 
-
 -- | returns a sequence of 'SendKeyPress'es.
 sendTextAsKeypresses :: String -> Actions ()
 sendTextAsKeypresses

@@ -55,6 +55,7 @@ data Root
  | Undo
  | ReplaceWith Phrase Phrase
  | Click_ Click
+ | Move_ Move
  | Phrase_ Phrase
  -- Roots [Root]
 -- TODO | Frozen freeze
@@ -71,8 +72,10 @@ root = set (comGrammar.gramExpand) 1 $ 'root
  <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      # click
  <|> Edit_       # edit
+ <|> Move_       # move
  <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has prefix
- <|> Phrase_     # phrase
+ <|> Phrase_     # phrase  -- must be last, phrase falls back to wildcard.
+
  -- <|> Roots       # (multipleC root)
 -- TODO <|> Frozen # "freeze" & root
 
@@ -307,12 +310,27 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
 
 
+data Move
+ = Move Direction Region
+ | MoveTo Slice Region
+ deriving (Show,Eq,Ord)
+move = 'move
+ <=> Move   # direction & region
+ <|> MoveTo # slice & region
+-- boilerplate.
+-- can't scrap it with GHC.generics because the grammars are values not instance methods.
+-- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
+
+
+data Direction = UpD | DownD | LeftD | RightD | InD | OutD  deriving (Show,Eq,Ord,Enum,Typeable)
+direction = qualifiedGrammarWith "D"
+
 
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 edit = 'edit
  <=> editing # (action-?) & (slice-?) & (region-?)
- <|> Edit # action & (slice -?- Whole) & region
+ <|> Edit # action & (slice -?- WholeSlice) & region
 
 -- TODO ensure no alternative is empty, necessary?
 
@@ -330,12 +348,12 @@ editing = undefined
  -- <|> Edit undefined # region
  -- <|> flip Edit undefined # action
 
-
-data Slice = Back | Whole | For
+data Slice = BackSlice | WholeSlice | ForSlice
  deriving (Show,Eq,Ord,Enum,Typeable)
 -- "for" is homophone with "four".
 -- and both Positive and Slice can be the prefix (i.e. competing for the same recognition).
-slice = enumGrammar
+slice = qualifiedGrammar
+
 
 
 data Action
@@ -359,13 +377,7 @@ action = 'action <=> empty
  <|> Transpose   # "trans"
  <|> Google      # "google"
 
-data Direction = UpD | DownD | LeftD | RightD | InD | OutD  deriving (Show,Eq,Ord,Enum,Typeable)
-direction = qualifiedGrammarWith "D"
 
--- | TODO mutable, represents the previous recognition.
--- That is, the words (thought to be) spoken in the recognition, not any words (compiled into actions and) inserted by the recognition. Unless the command is a insertion-like command, hmm... Should we undo the command induced by the previous recognition, if it is undoable?
-newtype Recognized = Recognized [String] deriving (Show,Eq,Ord)
-recognized = 'recognized <=> empty
 
 data Region
  = That
@@ -402,6 +414,13 @@ region = 'region
  <|> Reference  # "ref"
  <|> Structure  # "struct"
 
+
+
+moveEmacs :: Move -> Actions ()
+moveEmacs = \case
+ _ -> undefined
+
+
 editEmacs :: Edit -> Actions ()
 editEmacs = \case
  _ -> undefined
@@ -412,10 +431,7 @@ editEmacs = \case
 
 
 
--- correction = 'correction <=> Correction  # "fix" & recognized
--- data Correction = Correction Recognized  deriving (Show,Eq,Ord)
 
-speech = phrase -- TODO
 
 casing = enumGrammar
 joiner = 'joiner
@@ -684,13 +700,15 @@ main = do
  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
  print $ getWords (rootG ^. gramGrammar)
 
+
 --  , ""
  putStrLn ""
  traverse_ attemptMunge_
   [ "coal server space tick local"  -- :server 'local --
 -- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
  -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
-  , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+  , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+  -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
   , "class unit test spell M T A"  -- UnitTestMTA
   , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
   , "class spell M T A bid optimization"  -- MTABidOptimization
@@ -705,6 +723,7 @@ main = do
   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+
 
  putStrLn ""
  traverse_ (attemptParse $ root^.comGrammar)

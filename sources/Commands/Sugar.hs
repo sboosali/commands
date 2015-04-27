@@ -1,9 +1,13 @@
 {-# LANGUAGE FlexibleInstances, TypeFamilies, TypeSynonymInstances #-}
-module Commands.Command.Sugar where
+module Commands.Sugar
+ ( module Commands.Sugar
+ , module Commands.Sugar.Press
+ ) where
 import Commands.Command
 import Commands.Etc               ()
 import Commands.Grammar
 import Commands.Grammar.Types
+import Commands.Sugar.Press
 
 import Control.Lens               (view)
 

@@ -74,11 +74,13 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
   , "Commands.Command"
   , "Commands.Command.Types"
-  , "Commands.Command.Sugar"
   , "Commands.Command.Combinator"
 
   , "Commands.Plugins.Example"
   , "Commands.Plugins.Example.Phrase"
+
+  , "Commands.Sugar"
+  , "Commands.Sugar.Press"
 
   , "Commands.Etc"
   , "Commands.Etc.Generics"

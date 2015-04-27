@@ -7,7 +7,7 @@
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
-import           Commands.Core                   hiding (tab)
+import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
@@ -86,19 +86,19 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
 
   ReplaceWith this that -> \case
    "emacs" -> do
-    press met r
+    press M r
     slot =<< munge this
     slot =<< munge that
    "intellij" -> do
     press met r
-    (insert =<< munge this) >> press [] tab
+    (insert =<< munge this) >> press tab
     slot =<< munge that
    _ -> nothing
 
-
   Undo -> always $ press met z
 
-  Edit_ e -> onlyWhen "emacs" $ editEmacs e
+  Edit_ x -> onlyWhen "emacs" $ editEmacs x
+  Move_ x -> onlyWhen "emacs" $ moveEmacs x
 
   Repeat n c ->
    \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
@@ -110,16 +110,11 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
 
 
 nothing = return ()
-press = sendKeyPress
-met = [OSX.Command]
-r = RKey
-z = ZKey
-tab = TabKey
-insert = sendText
 slot s = do
  -- delay 30
  sendText s
- press [] ReturnKey
+ sendKeyPress [] ReturnKey
+
 always = const
 when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
 when theseContexts thisAction = \theContext -> do
@@ -128,6 +123,7 @@ when theseContexts thisAction = \theContext -> do
  else nothing
 onlyWhen = when . (:[])
 whenEmacs = onlyWhen "emacs"
+
 munge :: Phrase -> Actions String
 munge p = do
  q <- splatPasted p <$> getClipboard
@@ -768,3 +764,6 @@ main = do
  attemptParse move  "up line"
  attemptParse rootG "back word"
  attemptParse rootG "up line"
+
+ -- the keys are in the right order, and multiple modifiers applied to each
+ putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)

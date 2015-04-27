@@ -63,13 +63,17 @@ newtype Positive = Positive { getPositive :: Int }
 -- data KeyPress = KeyPress [Modifier] Key
 --  deriving (Show,Eq,Ord)
 
+type KeyPress = ([Modifier], Key)
+
 {- | modifier keys are keys that can be "held".
 
 the escape key is "pressed", not "held", it seems.
 (possibly explains its behavior in your terminal emulator?)
 
+@alt@ is 'Option'.
+
 -}
-data Modifier = Command | Control | Shift | Option | Function
+data Modifier = Control | Command | Shift | Option | Function
  deriving (Show,Eq,Ord,Enum)
 
 {- | all the keys on a standard keyboard.
@@ -170,7 +174,7 @@ data Key
 
  deriving (Show,Eq,Ord)
 
-
+-- | a platform-agnostic free monad, which can be executed by platform-specific bindings.
 type Actions = Free ActionF
 
 -- | the "Action Functor".
@@ -201,10 +205,21 @@ type Time = Int
 -- units package
 
 
+{- |
+
+>>> int2keypress -12
+[([],MinusKey),([],OneKey),([],TwoKey)]
+
+
+-}
+int2keypress :: Integer -> [([Modifier], Key)]
+int2keypress = concatMap char2keypress . show
+
+
 {- | the keypress that would insert the character into the application.
 
 >>> char2keypress '@' :: Maybe KeyPress
-Just (KeyPress [Shift] TwoKey)
+Just ([Shift], TwoKey)
 
 some characters cannot be represented as keypresses, like some non-printable characters
 (in arbitrary applications, not just the terminal emulator):
@@ -215,7 +230,7 @@ Nothing
 prop> case char2keypress c of {  Just ([],_) -> True;  Just ([Shift],_) -> True;  Nothing -> True;  _ -> False  }
 
 -}
-char2keypress :: Char -> Possibly ((,) [Modifier] Key)
+char2keypress :: Char -> Possibly KeyPress -- ((,) [Modifier] Key)
 
 char2keypress 'a'  = return $ (,) [     ] AKey
 char2keypress 'A'  = return $ (,) [Shift] AKey
@@ -323,12 +338,12 @@ char2keypress c = fail $ "Commands.Compile.char2keypress: un-pressable Char: " <
 
 {- | the character that represents the keypress:
 
->>> keypress2char (KeyPress [Shift] TwoKey) :: Maybe Char
+>>> keypress2char ([Shift], TwoKey) :: Maybe Char
 Just '@'
 
 some keypresses cannot be represented as characters, like keyboard shortcuts:
 
->>> keypress2char (KeyPress [Command] CKey) :: Maybe Char
+>>> keypress2char ([Command], CKey) :: Maybe Char
 Nothing
 
 >>> import Data.Char
@@ -337,7 +352,7 @@ prop> maybe True isAscii (keypress2char k)
 TODO replace true with redo test
 
 -}
-keypress2char ::  ((,) [Modifier] Key) -> Possibly Char
+keypress2char :: KeyPress -> Possibly Char -- ((,) [Modifier] Key)
 
 keypress2char ((,) [     ] AKey)            = return $ 'a'
 keypress2char ((,) [Shift] AKey)            = return $ 'A'

@@ -8,6 +8,9 @@ import Control.Monad.Free.TH       (makeFree)
 
 makeFree ''ActionF
 
+insert :: String -> Actions ()
+insert = sendText
+
 -- TODO
 -- wait (25 ms)
 -- wait $ 25 ms

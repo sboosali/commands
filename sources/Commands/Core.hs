@@ -16,7 +16,6 @@ module Commands.Core
  ( module Commands.Etc
 
  , module Commands.Command.Combinator
- , module Commands.Command.Sugar
  , module Commands.Command
 
  , module Commands.Grammar.Types
@@ -25,6 +24,8 @@ module Commands.Core
  , module Commands.Graph
 
  , module Commands.Munging
+
+ , module Commands.Sugar
 
  , module Commands.Parse.Types
  , module Commands.Parse
@@ -35,7 +36,6 @@ module Commands.Core
 
 import Commands.Command
 import Commands.Command.Combinator
-import Commands.Command.Sugar
 import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
@@ -45,5 +45,6 @@ import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
 import Commands.Parsec               hiding (lower, option, optional, runParser,
-                                      upper)
+                                      tab, upper)
+import Commands.Sugar
 import Control.Alternative.Free.Tree hiding (Empty)

@@ -287,7 +287,8 @@ data PAtom
  | PAcronym [Char]
  deriving (Show,Eq,Ord)
 
-instance IsString PAtom where fromString = PWord -- ^ for doctest
+-- | for doctest
+instance IsString PAtom where fromString = PWord
 
 {- | a Pasted is like a 'Dictation'/'Quoted_' i.e. a list of words, not a single word.
 

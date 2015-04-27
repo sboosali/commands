@@ -90,15 +90,15 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
     slot =<< munge this
     slot =<< munge that
    "intellij" -> do
-    press met r
+    press M r
     (insert =<< munge this) >> press tab
     slot =<< munge that
    _ -> nothing
 
   Undo -> always $ press met z
 
-  Edit_ x -> onlyWhen "emacs" $ editEmacs x
-  Move_ x -> onlyWhen "emacs" $ moveEmacs x
+  Edit_ a -> onlyWhen "emacs" $ editEmacs a
+  Move_ a -> onlyWhen "emacs" $ moveEmacs a
 
   Repeat n c ->
    \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
@@ -107,6 +107,46 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
    insert =<< munge p
 
   _ -> always nothing
+
+
+runEmacs :: String -> Actions ()
+runEmacs interactiveCommand = do
+ press C w -- non-standard: make this configurable?
+ delay 30
+ insert interactiveCommand
+-- configurable by actions being a ReaderT? The solved another problem, delays or something. code just let the user define it, after copying and pasting the Example Plug-in. That's the whole point of the configuration being Haskell.
+
+moveEmacs :: Move -> Actions ()
+moveEmacs = \case
+
+ Move Left_ Character -> press C b
+ Move Right_ Character -> press C f
+ Move Left_ Word_ -> press M b
+ Move Right_ Word_ -> press M f
+ Move Left_ Group -> press C M b
+ Move Right_ Group -> press C M f
+ Move Up_ Line -> press C p
+ Move Down_ Line -> press C n
+ Move Up_ Block -> press C up
+ Move Down_ Block -> press C down
+ Move Up_ Screen -> runEmacs "scroll-up-command"
+ Move Down_ Screen -> press C v
+ Move Up_ Page -> runEmacs "backward-page"
+ Move Down_ Page -> runEmacs "forward-page"
+
+ MoveTo Backwards Line -> press C a
+ MoveTo Forwards  Line -> press C e
+ MoveTo Backwards Everything -> press M up
+ MoveTo Forwards Everything -> press M down
+
+ -- Move -> press 
+ -- MoveTo -> press 
+ _ -> nothing
+
+editEmacs :: Edit -> Actions ()
+editEmacs = \case
+ _ -> nothing
+
 
 
 nothing = return ()
@@ -318,14 +358,14 @@ move = 'move
 -- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
 
 
-data Direction = UpD | DownD | LeftD | RightD | InD | OutD  deriving (Show,Eq,Ord,Enum,Typeable)
-direction = qualifiedGrammarWith "D"
+data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
+direction = qualifiedGrammarWith "_"
 
 
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 edit = 'edit <=> empty
- <|> Edit # action & (slice -?- WholeSlice) & region
+ <|> Edit # action & (slice -?- Whole) & region
  -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
  -- <|> editing # (action-?) & (slice-?) & (region-?)
  -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
@@ -346,11 +386,17 @@ editing = undefined
  -- <|> Edit undefined # region
  -- <|> flip Edit undefined # action
 
-data Slice = BackSlice | WholeSlice | ForSlice
- deriving (Show,Eq,Ord,Enum,Typeable)
+data Slice = Backwards | Whole | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
+-- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
+-- slice = qualifiedGrammar
+slice = 'slice
+ <=> Backwards # "back"
+ <|> Whole     # "whole"
+ <|> Forwards  # "for"
+
 -- "for" is homophone with "four".
 -- and both Positive and Slice can be the prefix (i.e. competing for the same recognition).
-slice = qualifiedGrammar
+
 
 
 
@@ -380,7 +426,7 @@ action = 'action <=> empty
 data Region
  = That
  | Character
- | WordR
+ | Word_
  | Token
  | Group
  | Line
@@ -390,7 +436,7 @@ data Region
  | Screen
  | Everything
  | Definition
- | FunctionR
+ | Function_
  | Reference
  | Structure
  deriving (Show,Eq,Ord,Enum,Typeable)
@@ -398,7 +444,7 @@ data Region
 region = 'region
  <=> That       # "that"
  <|> Character  # "char"
- <|> WordR      # "word"
+ <|> Word_      # "word"
  <|> Token      # "toke"
  <|> Group      # "group"
  <|> Line       # "line"
@@ -408,20 +454,9 @@ region = 'region
  <|> Screen     # "screen"
  <|> Everything # "all"
  <|> Definition # "def"
- <|> FunctionR  # "fun"
+ <|> Function_  # "fun"
  <|> Reference  # "ref"
  <|> Structure  # "struct"
-
-
-
-moveEmacs :: Move -> Actions ()
-moveEmacs = \case
- _ -> undefined
-
-
-editEmacs :: Edit -> Actions ()
-editEmacs = \case
- _ -> undefined
 
 
 

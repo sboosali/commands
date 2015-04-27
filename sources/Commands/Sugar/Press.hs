@@ -12,6 +12,14 @@ by polluting the global namespace with single-letter identifiers, your config wi
 * the non-alphanumeric aliased keys (like 'ret') follow the Emacs convention, lowercased.
 * use 'S'hift for capital letters: @'press' 'C' 'S' 'b'@.
 
+when writing keyboard shortcuts, watch out for shadowed bindings like:
+
+* @press 'm' where :: 'Modifier'@
+* @press 'k' where :: 'Key'@
+* @press 'c' where :: Char@
+* @press 's' where :: String@
+* @press 'i' where :: Integer@
+
 -}
 module Commands.Sugar.Press where
 import Commands.Backends.OSX.DSL
@@ -21,7 +29,8 @@ import Data.Foldable               (traverse_)
 import Data.Monoid                 ((<>))
 
 
-{- | desugars to a sequence of 'sendKeyPress'es
+{- |a <http://chris-taylor.github.io/blog/2013/03/01/how-haskell-printf-works/ polyvariadic function>
+ that desugars to a sequence of 'sendKeyPress'es.
 
 e.g. @(C-u) x 1@, an Emacs keyboard shortcut, in the DSL:
 
@@ -62,12 +71,13 @@ type PressArgT = Either Modifier [KeyPress]
 -- | its instances can be an argument to 'press'. simply injects into a sum type.
 class PressArg a where toPressArg :: a -> PressArgT
 
-instance PressArg Modifier  where toPressArg = Left
 instance PressArg ModifierSynonym  where toPressArg = Left . pattern
+instance PressArg Modifier  where toPressArg = Left
+instance PressArg KeyPress  where toPressArg = Right . (:[])
 instance PressArg Key       where toPressArg = Right . (:[]) . ([],)
 instance PressArg Char      where toPressArg = Right . char2keypress
 instance PressArg String    where toPressArg = Right . concatMap char2keypress
-instance PressArg Integer       where toPressArg = Right . int2keypress
+instance PressArg Integer   where toPressArg = Right . int2keypress
 -- any IsString
 -- any Num?
 

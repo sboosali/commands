@@ -17,7 +17,7 @@ import           Test.QuickCheck
 
 
 instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSGrammar i n t) where
- arbitrary = DNSGrammar <$> resized 2 arbitrary <*> resized 2 arbitrary <*> pure [] -- TODO  pure []
+ arbitrary = DNSGrammar <$> resized 2 arbitrary <*> resized 2 arbitrary <*> pure [] -- TODO
 
 instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction i n t) where
  arbitrary = DNSProduction <$> arbitrary <*> arbitrary <*> resized 2 arbitrary
@@ -25,12 +25,16 @@ instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSProduction i n
 instance (Arbitrary i, Arbitrary n, Arbitrary t) => Arbitrary (DNSVocabulary i n t) where
  arbitrary = DNSVocabulary <$> arbitrary <*> arbitrary <*> resized 2 arbitrary
 
+instance (Arbitrary n) => Arbitrary (DNSImport n) where
+ arbitrary = oneof
+  [ DNSImport <$> (arbitrary :: Gen (DNSLHS LHSRule LHSDefined n))
+  , DNSImport <$> (arbitrary :: Gen (DNSLHS LHSRule LHSBuiltin n))
+  ]
+
 instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSRHS n t) where
  arbitrary = oneof
   [ DNSTerminal     <$> arbitrary
-
-  , (DNSNonTerminal . SomeDNSLHS) <$> (arbitrary :: Gen (DNSLHS LHSList n)) -- avoids @OverlappingInstances@
-  , (DNSNonTerminal . SomeDNSLHS) <$> (arbitrary :: Gen (DNSLHS LHSRule n))
+  , DNSNonTerminal  <$> arbitrary
 
   , DNSOptional     <$> resized 2 arbitrary
   , DNSMultiple     <$> resized 2 arbitrary
@@ -39,17 +43,18 @@ instance (Arbitrary n, Arbitrary t) => Arbitrary (DNSRHS n t) where
   , DNSAlternatives <$> resized 2 arbitrary
   ]
 
-instance (Arbitrary n) => Arbitrary (DNSLHS LHSList n) where
+instance (Arbitrary n) => Arbitrary (SomeDNSLHS n) where
  arbitrary = oneof
-  [ DNSList        <$> arbitrary
-  , DNSBuiltinList <$> arbitrary
+  [ SomeDNSLHS <$> (arbitrary :: Gen (DNSLHS LHSRule LHSDefined n))
+  , SomeDNSLHS <$> (arbitrary :: Gen (DNSLHS LHSRule LHSBuiltin n))
+  , SomeDNSLHS <$> (arbitrary :: Gen (DNSLHS LHSList LHSDefined n))
+  , SomeDNSLHS <$> (arbitrary :: Gen (DNSLHS LHSList LHSBuiltin n))
   ]
 
-instance (Arbitrary n) => Arbitrary (DNSLHS LHSRule n) where
- arbitrary = oneof
-  [ DNSRule        <$> arbitrary
-  , DNSBuiltinRule <$> arbitrary
-  ]
+instance (Arbitrary n) => Arbitrary (DNSLHS LHSRule LHSDefined n) where arbitrary = DNSRule        <$> arbitrary
+instance (Arbitrary n) => Arbitrary (DNSLHS LHSRule LHSBuiltin n) where arbitrary = DNSBuiltinRule <$> arbitrary
+instance (Arbitrary n) => Arbitrary (DNSLHS LHSList LHSDefined n) where arbitrary = DNSList        <$> arbitrary
+instance (Arbitrary n) => Arbitrary (DNSLHS LHSList LHSBuiltin n) where arbitrary = DNSBuiltinList <$> arbitrary
 
 instance (Arbitrary t) => Arbitrary (DNSToken t) where
  arbitrary = oneof

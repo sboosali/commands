@@ -5,17 +5,18 @@
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc
 
-import Control.Applicative
 import Control.Lens.Plated (Plated (..))
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
+import Data.List.NonEmpty  (NonEmpty (..))
+import Data.Semigroup
+
+import Control.Applicative
 import Data.Char           (toLower)
 import Data.Foldable
-import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Traversable
 import GHC.Exts            (IsString (..))
-import Prelude             hiding (mapM)
 
 
 -- ================================================================ --
@@ -49,14 +50,20 @@ import Prelude             hiding (mapM)
 --
 -- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
 --
+-- (technically, this is an abstract syntax tree for a general SAPI grammar.
+-- which could work with either DNS or WSR (Windows speech recognition), for example.)
+--
 data DNSGrammar i n t = DNSGrammar
  { _dnsProductions  :: NonEmpty (DNSProduction i n t)
  , _dnsVocabularies :: [DNSVocabulary i n t]
  , _dnsImports      :: [DNSImport n] -- TODO  a Set, or remove duplicates later
- }
- deriving (Show, Eq)
+ -- TODO _dnsExports  :: NonEmpty (DNSProduction i n t)
+ -- TODO _dnsP? :: (DNSProduction i n t)
+ -- TODO dnsProductions = dnsExports <> _dnsP?
+ } deriving (Show, Eq)
 
--- TODO instance Semigroup (DNSGrammar n t) where <>
+instance Semigroup (DNSGrammar i n t) where
+ DNSGrammar ps vs is <> DNSGrammar ps' vs' is' = DNSGrammar (ps <> ps') (vs <> vs') (is <> is')
 
 instance Bifunctor     (DNSGrammar i) where  bimap     = bimapDefault
 instance Bifoldable    (DNSGrammar i) where  bifoldMap = bifoldMapDefault
@@ -66,15 +73,28 @@ instance Bitraversable (DNSGrammar i) where -- valid Bitraversable?
   <*> traverse (bitraverse f g) vocabularies
   <*> traverse (traverse f) imports
 
+
+-- ================================================================ --
+
 -- |
 --
--- you can only import 'LHSRule's.
-type DNSImport n = DNSLHS LHSRule n
+-- you can only import 'LHSRule's, but of either 'LHSSide'dness.
+data DNSImport n = forall s. DNSImport (DNSLHS LHSRule s n)
+-- A newtype constructor cannot have existential type variables
+-- Can't make a derived instance of ‘Show (DNSImport n)’:
+instance (Show n) => Show (DNSImport n) where showsPrec d (DNSImport l) = showsPrecNewtype d "DNSImport" l
+instance (Eq   n) => Eq   (DNSImport n) where DNSImport l1 ==        DNSImport l2 = l1 `equalDNSLHS`   l2
+instance (Ord  n) => Ord  (DNSImport n) where DNSImport l1 `compare` DNSImport l2 = l1 `compareDNSLHS` l2
+
+instance Functor     DNSImport where fmap     = fmapDefault
+instance Foldable    DNSImport where foldMap  = foldMapDefault
+instance Traversable DNSImport where traverse f (DNSImport l) = DNSImport <$> traverse f l
+
 
 -- | import every 'DNSBuiltinRule'.
 --
 dnsHeader :: [DNSImport n]
-dnsHeader = DNSBuiltinRule <$> constructors
+dnsHeader = (DNSImport . DNSBuiltinRule) <$> constructors
 
 
 -- ================================================================ --
@@ -84,7 +104,7 @@ dnsHeader = DNSBuiltinRule <$> constructors
 --
 data DNSProduction i n t = DNSProduction
  { _dnsProductionInfo :: i
- , _dnsProductionLHS  :: (DNSLHS LHSRule n)
+ , _dnsProductionLHS  :: (DNSLHS LHSRule LHSDefined n)
  , _dnsProductionRHS  :: (DNSRHS n t)
  }
  deriving (Show,Eq,Ord)
@@ -100,7 +120,7 @@ instance Bitraversable (DNSProduction i) where
 --
 data DNSVocabulary i n t = DNSVocabulary
  { _dnsVocabularyInfo   :: i
- , _dnsVocabularyLHS    :: (DNSLHS LHSList n)
+ , _dnsVocabularyLHS    :: (DNSLHS LHSList LHSDefined n)
  , _dnsVocabularyTokens :: [DNSToken t]
  }
  deriving (Show,Eq,Ord)
@@ -227,7 +247,7 @@ nonemptyDNSRHS r = r :| []
 
 -- |
 --
--- in the type @DNSLHS l n@, you can read:
+-- in the type @DNSLHS l s n@, you can read:
 --
 -- * @l@ as @leftHandSide@
 -- * @n@ as @name@ or @nonTerminal@
@@ -252,28 +272,28 @@ nonemptyDNSRHS r = r :| []
 --
 -- (see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
 --
-data DNSLHS (l :: LHSKind) n where
- DNSRule        :: n              -> DNSLHS LHSRule n
- DNSBuiltinRule :: DNSBuiltinRule -> DNSLHS LHSRule x
- DNSList        :: n              -> DNSLHS LHSList n
- DNSBuiltinList :: DNSBuiltinList -> DNSLHS LHSList x
+data DNSLHS (l :: LHSKind) (s :: LHSSide) n where
+ DNSRule        :: n              -> DNSLHS LHSRule LHSDefined n
+ DNSBuiltinRule :: DNSBuiltinRule -> DNSLHS LHSRule LHSBuiltin x
+ DNSList        :: n              -> DNSLHS LHSList LHSDefined n
+ DNSBuiltinList :: DNSBuiltinList -> DNSLHS LHSList LHSBuiltin x
 
--- TODO enforce whether DNSLHS, well, whether it can be on the LHS rather than only in an RHS.
+-- TODO enforce whether DNSLHS, well, whether it can be on the LHS rather than only in an RHS. this complicates everything! I forget why I even doing this.
 
-deriving instance (Show n) => Show (DNSLHS l n)
-instance (Eq n) => Eq (DNSLHS l n) where (==) = equalDNSLHS
-instance (Ord n) => Ord (DNSLHS l n) where compare = compareDNSLHS
+deriving instance (Show n) => Show (DNSLHS l s n)
+instance (Eq n)  => Eq  (DNSLHS l s n) where (==)    = equalDNSLHS
+instance (Ord n) => Ord (DNSLHS l s n) where compare = compareDNSLHS
 
-instance Functor     (DNSLHS l) where fmap     = fmapDefault
-instance Foldable    (DNSLHS l) where foldMap  = foldMapDefault
-instance Traversable (DNSLHS l) where
+instance Functor     (DNSLHS l s) where fmap     = fmapDefault
+instance Foldable    (DNSLHS l s) where foldMap  = foldMapDefault
+instance Traversable (DNSLHS l s) where
  traverse f (DNSRule n) = DNSRule <$> f n
  traverse f (DNSList n) = DNSList <$> f n
  traverse _ (DNSBuiltinRule x) = pure (DNSBuiltinRule x)
  traverse _ (DNSBuiltinList x) = pure (DNSBuiltinList x)
 
 -- | heterogeneous (but only in the phantom) equality
-equalDNSLHS :: (Eq n) => DNSLHS l1 n -> DNSLHS l2 n -> Bool
+equalDNSLHS :: (Eq n) => DNSLHS l1 s1 n -> DNSLHS l2 s2 n -> Bool
 DNSRule        x `equalDNSLHS` DNSRule        y = x == y
 DNSBuiltinRule x `equalDNSLHS` DNSBuiltinRule y = x == y
 DNSList        x `equalDNSLHS` DNSList        y = x == y
@@ -281,14 +301,14 @@ DNSBuiltinList x `equalDNSLHS` DNSBuiltinList y = x == y
 _                `equalDNSLHS` _                = False
 
 -- | heterogeneous (wrt the phantom) comparison
-compareDNSLHS :: (Ord n) => DNSLHS l1 n -> DNSLHS l2 n -> Ordering
+compareDNSLHS :: (Ord n) => DNSLHS l1 s1 n -> DNSLHS l2 s2 n -> Ordering
 DNSRule        x  `compareDNSLHS` DNSRule        y  = x `compare` y
 DNSBuiltinRule x  `compareDNSLHS` DNSBuiltinRule y  = x `compare` y
 DNSList        x  `compareDNSLHS` DNSList        y  = x `compare` y
 DNSBuiltinList x  `compareDNSLHS` DNSBuiltinList y  = x `compare` y
 (rankDNSLHS -> x) `compareDNSLHS` (rankDNSLHS -> y) = x `compare` y
 
-rankDNSLHS :: DNSLHS l n -> Integer
+rankDNSLHS :: DNSLHS l s n -> Integer
 rankDNSLHS = \case
  DNSRule        {} -> 0
  DNSBuiltinRule {} -> 1
@@ -305,30 +325,37 @@ displayDNSBuiltinRule = fmap toLower . show
 
 -- | Builtin 'DNSVocabulary's.
 --
+-- (in the future, DNS better have more built-in lists.)
 data DNSBuiltinList = DNSEmptyList
  deriving (Show, Eq, Ord, Enum)
 
 displayDNSBuiltinList :: DNSBuiltinList -> String
 displayDNSBuiltinList DNSEmptyList = "emptyList"
 
--- | for promotion by @DataKinds@.
---
--- 'LHSRule's and 'LHSList's seem to share different namespaces
+-- |
+-- 'LHSRule's and 'LHSList's inhabit distinct namespaces,
 -- in Dragon NaturallySpeaking.
 --
+-- for promotion by @DataKinds@.
 data LHSKind = LHSRule | LHSList
+
+-- |
+-- whether the 'DNSLHS' has a corresponding right-hand side or not (e.g. for inlining):
+--
+-- * most productions are 'LHSDefined', i.e. they have both a left-hand side and a right-hand side
+-- * builtins are 'LHSBuiltin', they can be used, but are never defined
+--
+-- for promotion by @DataKinds@.
+data LHSSide = LHSDefined | LHSBuiltin
 
 
 -- ================================================================ --
 
 -- |
-data SomeDNSLHS n = forall l. SomeDNSLHS (DNSLHS l n)
+data SomeDNSLHS n = forall l s. SomeDNSLHS (DNSLHS l s n)
 
-instance (Show n) => Show (SomeDNSLHS n) where
- showsPrec d (SomeDNSLHS l) = showParen (d > 10)
-  (showString "SomeDNSLHS " . showsPrec (10+1) l)
-
-instance (Eq   n) => Eq   (SomeDNSLHS n) where SomeDNSLHS l1 == SomeDNSLHS l2 = l1 `equalDNSLHS` l2
+instance (Show n) => Show (SomeDNSLHS n) where showsPrec d (SomeDNSLHS l) = showsPrecNewtype d "SomeDNSLHS" l
+instance (Eq   n) => Eq   (SomeDNSLHS n) where SomeDNSLHS l1 ==        SomeDNSLHS l2 = l1 `equalDNSLHS`   l2
 instance (Ord  n) => Ord  (SomeDNSLHS n) where SomeDNSLHS l1 `compare` SomeDNSLHS l2 = l1 `compareDNSLHS` l2
 
 instance Functor     SomeDNSLHS where fmap     = fmapDefault

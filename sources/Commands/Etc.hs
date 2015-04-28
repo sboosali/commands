@@ -180,3 +180,10 @@ getLefts = nub . bifoldMap (:[]) (const [])
 getRights :: (Eq t, Bifoldable p) => p n t -> [t]
 getRights = nub . bifoldMap (const []) (:[])
 
+-- | helper function to write manual Show instances.
+ -- e.g. for existentially quantified types.
+showsPrecNewtype :: (Show a) => Int -> String -> a -> ShowS
+showsPrecNewtype depth name value = showParen
+ (depth > 10)
+ (showString (name <> " ") . showsPrec (10+1) value)
+

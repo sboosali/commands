@@ -20,7 +20,7 @@ renderRule (Rule l r) = DNSProduction defaultDNSInfo lhs rhs
  lhs = renderLHS l
  rhs = renderRHS r
 
-renderLHS :: LHS -> DNSLHS LHSRule DNSCommandName
+renderLHS :: LHS -> DNSLHS LHSRule LHSDefined DNSCommandName
 renderLHS = DNSRule . defaultDNSExpandedName
 
 -- |

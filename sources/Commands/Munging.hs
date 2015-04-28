@@ -113,7 +113,6 @@ uncapitalize (x:xs) = toLower x : xs
 unCamelCase :: String -> [String]
 unCamelCase = fmap lower . (split . dropInitBlank . keepDelimsL . whenElt) isUpper
 
-underCamelCase :: ([String] -> [String]) -> (String -> String)
-underCamelCase f = (intercalate " ") . f . unCamelCase
--- underCamelCase = dimap (intercalate " ") unCamelCase
--- or "overCamelCase"?
+overCamelCase :: ([String] -> [String]) -> (String -> String)
+overCamelCase f = (intercalate " ") . f . unCamelCase
+-- overCamelCase = dimap (intercalate " ") unCamelCase

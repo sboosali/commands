@@ -43,7 +43,7 @@ type DNSExpanded n t = [SomeDNSLHS (DNSExpandedName n)]
 type DNSInlined n t = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS (DNSExpandedName n) t)
 
 -- |
-type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList (DNSExpandedName n))
+type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList LHSDefined (DNSExpandedName n))
 
 
 -- ================================================================ --
@@ -147,7 +147,7 @@ expandProductionCycleTo ls d p@(DNSProduction i l r)
 expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProductionOptimizeable n t -> DNSProductionOptimizeable n t
 expandProductionAt ls d (DNSProduction i l r) = DNSProduction i (expandLHSAt d l) (expandRHSAt ls (d-1) r)
 
-expandLHSAt :: Natural -> DNSLHS l (DNSExpandedName n) -> DNSLHS l (DNSExpandedName n)
+expandLHSAt :: Natural -> DNSLHS l s (DNSExpandedName n) -> DNSLHS l s (DNSExpandedName n)
 expandLHSAt = set (dnsLHSName.dnsExpansion) . Just
 
 expandRHSAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSRHS (DNSExpandedName n) t -> DNSRHS (DNSExpandedName n) t
@@ -251,8 +251,7 @@ partitionVocabularizables (e:|_ps) = (e:|ps, vs)
 canVocabularize :: DNSProductionOptimizeable n t -> Either (DNSProductionOptimizeable n t) (DNSVocabularyOptimizeable n t)
 canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getApp . onlyTokens) r of
  Nothing -> Left p
- Just ts -> Right $ DNSVocabulary i (DNSList n) ts
-canVocabularize _ = undefined -- TODO distinguish between LHS that can and can't be on the left-hand side, as it were
+ Just ts -> Right $ DNSVocabulary i (DNSList n) ts  -- make sure this doesn't introduce a naming conflict with existing DNSList. might be best to just treat rules and lists as if they shared the same namespace.
 
 {- | returns all the tokens in the right-hand side, but only if that
 right-hand side has only tokens (or nested alternatives thereof).

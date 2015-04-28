@@ -108,6 +108,41 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
 
   _ -> always nothing
 
+{-
+
+ Up_
+ Down_
+ Left_
+ Right_
+ In_
+ Out_
+
+ Select
+ Beginning
+ End
+ Copy
+ Cut
+ Delete
+ Transpose
+ Google
+
+ That
+ Character
+ Word_
+ Token
+ Group
+ Line
+ Rectangle
+ Block
+ Page
+ Screen
+ Everything
+ Definition
+ Function_
+ Reference
+ Structure
+
+-}
 
 runEmacs :: String -> Actions ()
 runEmacs interactiveCommand = do
@@ -139,13 +174,44 @@ moveEmacs = \case
  MoveTo Backwards Everything -> press M up
  MoveTo Forwards Everything -> press M down
 
- -- Move -> press 
- -- MoveTo -> press 
+ -- Move -> press
+ -- MoveTo -> press
  _ -> nothing
+
+
+
 
 editEmacs :: Edit -> Actions ()
 editEmacs = \case
+
+ -- Select
+ -- Beginning
+ -- End
+ -- Copy
+ -- Cut
+ -- Delete
+ -- Transpose
+ -- Google
+
+ -- That
+ -- Character
+ -- Word_
+ -- Token
+ -- Group
+ -- Line
+ -- Rectangle
+ -- Block
+ -- Page
+ -- Screen
+ -- Everything
+ -- Definition
+ -- Function_
+ -- Reference
+ -- Structure
+
  _ -> nothing
+
+
 
 
 
@@ -359,7 +425,9 @@ move = 'move
 
 
 data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
-direction = qualifiedGrammarWith "_"
+direction = tidyGrammar
+-- direction = transformedGrammar (filter (/= '_'))
+-- direction = qualifiedGrammarWith "_"
 
 
 

@@ -144,15 +144,15 @@ dragonGrammar name rhs p = Grammar
  where
  Just l = lhsFromName name
 
--- | a default 'Grammar' for simple ADTs.
+-- | a default 'Grammar' for 'Enum's.
 --
--- with 'Enum' ADTs, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parser's and 'DNSGrammar's. without TemplateHaskell.
+-- with 'Enum's, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parser's and 'DNSGrammar's. with 'Typeable', but without TemplateHaskell.
 --
 -- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Grammar's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
 --
 --
 enumGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
-enumGrammar = transformedGrammar (underCamelCase id)
+enumGrammar = transformedGrammar (overCamelCase id)
 
 -- | a default 'Grammar' for simple ADTs.
 --
@@ -198,13 +198,13 @@ qualifiedGrammar = qualifiedGrammarWith occ
 --
 --
 qualifiedGrammarWith :: forall a. (Typeable a, Enum a, Show a) => String -> Grammar a
-qualifiedGrammarWith affix = transformedGrammar (underCamelCase (filter (/= fmap toLower affix)))
+qualifiedGrammarWith affix = transformedGrammar (overCamelCase (filter (/= fmap toLower affix)))
 
 -- | strips out data typename like 'qualifiedGrammar', and @_@'s, and numbers.
 -- makes it easy to generate generic terminals (like @"left"@),
 -- without conflicting with.common symbols (like 'Left').
 tidyGrammar :: forall a. (Typeable a, Enum a, Show a) => Grammar a
-tidyGrammar = transformedGrammar (underCamelCase (filter (/= fmap toLower occ) . filter (/= "_")))
+tidyGrammar = transformedGrammar (overCamelCase (filter (/= fmap toLower occ)) . filter (/= '_'))
  where
  GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
 

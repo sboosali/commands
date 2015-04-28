@@ -91,5 +91,5 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   ]
 
 main = do
- doctest doctestArgs
- -- tastytest TODO
+ -- doctest doctestArgs
+ tastytest

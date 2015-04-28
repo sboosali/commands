@@ -136,7 +136,7 @@ serializeGrammar grammar = SerializedGrammar{..}
 -- <dgnletters> imported;
 --
 serializeImports :: [DNSImport DNSName] -> Doc
-serializeImports = vsep . fmap (\l -> serializeLHS l <+> "imported" <> ";")
+serializeImports = vsep . fmap (\(DNSImport l) -> serializeLHS l <+> "imported" <> ";")
 
 {- | serializes a 'DNSVocabulary' into a Python @Dict@.
 
@@ -168,7 +168,6 @@ serializeVocabularies
 serializeVocabulary :: DNSVocabulary i DNSName DNSText -> Possibly Doc
 serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
  (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
-serializeVocabulary _ = failed "serializeVocabulary"
 
 -- | serializes 'DNSProduction's into a Python @String@.
 --
@@ -232,7 +231,7 @@ serializeRHS (DNSAlternatives (toList -> rs)) = "(" <> (cat . punctuate " | " . 
 -- {list}
 --
 --
-serializeLHS :: DNSLHS l DNSName -> Doc
+serializeLHS :: DNSLHS l s DNSName -> Doc
 serializeLHS (DNSRule (DNSName s)) = "<" <> text s <> ">"
 serializeLHS (DNSBuiltinRule b)    = "<" <> text s <> ">"
  where s = T.pack $ displayDNSBuiltinRule b

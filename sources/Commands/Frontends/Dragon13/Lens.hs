@@ -32,7 +32,7 @@ dnsSomeLHSName :: Traversal' (SomeDNSLHS n) n
 dnsSomeLHSName f (SomeDNSLHS l) = SomeDNSLHS <$> dnsLHSName f l
 
 -- not a Prism because it merges two cases
-dnsLHSName :: Traversal' (DNSLHS l n) n
+dnsLHSName :: Traversal' (DNSLHS l s n) n
 dnsLHSName f = \case
  DNSRule n   -> DNSRule <$> f n
  DNSList n   -> DNSList <$> f n

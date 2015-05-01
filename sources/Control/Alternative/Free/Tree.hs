@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, GADTs, PatternSynonyms, TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor, GADTs, PatternSynonyms, TypeFamilies, RankNTypes, ScopedTypeVariables #-}
 {- |
 
 see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors> for different free applicatives, and certain properties (e.g. associativity, the complexity of certain operations, etc.).
@@ -142,8 +142,16 @@ toAltList x         = [x]
 
 pattern Empty = Many []
 
-lift :: f a -> Alt f a
-lift ga = Pure id `App` ga
+liftAlt :: f a -> Alt f a
+liftAlt f = Pure id `App` f
 
-fell :: (Alternative f) => Alt f a -> f a
-fell = undefined
+fellAlt :: (Alternative f) => Alt f a -> f a
+fellAlt = runAlt id
+
+-- | 'Alt' satisfies associativity modulo 'runAlt'. (I think)
+runAlt :: forall f g a. Alternative g => (forall x. f x -> g x) -> Alt f a -> g a
+runAlt _ (Pure a)     = pure a
+runAlt u (Many fs)    = foldr (<|>) empty (runAlt u <$> fs)
+runAlt u (f `App` x) = runAlt u f <*> u x
+runAlt u (f :<*>  g) = runAlt u f <*> runAlt u g
+

@@ -118,6 +118,8 @@ compiles :: Command a -> a -> CompilerContext -> Actions ()
 
 
 -- |
+--
+-- the 'RHS' is "erased" into a grammar and a parser.
 genericGrammar :: LHS -> RHS a -> Grammar a
 genericGrammar l r = Grammar (Rule l r) g p
  where

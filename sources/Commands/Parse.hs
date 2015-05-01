@@ -65,9 +65,8 @@ gparser grammar context = (grammar ^. gramParser) context <?> showLHS (grammar ^
 -- always returns a 'Parsec' wrapped in 'try'
 rparser :: RHS a -> Parser a
 rparser (Pure a) _ = pure a
-rparser (Many rs) context = try p
+rparser (Many rs) context = try (asum ps)
  where
- p = asum ps
  ps = fmap (flip rparser $ context) rs
 rparser (fs `App` x) context = try (p <*> q)
  where
@@ -78,6 +77,7 @@ rparser (fs :<*> xs) context = try (p <*> q)
  p = rparser fs (Some q)
  q = rparser xs context
 
+-- TODO rewrite with generic function on free alternatives? but right-context-sensitive Parser is not Applicative, violating composition.
 
 {-
 

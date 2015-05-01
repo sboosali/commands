@@ -11,9 +11,9 @@ import Data.List.NonEmpty                (nonEmpty)
 import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
 
 
--- |
+-- | "render"s into a grammar, which can then be "serialize"d into text.
 --
--- 'RHS' instantiate @Alternative@, and so may be @empty@. but 'DNSProduction' take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ for empty 'RHS's (later optimized away).
+-- 'RHS's instantiate @Alternative@, and so may be @empty@. but 'DNSProduction's take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ for empty 'RHS's (later optimized away).
 renderRule :: Rule x -> DNSProduction DNSInfo DNSCommandName DNSCommandToken
 renderRule (Rule l r) = DNSProduction defaultDNSInfo lhs rhs
  where
@@ -39,4 +39,6 @@ renderSymbol :: GrammaticalSymbol x -> DNSRHS DNSCommandName DNSCommandToken
 renderSymbol = symbol
  (\(Word t) -> DNSTerminal (DNSToken t))
  (\grammar -> DNSNonTerminal (SomeDNSLHS (grammar ^. gramGrammar.dnsProductionLHS)))
+
+-- TODO define as sound generic free alternative operation, with an (Applicative) Const DNSRHS?
 

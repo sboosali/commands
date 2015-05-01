@@ -264,11 +264,11 @@ fromGrammar :: Grammar a -> GrammaticalSymbol a
 fromGrammar = InR
 
 liftGrammar :: Grammar a -> RHS a
-liftGrammar = lift . fromGrammar
+liftGrammar = liftAlt . fromGrammar
 -- TODO rename to rule
 
 liftString :: String -> RHS a
-liftString = lift . fromWord . Word
+liftString = liftAlt . fromWord . Word
 -- TODO rename to word
 
 -- | a name, with the level of its expansion.

@@ -63,10 +63,10 @@ do
  sendKeyPress ([Command]) (DownArrowKey)
  x1 <- currentApplication
  x2 <- getClipboard
- openURL ("https://www.google.com/search?q=x2")
- setClipboard ("x1")
+ openURL ("https://www.google.com/search?q={x2}")
+ setClipboard ("{x1}")
  x3 <- getClipboard
- return "x3"
+ return "{x3}"
 
 (note: doesn't print variables as raw strings (cf. 'print' versus 'putStrLn'), as it doesn't "crystallize" all operations into "symbols", but gives you an idea of the data flow. however, it does correctly track the control flow, even when the variables are used non-sequentially.)
 
@@ -74,6 +74,7 @@ do
 'gensym', for readability. but of course the bindings aren't reified,
 and they could have been named anything)
 
+basically, the monadically-bound variable @x1@ is shown as if it were literally @"{x1}"@ (rather than, the current clipboard contents). a more complicated alternative could be to purely model the state: e.g. a clipboard, with 'SetClipboard' and 'GetClipboard' working together, etc.).
 
 -}
 showActions :: (Show x) => Actions x -> String
@@ -101,12 +102,12 @@ showActions as = "do\n" <> evalState (showActions_ as) 1
 
   GetClipboard f -> do
    x <- gensym
-   rest <- showActions_ (f x)
+   rest <- showActions_ (f ("{"<>x<>"}"))
    return $ " " <> x <> " <- getClipboard" <> showArgs [] <> rest
 
   CurrentApplication f -> do
    x <- gensym
-   rest <- showActions_ (f x)
+   rest <- showActions_ (f ("{"<>x<>"}"))
    return $ " " <> x <> " <- currentApplication" <> showArgs [] <> rest
 
  showArgs :: [String] -> String

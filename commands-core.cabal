@@ -152,6 +152,7 @@ library
 
   , bv  ==0.3.*
   , free  ==4.11.*
+  , http-types ==0.8.6.*
 
   , aeson  ==0.8.*
   , servant-server ==0.2.*
@@ -160,6 +161,7 @@ library
   , wai  ==3.0.*
   , warp  ==3.0.*
   , either  ==4.3.*
+
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly

@@ -190,6 +190,7 @@ data ActionF k
  | OpenURL         URL                              k
 
  | Delay           Time                             k
+ -- TODO  | Annihilate      SomeException                       -- no k, it annihilates the action, for mzero and MonadThrow
  -- TODO   | PerformIO       (IO a)                           (a -> k)
  deriving (Functor)
 

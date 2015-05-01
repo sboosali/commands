@@ -1,24 +1,25 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, MultiWayIf, TemplateHaskell, PostfixOperators #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, MultiWayIf #-}
+{-# LANGUAGE PostfixOperators, TemplateHaskell                         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
-import           Commands.Munging
 import           Commands.Core
 import           Commands.Frontends.Dragon13
+import           Commands.Munging
 
+import           Control.Lens                hiding (from, ( # ), (&))
 import           Control.Lens.Plated
+import           Data.List.NonEmpty          (NonEmpty (..), fromList)
+import qualified Data.List.NonEmpty          as NonEmpty
 import           Data.Semigroup
-import           Data.List.NonEmpty              (NonEmpty (..), fromList)
-import qualified Data.List.NonEmpty              as NonEmpty
-import           Control.Lens                    hiding (from, ( # ), (&))
 
-import           Data.Foldable                   (Foldable (..), asum)
 import           Control.Applicative
 import           Data.Char
-import qualified Data.List           as List
+import           Data.Foldable               (Foldable (..), asum)
+import qualified Data.List                   as List
 import           Data.Traversable
-import           Data.Typeable       (Typeable)
-import           GHC.Exts            (IsString (..))
-import           Prelude             hiding (mapM, foldr1)
+import           Data.Typeable               (Typeable)
+import           GHC.Exts                    (IsString (..))
+import           Prelude                     hiding (foldr1, mapM)
 
 
 -- |

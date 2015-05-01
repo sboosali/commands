@@ -22,26 +22,28 @@ int main(int argc, char** argv)
     // strcpy(url, site);
     // strcat(url, query);
     // openURL(url);
+  openURL("https://www.google.com/search?q=somewords");
 
      // bringApplication("Notes");  // works, sometimes
      // when launched from another Emacs like Work, Notes inherits its environment variables
  // bringApplication("Google Chrome");  // works, no more weirdness
 
-  printApplications ();
 
- // full path (name would be "Emacs")
-  ProcessSerialNumber* psn1 = getApplicationPSN("/Applications/Notes.app");
-  pressKeyTo(0, kVK_ANSI_X, *psn1);
+//   // printApplications ();
 
-[NSThread sleepForTimeInterval:(30 / 1000.0f)]; //  otherwise, the next event is lost
+//  // full path (name would be "Emacs")
+//   ProcessSerialNumber* psn1 = getApplicationPSN("/Applications/Notes.app");
+//   pressKeyTo(0, kVK_ANSI_X, *psn1);
 
- // just name
-  ProcessSerialNumber* psn2 = getApplicationPSN("Google Chrome");
-  pressKeyTo(0, kVK_ANSI_X, *psn2);
+// [NSThread sleepForTimeInterval:(30 / 1000.0f)]; //  otherwise, the next event is lost
+
+//  // just name
+//   ProcessSerialNumber* psn2 = getApplicationPSN("Google Chrome");
+//   pressKeyTo(0, kVK_ANSI_X, *psn2);
  
-  //  doesn't crash
-  ProcessSerialNumber* psn3 = getApplicationPSN("doesn't exist");
-  pressKeyTo(0, kVK_ANSI_X, *psn3);
+//   //  doesn't crash
+//   ProcessSerialNumber* psn3 = getApplicationPSN("doesn't exist");
+//   pressKeyTo(0, kVK_ANSI_X, *psn3);
 
 
 

@@ -1,9 +1,14 @@
-{-# LANGUAGE FlexibleContexts, RankNTypes, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, RankNTypes #-}
+{-# LANGUAGE TemplateHaskell, ViewPatterns                   #-}
 module Commands.Backends.OSX.DSL where
-import Commands.Backends.OSX.Types
+import           Commands.Backends.OSX.Types
 
-import Control.Monad.Free          (MonadFree, liftF)
-import Control.Monad.Free.TH       (makeFree)
+import           Control.Monad.Free          (MonadFree, liftF)
+import           Control.Monad.Free.TH       (makeFree)
+import qualified Data.ByteString.Char8       as BS
+import           Network.HTTP.Types.URI      (renderQuery)
+
+import           Data.Monoid                 ((<>))
 
 
 makeFree ''ActionF
@@ -27,18 +32,16 @@ insert = sendText
 copy :: Actions String
 copy = do
  sendKeyPress [Command] CKey
- -- TODO does it need to wait? wait $ milliseconds 25
+ delay 25 -- TODO does it need to wait? how long? delay $ milliseconds 25
  getClipboard
 
 paste :: Actions ()
 paste = do
  sendKeyPress [Command] VKey
 
+google :: String -> Actions ()
+google (BS.pack -> query) = openURL (BS.unpack $ "https://www.google.com/search" <> renderQuery True [("q", Just query)])
+
 -- TODO
 -- instance convert KeyPress Actions
 -- instance convert MouseClick Actions
-
--- TODO
--- google :: String -> URL
--- google query = [qq| https://www.google.com/search?q={query} |]
-

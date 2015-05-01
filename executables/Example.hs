@@ -16,9 +16,9 @@ main = mainWith =<< getArgs
 mainWith = \case
  ["serve"] -> do
   print "serveCommands 8666 root"
-  Server.serveCommands 8666 theModel
+  Server.serveNatlink 8666 theModel
  _ -> Example.main
  -- OSX.main
 
-theModel :: Server.CModel Example.Root
-theModel = (Server.CModel Example.root (Example.Phrase_ . Example.asPhrase) "emacs")
+theModel :: Server.CmdModel Example.Root
+theModel = (Server.CmdModel Example.root (Example.Phrase_ . Example.asPhrase) "emacs")

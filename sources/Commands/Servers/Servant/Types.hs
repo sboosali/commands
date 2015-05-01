@@ -15,7 +15,7 @@ State that configures the server's handlers, and may be updated by clients.
 
 
 -}
-data CModel a = CModel
+data CmdModel a = CmdModel
  { _modCommand :: Command a
  , _modDefault :: String -> a
  , _modContext :: CompilerContext

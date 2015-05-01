@@ -3,7 +3,6 @@
 {-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards               #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections         #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
-
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
@@ -85,10 +84,7 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
 --  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
 
   ReplaceWith this that -> \case
-   "emacs" -> do
-    press M r
-    slot =<< munge this
-    slot =<< munge that
+   "emacs" -> runEmacsWithP "replace-regexp" [this, that]
    "intellij" -> do
     press M r
     (insert =<< munge this) >> press tab
@@ -107,6 +103,23 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
    insert =<< munge p
 
   _ -> always nothing
+
+always = const
+when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
+when theseContexts thisAction = \theContext -> do
+ if theContext `List.elem` theseContexts
+ then thisAction
+ else nothing
+onlyWhen = when . (:[])
+whenEmacs = onlyWhen "emacs"
+
+munge :: Phrase -> Actions String
+munge p = do
+ q <- splatPasted p <$> getClipboard
+ return $ mungePhrase q defSpacing
+
+
+
 
 {-
 
@@ -144,54 +157,197 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
 
 -}
 
+nothing = return ()
+
+slot s = do
+ delay 10
+ sendText s
+ sendKeyPress [] ReturnKey
+
+execute_extended_command = press C w -- non-standard: make this configurable? ImplicitParams?
+
+eval_expression = press M ':'
+
+-- | as it opens a minibuffer, it needs @(setq enable-recursive-minibuffers t)@ to work when already in a minibuffer.
+evalEmacs :: ElispSexp -> Actions ()
+evalEmacs sexp = do
+ eval_expression
+ slot sexp
+
+type ElispSexp = String
+-- type ElispSexp = Sexp String String
+
+parseSexp :: String -> Possibly ElispSexp
+parseSexp = undefined
+
+prettySexp :: ElispSexp -> String
+prettySexp = undefined
+
 runEmacs :: String -> Actions ()
-runEmacs interactiveCommand = do
- press C w -- non-standard: make this configurable?
- delay 30
- insert interactiveCommand
--- configurable by actions being a ReaderT? The solved another problem, delays or something. code just let the user define it, after copying and pasting the Example Plug-in. That's the whole point of the configuration being Haskell.
+runEmacs f = runEmacsWith f []
+
+{- | pseudo-rpc:
+
+* "rpc" because you can call emacs commands (I.e. interactive functions) with arguments
+
+* "pseudo" because the return type is unit: the communication is via one-way keyboard-shortcuts, rather than a two-way channel like a network connection.
+
+no "type"-checking or ararity-checking.
+
+as it opens a minibuffer, it needs @(setq enable-recursive-minibuffers t)@ to work when already in a minibuffer.
+-}
+runEmacsWith :: String -> [String] -> Actions ()
+runEmacsWith f xs = do
+ execute_extended_command -- non-standard: make this configurable? ImplicitParams?
+ slot f
+ traverse_ slot xs
+-- configurable by actions being a ReaderT? The solved another problem, delays or something.
+-- or just let the user define it, after copying and pasting the Example Plug-in. That's the whole point of the configuration being Haskell.
+--
+-- integrate with a vocabulary. or simple sum grammar, falling back to dictation.
+-- print a list of all interactive commands, tokenize by splitting on "-".
+-- http://stackoverflow.com/questions/29953266/emacs-list-the-names-of-every-interactive-command
+
+runEmacsWithA :: String -> [Actions String] -> Actions ()
+runEmacsWithA f as = do
+ xs <- traverse id as
+ runEmacsWith f xs
+
+runEmacsWithP :: String -> [Phrase] -> Actions ()
+runEmacsWithP f ps = do
+ xs <- traverse munge ps
+ runEmacsWith f xs
 
 moveEmacs :: Move -> Actions ()
 moveEmacs = \case
 
- Move Left_ Character -> press C b
+ Move Left_ Character  -> press C b
  Move Right_ Character -> press C f
- Move Left_ Word_ -> press M b
- Move Right_ Word_ -> press M f
- Move Left_ Group -> press C M b
- Move Right_ Group -> press C M f
- Move Up_ Line -> press C p
- Move Down_ Line -> press C n
- Move Up_ Block -> press C up
- Move Down_ Block -> press C down
- Move Up_ Screen -> runEmacs "scroll-up-command"
- Move Down_ Screen -> press C v
- Move Up_ Page -> runEmacs "backward-page"
- Move Down_ Page -> runEmacs "forward-page"
+ Move Left_ Word_      -> press M b
+ Move Right_ Word_     -> press M f
+ Move Left_ Group      -> press C M b
+ Move Right_ Group     -> press C M f
+ Move Up_ Line         -> press C p
+ Move Down_ Line       -> press C n
+ Move Up_ Block        -> press C up
+ Move Down_ Block      -> press C down
+ Move Up_ Screen       -> runEmacs "scroll-up-command"
+ Move Down_ Screen     -> press C v
+ Move Up_ Page         -> runEmacs "backward-page"
+ Move Down_ Page       -> runEmacs "forward-page"
 
- MoveTo Backwards Line -> press C a
- MoveTo Forwards  Line -> press C e
- MoveTo Backwards Everything -> press M up
- MoveTo Forwards Everything -> press M down
+ MoveTo Beginning Line       -> press C a
+ MoveTo Ending  Line       -> press C e
+ MoveTo Beginning Everything -> press M up
+ MoveTo Ending Everything  -> press M down
 
  -- Move -> press
  -- MoveTo -> press
  _ -> nothing
 
+-- TODO read application from environment, which determines the keyboard shortcut
+-- an application is defined by the keyboard shortcuts it supports?
+-- Rec?
+-- Map String Actions
+-- lookup "mark"
+mark = press C spc
+
+-- gets the given region of text from Emacs
+selected :: Slice -> Region -> Actions String
+selected s r = do
+ -- editEmacs (Edit Select s r)
+ select r s
+ copy
+
+select :: Region -> Slice -> Actions ()
+select That = \_ -> nothing     -- (should be) already selected
+select r = \case
+ Whole     -> beg_of r >> mark >> end_of r
+ Backwards -> mark >> beg_of r
+ Forwards  -> mark >> end_of r
+
+{-
+
+idempotent means
+
+idempotent means unchainable.
+instead of [3 select word], how about [select 3 word]
+where the first selection is idempotent, and the next two Move Right.
+In Emacs, this preserves the mark.
 
 
 
+-}
+-- | should be idempotent (in Emacs, not Haskell).
+beg_of :: Region -> Actions ()
+beg_of = \case
+ -- runEmacs
+ That       -> evalEmacs "(goto-char (region-beginning))"
+ Character  -> nothing
+ Word_      -> evalEmacs "(beginning-of-thing 'word)"
+ Group      -> evalEmacs "(beginning-of-thing 'list)"
+ Line       -> press C a
+ Block      -> evalEmacs "(beginning-of-thing 'block)"
+ Page       -> evalEmacs "(beginning-of-thing 'page)"
+ Screen     -> evalEmacs "(goto-char (window-start))"
+ -- Screen     -> runEmacs "beginning-of-window" -- must be defined with (window-start)
+ Everything -> runEmacs "beginning-of-buffer"
+ _          -> nothing
+
+-- | should be idempotent (in Emacs, not Haskell).
+end_of :: Region -> Actions ()
+end_of = \case
+ -- runEmacs
+ That       -> evalEmacs "(goto-char (region-end))"
+ Character  -> nothing          -- [press C f] is not idempotent, but [nothing] fails on [beg_of r >> mark >> end_of r]
+ Word_      -> evalEmacs "(end-of-thing 'word)"
+ Group      -> evalEmacs "(end-of-thing 'list)"
+ Line       -> press C e
+ Block      -> evalEmacs "(end-of-thing 'block)" -- non-standard: expects forward-block
+ Page       -> evalEmacs "(end-of-thing 'page)"
+ Screen     -> evalEmacs "(goto-char (window-end))"
+ -- Screen     -> runEmacs "end-of-window"      -- must be defined with (window-end)
+ Everything -> runEmacs "end-of-buffer"
+ _          -> nothing
+
+-- | vim's composeability would keep the number of cases linear (not quadratic in 'Action's times 'Region's).
 editEmacs :: Edit -> Actions ()
 editEmacs = \case
 
- -- Select
- -- Beginning
- -- End
- -- Copy
- -- Cut
- -- Delete
- -- Transpose
- -- Google
+ Edit Select Whole Line -> do -- special behavior
+  select Line Whole
+  press right
+ Edit Select _ Character -> do -- special behavior
+  mark
+  press right
+ Edit Select s r -> select r s  -- generic behavior
+ -- some Regions need a { press right } for idempotency of their beg_of/end_of
+
+ Edit Google s r -> do
+  google =<< selected s r
+
+ Edit Delete s Word_ -> do
+  select Word_ s
+  press right                   -- doesn't work for camel case. only single-character-delimited. maybe Token, not Word?
+  press del
+ Edit Delete s r -> do
+  select r s
+  press del
+
+ Edit Copy s r -> do
+  select r s
+  press M c                     -- like Cua-mode for Mac
+
+ Edit Cut s r -> do
+  select r s
+  press M x                     -- like Cua-mode for Mac
+
+ Edit Transpose _ Character -> press C t
+ Edit Transpose _ Word_ -> press M t
+ Edit Transpose _ Group -> press C M t
+ Edit Transpose _ Line -> press C x t
+ Edit Transpose _ Block -> runEmacs "transpose-block"
+ -- Edit Transpose _ ->
 
  -- That
  -- Character
@@ -213,221 +369,40 @@ editEmacs = \case
 
 
 
-
-
-nothing = return ()
-slot s = do
- -- delay 30
- sendText s
- sendKeyPress [] ReturnKey
-
-always = const
-when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
-when theseContexts thisAction = \theContext -> do
- if theContext `List.elem` theseContexts
- then thisAction
- else nothing
-onlyWhen = when . (:[])
-whenEmacs = onlyWhen "emacs"
-
-munge :: Phrase -> Actions String
-munge p = do
- q <- splatPasted p <$> getClipboard
- return $ mungePhrase q defSpacing
-
-
-
-
-
-
-
--- |
---
--- 'Phrase_' is the unassociated concrete syntax list
--- (e.g. tokens, parentheses),
--- while 'Phrase' is the associated abstract syntax tree (e.g. s-expressions).
-data Phrase_
- = Escaped_  Keyword -- ^ atom-like.
- | Quoted_   Dictation -- ^ list-like.
- | Pasted_ -- ^ atom-like.
- | Blank_ -- ^ atom-like.
- | Separated_ Separator -- ^ like a "close paren".
- | Cased_      Casing -- ^ function-like (/ "open paren").
- | Joined_     Joiner -- ^ function-like (/ "open paren").
- | Surrounded_ Brackets -- ^ function-like (/ "open paren").
- | Capped_   [Char] -- ^ atom-like.
- | Spelled_  [Char] -- ^ list-like.
- | Dictated_ Dictation -- ^ list-like.
- deriving (Show,Eq,Ord)
-
--- | its custom parser and grammar are implemented differently, but should behave consistently.
---
--- (its special parser threads the context differently than the generic parser would.)
---
--- TODO erase this horror from time
---
--- transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
-phrase = pPhrase <$> phrase_
-phrase_ = Grammar
- (Rule l dependencies)
- (defaultDNSCommandProduction l gP)
- (\context -> try (pP context <?> showLHS l))
-
- where
- Just l = lhsFromName 'phrase
- dependencies = [] <$ liftGrammar (phraseA `eitherG` phraseB `eitherG` phraseC `eitherG` dictation)
- -- TODO the RHS of special grammars are ignored (so the eithers don't matter), except for extracting dependencies for serialization
-
- pP context                     -- merges the context-free Parsec.many the context-sensitive manyUntil
-    = ([]    <$  (case context of Some q -> (try . lookAhead) q *> pure (error "pP"))) -- terminate.
-  <|> ((:)   <$> pAB             <*> pP context)  -- continue. e.g. can escape "say" with "lit"
-  <|> ((:[]) <$> pC context) -- terminate.
-  <|> ((:)   <$> (pDxAB context) <*> pP context)  -- continue
- pAB = pA <|> pB
- pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure (error "pDxAB"))))
- -- pAB context = (pA context <||> pB context)
- -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
- pA         = try $ phraseA   ^. gramParser $ (error "pA") -- context free
- pB         = try $ phraseB   ^. gramParser $ (error "pB") -- context free
- pC context = try $ phraseC   ^. gramParser $ context             -- context-sensitive
- pD context = try $ dictation ^. gramParser $ context            -- context-sensitive
- -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
-
- gP = (DNSSequence $ fromList
-  [ (DNSOptional . DNSMultiple) (DNSAlternatives $ fromList [gA, gB, gD])
-  ,                              DNSAlternatives $ fromList [gC, gB, gD]
-  ])
- gA = (DNSNonTerminal . SomeDNSLHS) $ phraseA   ^. gramGrammar.dnsProductionLHS
- gB = (DNSNonTerminal . SomeDNSLHS) $ phraseB   ^. gramGrammar.dnsProductionLHS
- gC = (DNSNonTerminal . SomeDNSLHS) $ phraseC   ^. gramGrammar.dnsProductionLHS
- gD = (DNSNonTerminal . SomeDNSLHS) $ dictation ^. gramGrammar.dnsProductionLHS
-
--- | a sub-phrase where a phrase to the right is certain.
---
--- this ordering prioritizes the escaping Escaped_/Quoted_ over the
--- escaped, e.g. "quote greater equal unquote".
-phraseA = 'phraseA <=> empty
- <|> Escaped_    # "lit" & keyword
- <|> Quoted_     # "quote" & dictation & "unquote"
- <|> Pasted_     # "paste"
- <|> Blank_      # "blank"
- <|> (Spelled_ . (:[])) # letter_
- <|> (Spelled_ . (:[])) # character
- <|> Separated_  # separator
- <|> Cased_      # casing
- <|> Joined_     # joiner
- <|> Surrounded_ # brackets
--- | a sub-phrase where a phrase to the right is possible.
-phraseB = 'phraseB <=> empty
- -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
- -- <|> Spelled_  # "spell" & letters -- only, not characters
- <|> Spelled_  # "spell" & (character-+)
- <|> Capped_   # "caps" & (character-+)
- -- <$> alphabetRHS
--- | a sub-phrase where a phrase to the right is impossible.
-phraseC = 'phraseC <=> Dictated_ # "say" & dictation
--- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
-
-newtype Separator = Separator String  deriving (Show,Eq,Ord)
-separator = 'separator <=> empty
- <|> Separator ""  # "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
- <|> Separator " " # "space"
- <|> Separator "," # "comma"
-
-
-
--- | used by 'pPhrase'.
---
---
-type PStack = NonEmpty PItem
--- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
--- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
-
--- | an inlined subset of 'Sexp'.
---
--- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
-type PItem = (Maybe PFunc, [Phrase])
-
-joinSpelled :: [Phrase_] -> [Phrase_]
-joinSpelled = foldr' go []
- where
- go :: Phrase_ -> [Phrase_] -> [Phrase_]
- go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
- go p ps = p:ps
-
--- | parses "tokens" into an "Sexp". a total function.
-pPhrase :: [Phrase_] -> Phrase
-pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
- -- (PSexp (PList [PAtom (PWord "")]))
- where
- go :: PStack -> Phrase_ -> PStack
- go ps = \case
-  (Escaped_  (x))            -> update ps $ fromPAtom (PWord x)
-  (Quoted_   (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
-  (Dictated_ (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
-  (Capped_   cs)             -> update ps $ fromPAtom (PAcronym cs)
-  (Spelled_  cs)             -> update ps $ fromPAtom (PAcronym cs)
-  Pasted_                    -> update ps $ fromPasted
-  Blank_                     -> update ps $ fromPAtom (PWord "")
-  Separated_ (Separator x) -> update (pop ps) $ fromPAtom (PWord x)
-  -- Separated_ Broken -> update (pop ps)
-  (Cased_     f)  -> push ps (Cased f)
-  (Joined_    f)  -> push ps (Joined f)
-  (Surrounded_ f) -> push ps (Surrounded f)
-
- pop :: PStack -> PStack
- -- break from the innermost PFunc, it becomes an argument to the outer PFunc
- -- i.e. close the S expression with a right parenthesis "...)"
- pop ((Nothing,ps):|(q:qs)) = update (q:|qs) (List ps)
- pop ((Just f ,ps):|(q:qs)) = update (q:|qs) (Sexp f ps)
- -- if too many breaks, just ignore
- pop stack = stack
- -- i.e. open a left parenthesis with some function "(f ..."
- push :: PStack -> PFunc -> PStack
- push (p:|ps) f = (Just f, []) :| (p:ps)
-
- update :: PStack -> Phrase -> PStack
- update ((f,ps):|qs) p = (f, ps <> [p]) :| qs
-
- -- right-associate the PFunc's.
- fromStack :: PStack -> Phrase
- fromStack = fromItem . foldr1 associateItem . NonEmpty.reverse
-
- associateItem :: PItem -> PItem -> PItem
- associateItem (f,ps) = \case
-  (Nothing,qs) -> (f, ps <> [List   qs])
-  (Just g ,qs) -> (f, ps <> [Sexp g qs])
-
- fromItem :: PItem -> Phrase
- fromItem (Nothing, ps) = List   ps
- fromItem (Just f,  ps) = Sexp f ps
-
- fromPasted :: Phrase
- fromPasted = Atom . Left $ Pasted
-
- fromPAtom :: PAtom -> Phrase
- fromPAtom = Atom . Right
-
-
-
-
-
 data Move
  = Move Direction Region
- | MoveTo Slice Region
+ | MoveTo Endpoint Region
  deriving (Show,Eq,Ord)
 move = 'move
  <=> Move   # direction & region
- <|> MoveTo # slice & region
+ <|> MoveTo # endpoint & region
 -- boilerplate.
 -- can't scrap it with GHC.generics because the grammars are values not instance methods.
 -- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
 
+-- | Slice and Direction both have too many values.
+data Endpoint = Beginning | Ending deriving (Bounded,Enum,Eq,Ord,Read,Show)
+endpoint = 'endpoint
+ <=> Beginning # "beg"
+ <|> Ending    # "end"
 
+-- | orthogonal directions in three-dimensional space.
 data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
 direction = tidyGrammar
 -- direction = transformedGrammar (filter (/= '_'))
 -- direction = qualifiedGrammarWith "_"
+
+{- | slice the region between the cursor and the 'Slice'. induces a string.
+-}
+data Slice = Backwards | Whole | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
+-- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
+-- slice = qualifiedGrammar
+slice = 'slice
+ <=> Backwards # "back"
+ <|> Whole     # "whole"
+ <|> Forwards  # "for"
+
+-- "for" is homophone with "four", while both Positive and Slice can be the prefix (i.e. competing for the same recognition).
 
 
 
@@ -454,35 +429,20 @@ editing = undefined
  -- <|> Edit undefined # region
  -- <|> flip Edit undefined # action
 
-data Slice = Backwards | Whole | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
--- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
--- slice = qualifiedGrammar
-slice = 'slice
- <=> Backwards # "back"
- <|> Whole     # "whole"
- <|> Forwards  # "for"
-
--- "for" is homophone with "four".
--- and both Positive and Slice can be the prefix (i.e. competing for the same recognition).
-
 
 
 
 data Action
- = Select
- | Beginning
- | End
- | Copy
- | Cut
- | Delete
- | Transpose
- | Google
+ = Select                       -- read-only.
+ | Copy                         -- read-only.
+ | Cut                          -- read/write.
+ | Delete                       -- read/write.
+ | Transpose                    -- read/write.
+ | Google                       -- read-only.
  deriving (Show,Eq,Ord,Typeable)
 -- action = enumGrammar
 action = 'action <=> empty
  <|> Select      # "sell"
- <|> Beginning   # "beg"
- <|> End         # "end"
  <|> Copy        # "save"
  <|> Cut         # "kill"
  <|> Delete      # "del"
@@ -493,16 +453,18 @@ action = 'action <=> empty
 
 data Region
  = That
+
  | Character
- | Word_
- | Token
- | Group
+ | Word_                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all two 'Word_'s
+ | Token                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all one 'Token's
+ | Group                        -- ^ 'Bracket's delimit 'Group's (e.g. @"(...)"@ or @"<...>"@ or @"[|...|]"@)
  | Line
  | Rectangle
  | Block
  | Page
  | Screen
  | Everything
+
  | Definition
  | Function_
  | Reference
@@ -527,126 +489,6 @@ region = 'region
  <|> Structure  # "struct"
 
 
-
-
-
-
-
-
-
-casing = enumGrammar
-joiner = 'joiner
- <=> (\c -> Joiner [c]) # "join" & character
- <|> Joiner "_" # "snake"
- <|> Joiner "-" # "dash"
- <|> Joiner "/" # "file"
- <|> Joiner ""  # "squeeze"
- <|> CamelJoiner # "camel"
- <|> ClassJoiner # "class"
-brackets = 'brackets
- <=> bracket          # "round" & character
- <|> Brackets "(" ")" # "par"
- <|> Brackets "[" "]" # "square"
- <|> Brackets "{" "}" # "curl"
- <|> Brackets "<" ">" # "angle"
- <|> bracket '"'      # "string"
- <|> bracket '\''     # "ticked"
- <|> bracket '|'      # "norm"
- -- <|> Brackets "**" "**" # "bold"
-
-character :: Grammar Char
-character = 'character <=> empty
-
- <|> '`' # "grave"
- <|> '~' # "till"
- <|> '!' # "bang"
- <|> '@' # "axe"
- <|> '#' # "pound"
- <|> '$' # "doll"
- <|> '%' # "purse"
- <|> '^' # "care"
- <|> '&' # "amp"
- <|> '*' # "star"
- <|> '(' # "lore"
- <|> ')' # "roar"
- <|> '-' # "dash"
- <|> '_' # "score"
- <|> '=' # "eek"
- <|> '+' # "plus"
- <|> '[' # "lack"
- <|> '{' # "lace"
- <|> ']' # "rack"
- <|> '}' # "race"
- <|> '\\' # "stroke"
- <|> '|' # "pipe"
- <|> ';' # "sem"
- <|> ':' # "coal"
- <|> '\'' # "tick"
- <|> '"' # "quote"
- <|> ',' # "com"
- <|> '<' # "less"
- <|> '.' # "dot"
- <|> '>' # "great"
- <|> '/' # "slash"
- <|> '?' # "quest"
- <|> ' ' # "ace"
- <|> '\t' # "tab"
- <|> '\n' # "line"
-
- <|> '0' # "zero"
- <|> '1' # "one"
- <|> '2' # "two"
- <|> '3' # "three"
- <|> '4' # "four"
- <|> '5' # "five"
- <|> '6' # "six"
- <|> '7' # "seven"
- <|> '8' # "eight"
- <|> '9' # "nine"
-
- <|> 'a' # "ay"
- <|> 'b' # "bee"
- <|> 'c' # "sea"
- <|> 'd' # "dee"
- <|> 'e' # "eek"
- <|> 'f' # "eff"
- <|> 'g' # "gee"
- <|> 'h' # "aych"
- <|> 'i' # "eye"
- <|> 'j' # "jay"
- <|> 'k' # "kay"
- <|> 'l' # "el"
- <|> 'm' # "em"
- <|> 'n' # "en"
- <|> 'o' # "oh"
- <|> 'p' # "pea"
- <|> 'q' # "queue"
- <|> 'r' # "are"
- <|> 's' # "ess"
- <|> 't' # "tea"
- <|> 'u' # "you"
- <|> 'v' # "vee"
- <|> 'w' # "dub"
- <|> 'x' # "ex"
- <|> 'y' # "why"
- <|> 'z' # "zee"
- <|> alphabetRHS
-
-
-{- | equivalent to:
-
-@
- <|> 'a' # "A"
- <|> 'b' # "B"
- <|> 'c' # "C"
- <|> ...
- <|> 'z' # "Z"
-@
-
--}
-alphabetRHS = (asum . List.map (\c -> c <$ liftString [toUpper c]) $ ['a'..'z'])
--- TODO What will we get back from Dragon anyway?
-
 -- | 'Key's and 'Char'acters are "incomparable sets":
 --
 -- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
@@ -656,15 +498,6 @@ alphabetRHS = (asum . List.map (\c -> c <$ liftString [toUpper c]) $ ['a'..'z'])
 --
 key :: Grammar Key -- TODO
 key = 'key <=> empty
-
-type Keyword = String -- TODO
-keyword :: Grammar Keyword
-keyword = 'keyword <=>id#word_
-
-
-
-
-
 
 data Click = Click Times Button deriving (Show,Eq)
 click :: Grammar Click
@@ -688,31 +521,6 @@ positive = 'positive
 
 
 
-
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = dragonGrammar 'dictation
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (\context -> Dictation <$> anyBlack `manyUntil` context)
-
-word_ = dragonGrammar 'word_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
- (\_ -> anyWord)
-
-letter_ :: Grammar Char
-letter_ = dragonGrammar 'letter_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (\_ -> spaced anyLetter)
-
--- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
--- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
---  Letters # (letter-+)
- -- TODO greedy (many) versus non-greedy (manyUntil)
-
--- |
--- TODO spacing, casing, punctuation; are all weird when letters are recognized by Dragon NaturallySpeaking.
-anyLetter = oneOf ['A'..'Z']
--- anyLetter = anyChar
--- anyLetter = (\c -> c <$ [toUpper c]) <$> ['a'..'z'])
 
 
 
@@ -870,3 +678,5 @@ main = do
 
  -- the keys are in the right order, and multiple modifiers applied to each
  putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)
+ putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
+ -- runActions $ google "some words" -- it works

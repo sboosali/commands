@@ -26,8 +26,8 @@ import Control.Monad.IO.Class         (liftIO)
 
 
 -}
-handleInterpret :: (Show v) => CModel v -> String -> Response ()
-handleInterpret (CModel command def context) text = do
+handleInterpret :: (Show v) => CmdModel v -> String -> Response ()
+handleInterpret (CmdModel command def context) text = do
  liftIO $ putStrLn text
  let v = parse command text
  liftIO $ print v
@@ -38,8 +38,8 @@ handleInterpret (CModel command def context) text = do
  where
  parse c s = either (const $ def s) id $ (c ^. comGrammar) `parses` s
 
--- handleInterpret :: CModel a -> String -> Response ()
--- handleInterpret (CModel _c _ax) s = do
+-- handleInterpret :: CmdModel a -> String -> Response ()
+-- handleInterpret (CmdModel _c _ax) s = do
 --  liftIO $ putStrLn s
 --  let p = c ^. comGrammar
 --  let failure _e = do
@@ -78,21 +78,21 @@ $ python -c 'import urllib2,json,sys; print json.loads(urllib2.urlopen("http://l
 
 
 -}
-type CommandsAPI = "recognition" :> ReqBody DGNRecognition :> Post ()
--- type CommandsAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
+type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post ()
+-- type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
 
-commandsAPI :: Proxy CommandsAPI
-commandsAPI = Proxy
+natlinkAPI :: Proxy NatlinkAPI
+natlinkAPI = Proxy
 
-commandsServer :: (Show a) => CModel a -> Server CommandsAPI
-commandsServer = postRecognition
+natlinkHandlers :: (Show a) => CmdModel a -> Server NatlinkAPI
+natlinkHandlers = postRecognition
 
-postRecognition :: (Show a) => CModel a -> DGNRecognition -> Response ()
+postRecognition :: (Show a) => CmdModel a -> DGNRecognition -> Response ()
 postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
-commandsApplication :: (Show a) => CModel a -> Application
-commandsApplication = serve commandsAPI . commandsServer
+natlinkApplication :: (Show a) => CmdModel a -> Application
+natlinkApplication = serve natlinkAPI . natlinkHandlers
 
-serveCommands :: (Show a) => Port -> CModel a -> IO ()
-serveCommands port = run port . commandsApplication
+serveNatlink :: (Show a) => Port -> CmdModel a -> IO ()
+serveNatlink port = run port . natlinkApplication
 

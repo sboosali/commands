@@ -134,11 +134,11 @@ instance Functor f => Alternative (Alt f) where
  xs        <|> Empty     = xs              -- Right-Identity
  (Many xs) <|> (Many ys) = Many (xs <> ys) -- Associativity
 
- xs        <|> ys        = many_ xs <|> many_ ys
-  where
-  many_ :: Alt f a -> Alt f a
-  many_ (Many xs) = Many xs
-  many_ x         = Many [x]
+ xs        <|> ys        = Many (toAltList xs) <|> Many (toAltList ys)
+
+toAltList :: Alt f a -> [Alt f a]
+toAltList (Many xs) = xs
+toAltList x         = [x]
 
 pattern Empty = Many []
 

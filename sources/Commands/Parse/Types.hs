@@ -3,16 +3,26 @@ module Commands.Parse.Types where
 import Commands.Etc
 import Commands.Parsec (Parsec)
 
--- import Control.Monad.Reader
+-- import Data.Foldable                   (asum)
 
 
--- type Parser a = Reader ParserContext (Parsec a)
-type Parser a = ParserContext -> (Parsec a)
+-- | isomorphic to @type SensitiveParser a = Some Parsec -> Parsec a@
+newtype Parser a = SensitiveParser { runSensitiveParser :: ParserContext -> (Parsec a) } --  [Parsec a] }
+ deriving (Functor)
+-- type Parser a = ParserContext -> (Parsec a)
+-- [ParsecT (ReaderT ParserContext Identity) () a]? They all share the same context.
+-- "inline" the top level of alternatives, for maximal backtracking (see "parsing").
 
 type ParserContext = Some Parsec
 
-runParser :: Parser a -> Parsec a
-runParser = undefined
+runSensitiveParsers :: Parser a -> ParserContext -> Parsec a
+runSensitiveParsers sp = runSensitiveParser sp -- asum .
+
+freeParser :: Parsec a -> Parser a
+freeParser = SensitiveParser . const  -- . (:[])
+
+sensitiveParser :: (ParserContext -> Parsec a) -> Parser a
+sensitiveParser = SensitiveParser  -- . (:[])
 
 -- -- | Parsers with restricted right-context-sensitivity.
 -- --

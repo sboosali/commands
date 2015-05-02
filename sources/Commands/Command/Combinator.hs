@@ -18,6 +18,7 @@ import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Parse.Types
 import           Commands.Parsec
 
 import           Control.Applicative
@@ -88,7 +89,7 @@ multipleG :: Grammar a -> Grammar [a]
 multipleG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> (grammar ^. gramParser) context `manyUntil` context)
+ (sensitiveParser (\context -> runSensitiveParser (grammar ^. gramParser) context `manyUntil` context))
  where
  l = unsafeLHSFromName 'multipleG `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
@@ -99,7 +100,7 @@ multiple0G :: Grammar a -> Grammar [a]
 multiple0G grammar = Grammar
  (Rule l r)
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> (grammar ^. gramParser) context `many0Until` context)
+ (sensitiveParser (\context -> runSensitiveParser (grammar ^. gramParser) context `many0Until` context))
  where
  l = unsafeLHSFromName 'multiple0G `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
@@ -110,7 +111,7 @@ manyG :: Grammar a -> Grammar [a]
 manyG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> Parsec.many1 $ (grammar ^. gramParser) context)
+ (sensitiveParser (\context -> Parsec.many1 $ runSensitiveParser (grammar ^. gramParser) context))
  where
  l = unsafeLHSFromName 'manyG `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
@@ -121,7 +122,7 @@ many0G :: Grammar a -> Grammar [a]
 many0G grammar = Grammar
  (Rule l r)
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> Parsec.many $ (grammar ^. gramParser) context)
+ (sensitiveParser (\context -> Parsec.many $ runSensitiveParser (grammar ^. gramParser) context))
  where
  l = unsafeLHSFromName 'many0G `appLHS` (grammar ^. gramLHS)
  r = multipleRHS grammar self
@@ -166,7 +167,7 @@ optionG :: a -> Grammar a -> Grammar a
 optionG theDefault grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> Parsec.option theDefault $ (grammar ^. gramParser) context)
+ (sensitiveParser (\context -> Parsec.option theDefault $ runSensitiveParser (grammar ^. gramParser) context))
  where
  l = unsafeLHSFromName 'optionG `appLHS` (grammar ^. gramLHS)
  r = optionRHS theDefault grammar
@@ -176,7 +177,7 @@ optionalG :: Grammar a -> Grammar (Maybe a)
 optionalG grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
- (\context -> Parsec.optionMaybe $ (grammar ^. gramParser) context)
+ (sensitiveParser (\context -> Parsec.optionMaybe $ runSensitiveParser (grammar ^. gramParser) context))
  where
  l = unsafeLHSFromName 'optionalG `appLHS` (grammar ^. gramLHS)
  r = optionalRHS grammar

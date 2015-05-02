@@ -30,7 +30,7 @@ import qualified Text.Parsec         as Parsec
 -- our parsers are context-sensitive, but the context is passed from
 -- parent to child as argument. i.e. we would want @Reader@ with
 -- @local@ if anything (I think), not "non-local" @State@. hence the
--- unit @State@ @()@.
+-- unit @State@.
 type Parsec = Parsec.Parsec String ()
 
 -- type Parsec = ParsecT String () Identity

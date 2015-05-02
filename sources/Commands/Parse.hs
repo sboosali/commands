@@ -19,13 +19,18 @@ import Data.Foldable                 (asum)
 
 
 sparser :: GrammaticalSymbol a -> Parser a
-sparser s context = symbol (flip wparser $ context) (flip gparser $ context) s
+sparser = symbol wparser gparser
 
 wparser :: Word -> Parser a
-wparser (Word w) _ = try (word w) *> pure undefined -- TODO make safe
+wparser (Word w) = freeParser $
+ try (word w) *> pure undefined -- TODO make safe
 
 gparser :: Grammar a -> Parser a
-gparser grammar context = (grammar ^. gramParser) context <?> showLHS (grammar ^. gramLHS)
+gparser g = SensitiveParser $ \context ->
+ runSensitiveParser sp context <?> showLHS l
+ where
+ sp = (g^.gramParser)
+ l  = (g^.gramLHS)
 
 -- | build a parser from a right-hand side.
 --
@@ -65,18 +70,18 @@ gparser grammar context = (grammar ^. gramParser) context <?> showLHS (grammar ^
 --
 -- TODO the parser returned is wrapped in a 'try'
 rparser :: RHS a -> Parser a
-rparser (Pure a) _ = pure a
-rparser (Many rs) context = asum ps -- no try
- where
- ps = fmap (try . (flip rparser $ context)) rs
-rparser (fs `App` x) context = try $ p <*> q
- where
- p = rparser fs (Some q)
- q = sparser x  context
-rparser (fs :<*> xs) context = try $ p <*> q
- where
- p = rparser fs (Some q)
- q = rparser xs context
+rparser (Pure a)  = freeParser $ pure a
+rparser (Many fs) = SensitiveParser $ \context -> try (asum $ ((flip runSensitiveParser) context) <$> (rparser <$> fs))
+rparser (f `App` x) = SensitiveParser $ \context -> let
+ p = runSensitiveParser (rparser f) (Some q)
+ q = runSensitiveParser (sparser x) context
+ in
+ try (p <*> q)
+rparser (f :<*> g) = SensitiveParser $ \context -> let
+ p = runSensitiveParser (rparser f) (Some q)
+ q = runSensitiveParser (rparser g) context
+ in
+ try (p <*> q)
 
 -- TODO rewrite with generic function on free alternatives? but right-context-sensitive Parser is not Applicative, violating composition.
 
@@ -102,8 +107,8 @@ p :: Parsec a
 
 parsing :: Parser a -> String -> Possibly a
 parsing sp s = parse (fp <* eof) s
- where fp = sp (Some eof)               -- a context-free parser from a context-sensitive parser
--- TODO strip whitespace from either end and when more than one space
+ where fp = runSensitiveParser sp (Some eof) -- a context-free parser from a context-sensitive parser
+-- TODO strip whitespace from either end and when more than one space?
 
 handleParse :: Show a => Parser a -> String -> IO ()
 handleParse p s = handles parseHandlers $ do
@@ -117,6 +122,7 @@ parseHandlers =
  , handler _ErrorCall  $ print
  ]
 
+-- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
 _ParseError :: Prism' SomeException ParseError
 _ParseError = prismException
 

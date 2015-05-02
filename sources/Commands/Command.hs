@@ -14,17 +14,18 @@ import           Commands.Parse
 import           Commands.Parse.Types
 import           Commands.Parsec                       (parserUnit)
 
-import           Control.Applicative
 import           Control.Lens
-import           Control.Monad.Catch                   (SomeException (..))
 import           Data.Bifunctor                        (second)
-import           Data.Char
-import           Data.Foldable                         (asum)
 import qualified Data.List                             as List
 import           Data.List.NonEmpty                    (NonEmpty (..))
+import qualified Data.Text.Lazy                        as T
+
+import           Control.Applicative
+import           Control.Exception                     (SomeException (..))
+import           Data.Char
+import           Data.Foldable                         (asum)
 import qualified Data.Map                              as Map
 import           Data.Proxy
-import qualified Data.Text.Lazy                        as T
 import           Data.Typeable                         (Typeable)
 import           GHC.Exts                              (IsString (..))
 import           Language.Haskell.TH.Syntax            (Name)
@@ -243,7 +244,7 @@ epsilon = Grammar (Rule l r) g p
  Just l = lhsFromName 'epsilon
  r = empty
  g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) unitDNSRHS  -- TODO def method
- p = \_ -> parserUnit
+ p = freeParser parserUnit
 
 withParser :: Grammar a -> Parser a -> Grammar a
 withParser = flip (set gramParser)

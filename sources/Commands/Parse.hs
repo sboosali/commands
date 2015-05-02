@@ -6,15 +6,16 @@ import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Parse.Types
 import Commands.Parsec
-
 import Control.Alternative.Free.Tree
-import Control.Applicative
+
 import Control.Exception.Lens        (handler, _ErrorCall)
 import Control.Lens
+import Control.Monad.Catch           (SomeException (..))
+
+import Control.Applicative
+import Control.Exception             (Handler)
 import Control.Monad                 ((>=>))
-import Control.Monad.Catch           (Handler, SomeException (..))
 import Data.Foldable                 (asum)
-import Data.Typeable                 (cast)
 
 
 sparser :: GrammaticalSymbol a -> Parser a
@@ -62,17 +63,17 @@ gparser grammar context = (grammar ^. gramParser) context <?> showLHS (grammar ^
 --
 --
 --
--- always returns a 'Parsec' wrapped in 'try'
+-- TODO the parser returned is wrapped in a 'try'
 rparser :: RHS a -> Parser a
 rparser (Pure a) _ = pure a
-rparser (Many rs) context = try (asum ps)
+rparser (Many rs) context = asum ps -- no try
  where
- ps = fmap (flip rparser $ context) rs
-rparser (fs `App` x) context = try (p <*> q)
+ ps = fmap (try . (flip rparser $ context)) rs
+rparser (fs `App` x) context = try $ p <*> q
  where
  p = rparser fs (Some q)
  q = sparser x  context
-rparser (fs :<*> xs) context = try (p <*> q)
+rparser (fs :<*> xs) context = try $ p <*> q
  where
  p = rparser fs (Some q)
  q = rparser xs context
@@ -98,19 +99,24 @@ p :: Parsec a
 
 -}
 
--- TODO strip whitespace from either end and when more than one space
+
 parsing :: Parser a -> String -> Possibly a
 parsing sp s = parse (fp <* eof) s
- where fp = sp (Some eof)
+ where fp = sp (Some eof)               -- a context-free parser from a context-sensitive parser
+-- TODO strip whitespace from either end and when more than one space
 
--- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
-_ParseError :: Prism' SomeException ParseError
-_ParseError = prism SomeException $ \(SomeException e) -> case cast e of
- Nothing -> Left (SomeException e) -- wrong type (preserve)
- Just a  -> Right a                -- Right type (project)
+handleParse :: Show a => Parser a -> String -> IO ()
+handleParse p s = handles parseHandlers $ do
+ x <- p `parsing` s
+ print x
 
-parseHandlers :: [Handler IO ()]
+-- | "Control.Exception.Handler", not "Control.Monad.Catch.Handler" or "Control.Monad.Error.Lens.Handler".
+parseHandlers :: [Handler ()]
 parseHandlers =
  [ handler _ParseError $ print >=> const (putStrLn "")
  , handler _ErrorCall  $ print
  ]
+
+_ParseError :: Prism' SomeException ParseError
+_ParseError = prismException
+

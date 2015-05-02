@@ -16,8 +16,7 @@ import           Commands.Parsec                       (parserUnit)
 
 import           Control.Applicative
 import           Control.Lens
-import           Control.Monad.Catch                   (SomeException (..),
-                                                        catches)
+import           Control.Monad.Catch                   (SomeException (..))
 import           Data.Bifunctor                        (second)
 import           Data.Char
 import           Data.Foldable                         (asum)
@@ -104,11 +103,6 @@ getDescendentProductions grammar = export :| List.delete export productions
 
 parses :: Grammar a -> String -> Possibly a
 parses grammar = parsing (grammar ^. gramParser)
-
-handleParse :: Show a => Grammar a -> String -> IO ()
-handleParse grammar s = do
- (print =<< (grammar `parses` s)) `catches` parseHandlers
-
 
 compiles :: Command a -> a -> CompilerContext -> Actions ()
 (c `compiles` a) x = (c^.comCompiler) a x

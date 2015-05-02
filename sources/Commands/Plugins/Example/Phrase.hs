@@ -4,10 +4,8 @@
 module Commands.Plugins.Example.Phrase where
 import           Commands.Core
 import           Commands.Frontends.Dragon13
-import           Commands.Munging
 
 import           Control.Lens                hiding (from, ( # ), (&))
-import           Control.Lens.Plated
 import           Data.List.NonEmpty          (NonEmpty (..), fromList)
 import qualified Data.List.NonEmpty          as NonEmpty
 import           Data.Semigroup

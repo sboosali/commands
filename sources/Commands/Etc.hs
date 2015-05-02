@@ -3,18 +3,23 @@
 module Commands.Etc where
 import           Commands.Instances           ()
 
-import           Control.Applicative
-import           Control.Lens                 (Lens', lens)
+import           Control.Lens                 (Lens', Prism', lens, prism')
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
 import           Data.Bifunctor               (first)
 import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.Hashable
-import           Data.List                    (nub)
 import           Data.List.NonEmpty           (NonEmpty (..))
-import           Data.Monoid                  ((<>))
 import           Data.Text.Lazy               (Text)
+import           Numeric
+import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+
+import           Control.Applicative
+import           Control.Exception            (Exception (..), Handler,
+                                               SomeException (..), catches)
+import           Data.List                    (nub)
+import           Data.Monoid                  ((<>))
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
                                                typeRepTyCon)
@@ -24,8 +29,6 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                NameFlavour (NameG),
                                                OccName (OccName),
                                                PkgName (PkgName))
-import           Numeric
-import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 
 -- | generalized 'Maybe':
@@ -186,4 +189,12 @@ showsPrecNewtype :: (Show a) => Int -> String -> a -> ShowS
 showsPrecNewtype depth name value = showParen
  (depth > 10)
  (showString (name <> " ") . showsPrec (10+1) value)
+
+-- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
+prismException :: (Exception e) => Prism' SomeException e
+prismException = prism' SomeException fromException
+
+-- | @handles = flip 'catches'@
+handles :: [Handler a] -> IO a -> IO a
+handles = flip catches
 

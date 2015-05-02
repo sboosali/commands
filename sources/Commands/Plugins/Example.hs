@@ -175,13 +175,13 @@ evalEmacs sexp = do
  slot sexp
 
 type ElispSexp = String
--- type ElispSexp = Sexp String String
+-- -- type ElispSexp = Sexp String String
 
-parseSexp :: String -> Possibly ElispSexp
-parseSexp = undefined
+-- parseSexp :: String -> Possibly ElispSexp
+-- parseSexp = undefined
 
-prettySexp :: ElispSexp -> String
-prettySexp = undefined
+-- prettySexp :: ElispSexp -> String
+-- prettySexp = undefined
 
 runEmacs :: String -> Actions ()
 runEmacs f = runEmacsWith f []
@@ -195,6 +195,7 @@ runEmacs f = runEmacsWith f []
 no "type"-checking or ararity-checking.
 
 as it opens a minibuffer, it needs @(setq enable-recursive-minibuffers t)@ to work when already in a minibuffer.
+
 -}
 runEmacsWith :: String -> [String] -> Actions ()
 runEmacsWith f xs = do
@@ -290,7 +291,6 @@ beg_of = \case
  Block      -> evalEmacs "(beginning-of-thing 'block)"
  Page       -> evalEmacs "(beginning-of-thing 'page)"
  Screen     -> evalEmacs "(goto-char (window-start))"
- -- Screen     -> runEmacs "beginning-of-window" -- must be defined with (window-start)
  Everything -> runEmacs "beginning-of-buffer"
  _          -> nothing
 
@@ -306,11 +306,11 @@ end_of = \case
  Block      -> evalEmacs "(end-of-thing 'block)" -- non-standard: expects forward-block
  Page       -> evalEmacs "(end-of-thing 'page)"
  Screen     -> evalEmacs "(goto-char (window-end))"
- -- Screen     -> runEmacs "end-of-window"      -- must be defined with (window-end)
  Everything -> runEmacs "end-of-buffer"
  _          -> nothing
 
 -- | vim's composeability would keep the number of cases linear (not quadratic in 'Action's times 'Region's).
+-- in Emacs, we can use <http://www.emacswiki.org/emacs/ThingAtPoint thingatpt.el>.
 editEmacs :: Edit -> Actions ()
 editEmacs = \case
 
@@ -346,7 +346,7 @@ editEmacs = \case
  Edit Transpose _ Word_ -> press M t
  Edit Transpose _ Group -> press C M t
  Edit Transpose _ Line -> press C x t
- Edit Transpose _ Block -> runEmacs "transpose-block"
+ Edit Transpose _ Block -> runEmacs "transpose-block" -- nonstandard
  -- Edit Transpose _ ->
 
  -- That
@@ -394,12 +394,12 @@ direction = tidyGrammar
 
 {- | slice the region between the cursor and the 'Slice'. induces a string.
 -}
-data Slice = Backwards | Whole | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
+data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
 -- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
 -- slice = qualifiedGrammar
 slice = 'slice
- <=> Backwards # "back"
- <|> Whole     # "whole"
+ <=> Whole     # "whole"
+ <|> Backwards # "back"
  <|> Forwards  # "for"
 
 -- "for" is homophone with "four", while both Positive and Slice can be the prefix (i.e. competing for the same recognition).
@@ -408,12 +408,26 @@ slice = 'slice
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 edit = 'edit <=> empty
- <|> Edit # action & (slice -?- Whole) & region
+ -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @# "kill"@)
+ -- prefixes (e.g. "kill") must come before their superstrings (e.g. "kill for line").
+ -- otherwise, the prefix is committed prematurely, and parsec won't backtrack.
+ -- TODO but wouldn't @# action & (slice -?- Whole) & (region -?- That)@ match "kill" before @# "kill"@ does? yes it does
+
+ -- TODO we want:
+ -- "cop" -> Edit Copy Whole That
+ -- "kill" -> Edit Cut Forwards Line, not Edit Cut Whole That
+ -- "kill for line" -> Edit Cut Forwards Line, not {unexpected 'f', expecting end of input}
+ <|> Edit Cut Forwards Line # "kill"
+
+ -- generic
+ <|> Edit # action              & (slice -?- Whole) & (region -?- That) -- e.g. "cop" -> "cop that"
+ <|> Edit # (action -?- Select) & (slice -?- Whole) & region            -- e.g. "word" -> "select whole word"
+
+-- TODO ensure no alternative is empty, necessary? yes it is
  -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
  -- <|> editing # (action-?) & (slice-?) & (region-?)
  -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
- -- I don't know why the alternatives following the black hole didn't show up in the "expecting: ..." error though
--- TODO ensure no alternative is empty, necessary? yes it is
+ -- I don't know why the alternatives following the annihilator didn't show up in the "expecting: ..." error though
 
 -- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
 -- editWith editing = 'edit <=> editing # (direction-?) & (action-?) & (region-?)
@@ -443,7 +457,7 @@ data Action
 -- action = enumGrammar
 action = 'action <=> empty
  <|> Select      # "sell"
- <|> Copy        # "save"
+ <|> Copy        # "cop"
  <|> Cut         # "kill"
  <|> Delete      # "del"
  <|> Transpose   # "trans"
@@ -561,7 +575,7 @@ attemptMunge_ s = do
 
 attemptParse grammar s = do
  putStrLn ""
- attempt $ handleParse grammar s
+ attempt $ handleParse (grammar ^. gramParser) s
 
 failingParse grammar s = do
  putStrLn ""
@@ -680,3 +694,14 @@ main = do
  putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)
  putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
  -- runActions $ google "some words" -- it works
+
+ putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
+ putStrLn $ showActions $ editEmacs (Edit Cut Backwards Word_)
+
+ attemptParse edit "cop"
+ attemptParse edit "word"
+
+ attemptParse rootG "kill for line" --
+ attemptParse edit "kill for line" --
+ attemptParse edit "kill"
+

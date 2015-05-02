@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor, GADTs, PatternSynonyms, TypeFamilies, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor, GADTs, PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables, TypeFamilies                 #-}
 {- |
 
 see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors> for different free applicatives, and certain properties (e.g. associativity, the complexity of certain operations, etc.).

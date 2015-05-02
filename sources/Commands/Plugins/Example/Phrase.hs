@@ -4,10 +4,8 @@
 module Commands.Plugins.Example.Phrase where
 import           Commands.Core
 import           Commands.Frontends.Dragon13
-import           Commands.Munging
 
 import           Control.Lens                hiding (from, ( # ), (&))
-import           Control.Lens.Plated
 import           Data.List.NonEmpty          (NonEmpty (..), fromList)
 import qualified Data.List.NonEmpty          as NonEmpty
 import           Data.Semigroup
@@ -398,16 +396,16 @@ surroundWith (Brackets l r) as = do
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = dragonGrammar 'dictation
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (\context -> Dictation <$> anyBlack `manyUntil` context)
+ (sensitiveParser (\context -> Dictation <$> anyBlack `manyUntil` context))
 
 word_ = dragonGrammar 'word_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
- (\_ -> anyWord)
+ (freeParser anyWord)
 
 letter_ :: Grammar Char
 letter_ = dragonGrammar 'letter_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (\_ -> spaced anyLetter)
+ (freeParser $ spaced anyLetter)
 
 -- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
@@ -522,7 +520,7 @@ phrase = pPhrase <$> phrase_
 phrase_ = Grammar
  (Rule l dependencies)
  (defaultDNSCommandProduction l gP)
- (\context -> try (pP context <?> showLHS l))
+ (sensitiveParser (\context -> try (pP context <?> showLHS l)))
 
  where
  Just l = lhsFromName 'phrase
@@ -538,10 +536,10 @@ phrase_ = Grammar
  pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure (error "pDxAB"))))
  -- pAB context = (pA context <||> pB context)
  -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
- pA         = try $ phraseA   ^. gramParser $ (error "pA") -- context free
- pB         = try $ phraseB   ^. gramParser $ (error "pB") -- context free
- pC context = try $ phraseC   ^. gramParser $ context             -- context-sensitive
- pD context = try $ dictation ^. gramParser $ context            -- context-sensitive
+ pA         = try $ runSensitiveParser (phraseA   ^. gramParser) (error "pA") -- context free
+ pB         = try $ runSensitiveParser (phraseB   ^. gramParser) (error "pB") -- context free
+ pC context = try $ runSensitiveParser (phraseC   ^. gramParser) context             -- context-sensitive
+ pD context = try $ runSensitiveParser (dictation ^. gramParser) context            -- context-sensitive
  -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
 
  gP = (DNSSequence $ fromList

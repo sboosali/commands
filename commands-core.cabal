@@ -104,7 +104,7 @@ library
   Commands.Instances
   Commands.Munging
   Commands.Graph
-  Control.Alternative.Free.Tree
+  Control.Alternative.Free.Associated
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
@@ -117,30 +117,24 @@ library
  -- but runningApplications/frontmostApplication don't return application info, which has the application path
 
  build-depends:
-
-    base                      ==4.7.*
-  , template-haskell          ==2.9.*
+    base                      ==4.8.*
+  , template-haskell          ==2.10.*
   , containers                ==0.5.*
-  -- for doctest:
-  , transformers              ==0.3.*
-  , transformers-compat       ==0.4.*
-  -- ?
-  , mtl                       ==2.1.*
+  , mtl                       ==2.2.*
+-- transformers is a boot package, and has been bumped. So I both can import Data.Functor.Sum and run doctest.
+-- https://downloads.haskell.org/~ghc/7.10.1/docs/html/users_guide/release-7-10-1.html
+  , transformers              ==0.4.2.*
 
   , vinyl  ==0.5.*
   , exceptions                ==0.6.*
-  , lens                      ==4.8.*
-  , parsec                    ==3.1.*
-  , split                     ==0.2.*
+  , lens                      ==4.9.*
   , either                    ==4.3.*
   , semigroups                ==0.16.*
-
-  , async                     ==2.0.*
-  , parallel                  ==3.2.*
   , action-permutations       ==0.0.*
-  , hashable                  ==1.2.*
-  , data-default-generics     ==0.3.*
-  , nats
+  , split                     ==0.2.2.*
+
+  , Earley                    ==0.7.*
+  , parsec                    ==3.1.*
 
   , text                      ==1.2.*
   , wl-pprint-text            ==1.1.*
@@ -162,6 +156,10 @@ library
   , warp  ==3.0.*
   , either  ==4.3.*
 
+  , async                     ==2.0.*
+  , parallel                  ==3.2.*
+  , hashable                  ==1.2.*
+
 
 --               , aeson-pretty  ==0.7.*,
 -- use wl-pprint-text directly
@@ -174,6 +172,7 @@ library
  ghc-options:
   -Wall
   -fno-warn-name-shadowing
+  -fno-warn-unticked-promoted-constructors
 
 
 test-suite tests
@@ -195,14 +194,13 @@ test-suite tests
  build-depends:
     commands-core
 
-  , base       ==4.7.*
-  , text ==1.2.*
+  , base       ==4.8.*
+  , text       ==1.2.*
   , semigroups ==0.16.*
-  , bifunctors    ==4.2.*
 
-  , QuickCheck ==2.7.*
-  , doctest    ==0.9.*
-  , tasty   ==0.10.*
+  , QuickCheck       ==2.8.*
+  , doctest          ==0.9.*
+  , tasty            ==0.10.*
   , tasty-quickcheck ==0.8.*
 
 
@@ -221,7 +219,7 @@ executable example
 
  build-depends:
   commands-core,
-  base ==4.7.*
+  base ==4.8.*
 
 
 

@@ -31,7 +31,7 @@ module Commands.Core
  , module Commands.Parse
  , module Commands.Parsec
 
- , module Control.Alternative.Free.Tree
+ , module Control.Alternative.Free.Associated
  ) where
 
 import Commands.Command
@@ -40,11 +40,11 @@ import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Graph
-import Commands.Instances            ()
+import Commands.Instances                  ()
 import Commands.Munging
 import Commands.Parse
 import Commands.Parse.Types
-import Commands.Parsec               hiding (lower, option, optional, runParser,
-                                      tab, upper)
+import Commands.Parsec                     hiding (Empty, lower, option,
+                                            optional, runParser, tab, upper)
 import Commands.Sugar
-import Control.Alternative.Free.Tree hiding (Empty)
+import Control.Alternative.Free.Associated

@@ -9,15 +9,16 @@ Setup
 
 from Hackage:
 
-cabal sandbox init
-cabal install commands-core
+    cabal sandbox init
+    cabal install commands-core
 
 from GitHub:
 
-git clone https://github.com/sboosali/commands-core
-cd commands-core
-cabal sandbox init
-cabal install
+    git clone https://github.com/sboosali/commands-core
+    cd commands-core
+    cabal sandbox init
+    cabal update
+    cabal install
 
 
 

@@ -12,9 +12,7 @@ import Data.Bitraversable
 import Data.List.NonEmpty  (NonEmpty (..))
 import Data.Semigroup
 
-import Control.Applicative
 import Data.Char           (toLower)
-import Data.Foldable
 import Data.Traversable
 import GHC.Exts            (IsString (..))
 

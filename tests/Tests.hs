@@ -87,7 +87,7 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Instances"
   , "Commands.Munging"
   , "Commands.Graph"
-  , "Control.Alternative.Free.Tree"
+  , "Control.Alternative.Free.Associated"
   ]
 
 main = do

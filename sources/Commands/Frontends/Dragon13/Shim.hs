@@ -11,7 +11,6 @@ import qualified Data.Text.Lazy                  as T
 import           Language.Python.Version2.Parser (parseModule)
 import           Text.InterpolatedString.Perl6
 
-import           Data.Monoid                     (Monoid)
 import           GHC.Exts                        (IsString)
 
 

@@ -11,8 +11,8 @@ import Commands.Sugar.Press
 
 import Control.Lens               (view)
 
-import Control.Applicative
 import Language.Haskell.TH.Syntax (Name)
+
 
 infix  1 <%>
 infix  2 <=>

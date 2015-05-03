@@ -8,7 +8,7 @@ see <https://hackage.haskell.org/package/free-4.10.0.1/docs/Control-Alternative-
 
 
 -}
-module Control.Alternative.Free.Tree where
+module Control.Alternative.Free.Associated where
 
 import Control.Applicative
 -- import           Data.Foldable       (Foldable (..))
@@ -23,7 +23,7 @@ import Data.Monoid
 
 mostly satisfies Applicative laws: identity and interchange and composition, sort of by construction, and ignoring Many; and homomorphism, possibly.
 
-Explicitly violates (both left- and right-) distributivity (i.e. can't rewrite @(x + y) * z@ into @(x * z) + (y * z)@; nor can @x * (y + z)@ be rewritten into @(x * y) + (x * z)@), an Alternative law. the interpretation (i.e. a function of type @Alt f a -> _@) can distribute or not as needed.
+Explicitly violates (both left- and right-) distributivity (i.e. can't rewrite @(x + y) * z@ into @(x * z) + (y * z)@; nor can @x * (y + z)@ be rewritten into @(x * y) + (x * z)@), an Alternative law. the interpretation (i.e. a function of type @Alter f a -> _@) can distribute or not as needed.
 
 
 
@@ -67,7 +67,7 @@ also, @let 'Many'{} = xs '<|>' ys@ succeeds unless both @xs@ and @ys@ are non-@M
 = Notes on Implementation:
 
 * ':<*>' is necessary to __not distribute__ in the 'Many' case of the Applicative instance: @txa '<*>' 'Many' txs = txa ':<*>' 'Many' txs@
-* while specific values of type @Alt f a@ may be mostly "list-like" (i.e. those without 'Many'), without distributing, they are be "tree-like" generally.
+* while specific values of type @Alter f a@ may be mostly "list-like" (i.e. those without 'Many'), without distributing, they are be "tree-like" generally.
 
 
 = Notes on Naming (in the source):
@@ -82,15 +82,15 @@ like:
 
 * @a  :: a@
 * @fa :: f a@
-* @ta :: Alt f a@
-* @tas :: [Alt f a]
+* @ta :: Alter f a@
+* @tas :: [Alter f a]
 
 and:
 
 * @xa  :: (x -> a)@
 * @fxa :: f (x -> a)@
-* @txa :: Alt f (x -> a)@
-* @txas :: [Alt f (x -> a)]
+* @txa :: Alter f (x -> a)@
+* @txas :: [Alter f (x -> a)]
 
 (why? easier than the reader/writer doing type inference in their head).
 
@@ -104,19 +104,19 @@ and:
 
 
 -}
-data Alt f a where
- Pure   ::                         a -> Alt f a
- Many   ::                 [Alt f a] -> Alt f a
- App    :: Alt f (x -> a) -> f x     -> Alt f a
- (:<*>) :: Alt f (x -> a) -> Alt f x -> Alt f a
+data Alter f a where
+ Pure   ::                         a -> Alter f a
+ Many   ::                 [Alter f a] -> Alter f a
+ App    :: Alter f (x -> a) -> f x     -> Alter f a
+ (:<*>) :: Alter f (x -> a) -> Alter f x -> Alter f a
 
-instance Functor f => Functor     (Alt f) where
+instance Functor f => Functor     (Alter f) where
  fmap ab (Pure a)       = Pure (ab a)
  fmap ab (Many fas)     = Many (fmap (fmap ab) fas)
  fmap ab (txa `App` fx) = fmap (ab .) txa `App` fx
  fmap ab (txa :<*>  tx) = fmap (ab .) txa :<*>  tx
 
-instance Functor f => Applicative (Alt f) where
+instance Functor f => Applicative (Alter f) where
  pure  = Pure
 
  Pure xa <*> tx             = fmap xa tx                     -- Functor
@@ -128,7 +128,7 @@ instance Functor f => Applicative (Alt f) where
  txa     <*> (tyx `App` fy) = ((.) <$> txa <*> tyx) `App` fy -- Composition
  txa     <*> (tyx :<*> ty)  = ((.) <$> txa <*> tyx) :<*>  ty -- Composition
 
-instance Functor f => Alternative (Alt f) where
+instance Functor f => Alternative (Alter f) where
  empty = Many []
 
  Empty     <|> ys        = ys              -- Left-Identity
@@ -137,22 +137,36 @@ instance Functor f => Alternative (Alt f) where
 
  xs        <|> ys        = Many (toAltList xs) <|> Many (toAltList ys)
 
-toAltList :: Alt f a -> [Alt f a]
+toAltList :: Alter f a -> [Alter f a]
 toAltList (Many xs) = xs
 toAltList x         = [x]
 
 pattern Empty = Many []
 
-liftAlt :: f a -> Alt f a
-liftAlt f = Pure id `App` f
+-- | like the inverse to
+liftAlter :: f a -> Alter f a
+liftAlter f = Pure id `App` f
 
-fellAlt :: (Alternative f) => Alt f a -> f a
-fellAlt = runAlt id
+{- |
+
+left-inverse to 'liftAlter':
+
+@
+'fellAlter' ('liftAlter' f)
+'runAlter' 'id' ('Pure' id `'App'` f)
+runAlter id (Pure id) '<*>' id f
+pure id '<*>' f
+f
+@
+
+-}
+fellAlter :: (Alternative f) => Alter f a -> f a
+fellAlter = runAlter id
 
 -- | 'Alt' satisfies associativity modulo 'runAlt'. (I think)
-runAlt :: forall f g a. Alternative g => (forall x. f x -> g x) -> Alt f a -> g a
-runAlt _ (Pure a)     = pure a
-runAlt u (Many fs)    = foldr (<|>) empty (runAlt u <$> fs)
-runAlt u (f `App` x) = runAlt u f <*> u x
-runAlt u (f :<*>  g) = runAlt u f <*> runAlt u g
+runAlter :: forall f g a. Alternative g => (forall x. f x -> g x) -> Alter f a -> g a
+runAlter _ (Pure a)     = pure a
+runAlter u (Many fs)    = foldr (<|>) empty (runAlter u <$> fs)
+runAlter u (f `App` x) = runAlter u f <*> u x
+runAlter u (f :<*>  g) = runAlter u f <*> runAlter u g
 

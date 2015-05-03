@@ -6,7 +6,6 @@ import Commands.Backends.OSX.Types
 import Control.Monad.Free
 import Control.Monad.Trans.State
 
-import Control.Applicative
 import Control.Concurrent             (threadDelay)
 
 import Data.Foldable                  (traverse_)

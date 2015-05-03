@@ -3,12 +3,12 @@ module Commands.Frontends.Dragon13.Render where
 import Commands.Frontends.Dragon13.Lens
 import Commands.Frontends.Dragon13.Types
 import Commands.Grammar.Types
-import Control.Alternative.Free.Tree
+import Control.Alternative.Free.Associated
 
-import Control.Applicative
 import Control.Lens
-import Data.List.NonEmpty                (nonEmpty)
-import Data.Maybe                        (catMaybes, fromMaybe, mapMaybe)
+import Data.List.NonEmpty                  (nonEmpty)
+
+import Data.Maybe                          (catMaybes, fromMaybe, mapMaybe)
 
 
 -- | "render"s into a grammar, which can then be "serialize"d into text.
@@ -37,7 +37,7 @@ renderRHS_ (fs :<*> xs) = DNSSequence     <$> (nonEmpty . catMaybes $ [renderRHS
 -- |
 renderSymbol :: GrammaticalSymbol x -> DNSRHS DNSCommandName DNSCommandToken
 renderSymbol = symbol
- (\(Word t) -> DNSTerminal (DNSToken t))
+ (\t -> DNSTerminal (DNSToken t))
  (\grammar -> DNSNonTerminal (SomeDNSLHS (grammar ^. gramGrammar.dnsProductionLHS)))
 
 -- TODO define as sound generic free alternative operation, with an (Applicative) Const DNSRHS?

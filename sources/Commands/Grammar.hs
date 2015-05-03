@@ -6,24 +6,24 @@
 {-# LANGUAGE TypeOperators                                                  #-}
 -- |
 module Commands.Grammar where
-import           Commands.Command.Types        ()
+import           Commands.Command.Types              ()
 import           Commands.Etc
 import           Commands.Grammar.Types
 import           Commands.Munging
-import           Control.Alternative.Free.Tree
+import           Control.Alternative.Free.Associated
 
-import           Control.Applicative
 import           Control.Lens
-import           Control.Monad.State
-import           Data.Foldable                 (asum, traverse_)
 import           Data.Hashable
-import           Data.List                     (intercalate)
-import           Data.Map                      (Map)
-import qualified Data.Map                      as Map
-import           Data.Maybe                    (fromJust)
-import           Data.Monoid                   ((<>))
-import           Data.Typeable                 (Typeable)
-import           Language.Haskell.TH.Syntax    (Name)
+
+import           Control.Monad.State
+import           Data.Foldable                       (asum, traverse_)
+import           Data.List                           (intercalate)
+import           Data.Map                            (Map)
+import qualified Data.Map                            as Map
+import           Data.Maybe                          (fromJust)
+import           Data.Monoid                         ((<>))
+import           Data.Typeable                       (Typeable)
+import           Language.Haskell.TH.Syntax          (Name)
 
 
 vocabulary :: [String] -> RHS String
@@ -84,7 +84,7 @@ unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
  hashSymbol :: GrammaticalSymbol x -> Int
- hashSymbol = symbol (hash . unWord) (hash . view gramLHS)
+ hashSymbol = symbol hash (hash . view gramLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
 --

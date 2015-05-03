@@ -1,29 +1,28 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, RankNTypes #-}
 module Commands.Parse where
-import Commands.Command.Types        ()
+import Commands.Command.Types              ()
 import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
 import Commands.Parse.Types
 import Commands.Parsec
-import Control.Alternative.Free.Tree
+import Control.Alternative.Free.Associated
 
-import Control.Exception.Lens        (handler, _ErrorCall)
+import Control.Exception.Lens              (handler, _ErrorCall)
 import Control.Lens
-import Control.Monad.Catch           (SomeException (..))
+import Control.Monad.Catch                 (SomeException (..))
 
-import Control.Applicative
-import Control.Exception             (Handler)
-import Control.Monad                 ((>=>))
-import Data.Foldable                 (asum)
+import Control.Exception                   (Handler)
+import Control.Monad                       ((>=>))
+import Data.Foldable                       (asum)
 
 
 sparser :: GrammaticalSymbol a -> Parser a
-sparser = symbol wparser gparser
+sparser = symbol tparser gparser
 
-wparser :: Word -> Parser a
-wparser (Word w) = freeParser $
- try (word w) *> pure undefined -- TODO make safe
+tparser :: String-> Parser a
+tparser s = freeParser $
+ try (word s) *> pure undefined -- TODO make safe
 
 gparser :: Grammar a -> Parser a
 gparser g = SensitiveParser $ \context ->

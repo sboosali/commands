@@ -7,21 +7,20 @@ import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Graph
 
-import           Control.Applicative
 import           Control.Lens
-import           Data.Bifunctor                    (first)
-import           Data.Either                       (partitionEithers)
-import           Data.Foldable                     (foldMap)
-import           Data.Graph
-import qualified Data.List                         as List
 import           Data.List.NonEmpty                (NonEmpty (..))
 import qualified Data.List.NonEmpty                as NonEmpty
-import           Data.Map.Strict                   (Map)
-import qualified Data.Map.Strict                   as Map
-import           Data.Monoid                       ((<>))
 import           Data.Semigroup.Applicative        (Ap (..))
 import           Data.Text.Lazy                    (Text)
 import qualified Data.Text.Lazy                    as T
+
+import           Data.Bifunctor                    (first)
+import           Data.Either                       (partitionEithers)
+import           Data.Graph
+import qualified Data.List                         as List
+import           Data.Map.Strict                   (Map)
+import qualified Data.Map.Strict                   as Map
+import           Data.Monoid                       ((<>))
 import           Numeric.Natural
 
 

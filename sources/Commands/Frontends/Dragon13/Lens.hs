@@ -3,7 +3,6 @@ module Commands.Frontends.Dragon13.Lens where
 import Commands.Etc
 import Commands.Frontends.Dragon13.Types
 
-import Control.Applicative
 import Control.Lens
 import Data.Function                     (on)
 import Data.Maybe                        (mapMaybe)

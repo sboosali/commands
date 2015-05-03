@@ -20,11 +20,10 @@ module Commands.Frontends.Dragon13.Text
  ) where
 import           Commands.Etc
 
-import           Control.Applicative
 import           Data.Char
-import           Data.Monoid         ((<>))
-import           Data.Text.Lazy      (Text)
-import qualified Data.Text.Lazy      as T
+import           Data.Monoid    ((<>))
+import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as T
 
 
 newtype DNSName = DNSName { unDNSName :: Text } deriving (Show, Eq, Ord)

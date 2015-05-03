@@ -15,7 +15,6 @@ import           Data.Text.Lazy               (Text)
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
-import           Control.Applicative
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches)
 import           Data.List                    (nub)
@@ -44,11 +43,10 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 -- Right "actually"
 --
 --
-type Possibly a = (MonadThrow m) => m a
+type Possibly a = forall m. (MonadThrow m) => m a
 
 failed :: String -> Possibly a
 failed = throwM . userError
-
 
 -- | easily define smart constructors, whose error message has a
 -- fully-qualified name for debugging. if you rename the module, the
@@ -163,7 +161,6 @@ nonemptyTail :: Lens' (NonEmpty a) [a]
 nonemptyTail = lens
  (\(_ :| xs)   -> xs)
  (\(x :| _) xs -> x :| xs)
-
 
 -- | @Either@ is a @Monad@: it short-circuits. 'Validation' is an @Applicative@, but not a @Monad@: under @traverse@ (or @bitraverse@), it runs the validation (@:: a -> f b@) on every field (@:: a@) in the traversable (@:: t a@), monoidally appending together all errors, not just the first.
 eitherToValidations :: Either e a -> Validation [e] a

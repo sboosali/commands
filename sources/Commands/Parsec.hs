@@ -18,7 +18,6 @@ module Commands.Parsec
 ) where
 import           Commands.Etc
 
-import           Control.Applicative hiding (optional)
 import           Control.Monad.Catch (throwM)
 import           Data.Monoid         ((<>))
 import           Text.Parsec         hiding (Parsec, many, parse, space, (<|>))

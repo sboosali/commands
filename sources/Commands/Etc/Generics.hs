@@ -32,7 +32,7 @@ class TypeName a where
  default typeName :: (Generic a, Datatype d, (D1 d f) ~ (Rep a)) => a -> String
  typeName = datatypeName . from
 
-{- | filters away those (valid) Haskell field names that are invalid
+{- | Silently filters away those (valid) Haskell field names that are invalid
 Python identifiers. such as symbols, or the empty string from
 field-less Haskell constructors.
 

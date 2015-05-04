@@ -1,27 +1,29 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Commands.Servers.Servant.Types where
-import Commands.Grammar.Types
+import Commands.Backends.OSX.Types     (Application)
+import Commands.Mixins.DNS13OSX9.Types (C)
 
 import Data.Aeson
 -- import Data.Aeson.Types
 
 -- import Data.Map         (Map)
-import GHC.Generics           (Generic)
+import GHC.Generics                    (Generic)
 
 
 {- | the Commands Model.
 
 State that configures the server's handlers, and may be updated by clients.
 
+'_modContext' can be updated by clients and used by the '_modCommand', concurrently.
 
 -}
 data CmdModel a = CmdModel
- { _modCommand :: Command a
- , _modDefault :: String -> a
- , _modContext :: CompilerContext
+ { _modCommand :: C a
+ , _modDefault :: String -> a   -- ^ what a failed parse should default to
+  -- TODO (should move _modDefault into the parser, to make it total? But then we can't report errors unless the Either was desugar into an Action error, with ThrowA or something)
+ , _modContext :: Application   -- ^ the current context (e.g. the current application).
  -- , _mod ::
  }
- -- deriving (Show,Eq,Ord) no?
 
 {- |
 

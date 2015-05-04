@@ -8,6 +8,10 @@ import Data.Monoid        ((<>))
 import Foreign.C.Types
 
 
+-- | desugars the thing into Actions, given an Application.
+newtype ApplicationDesugarer a = ApplicationDesugarer { runApplicationDesugarer :: a -> Application -> Actions () }
+-- the concrete unit @(Actions ())@ will cause type-errors when your do-block returns non-unit types (like @(copy :: Actions String)@), but avoids existential quantification.
+
 {- | relates a Haskell type with a Objective-C type:
 
 * Objective-C defines @typedef unsigned short uint16_t;@

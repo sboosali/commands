@@ -11,8 +11,10 @@ they must output a unique LHS from the LHSs of their input.
 hence, 'LHSApp'.
 
 -}
-module Commands.Command.Combinator where
-import           Commands.Command
+module Commands.Mixins.DNS13OSX9.Combinator where
+import           Commands.Mixins.DNS13.Types
+import           Commands.Mixins.DNS13OSX9.Types
+import           Commands.Mixins.DNS13OSX9.Primitive
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
@@ -32,7 +34,7 @@ import qualified Text.Parsec                       as Parsec
 -- e.g. @(rule-+)@, using @-XPostfixOperators@
 --
 -- @(-+) = 'manyG'@
-(-+) :: Grammar a -> Grammar [a]
+(-+) :: G a -> G [a]
 (-+) = manyG
 
 -- | zero or more of the grammar.
@@ -40,7 +42,7 @@ import qualified Text.Parsec                       as Parsec
 -- e.g. @(rule-*)@, using @-XPostfixOperators@
 --
 -- @(-*) = 'many0G'@
-(-*) :: Grammar a -> Grammar [a]
+(-*) :: G a -> G [a]
 (-*) = many0G
 
 -- | zero or one of the grammar.
@@ -48,7 +50,7 @@ import qualified Text.Parsec                       as Parsec
 -- e.g. @(rule-?)@, using @-XPostfixOperators@
 --
 -- @(-?) = 'optionalG'@
-(-?) :: Grammar a -> Grammar (Maybe a)
+(-?) :: G a -> G (Maybe a)
 (-?) = optionalG
 
 -- | zero or one of the grammar.
@@ -58,7 +60,7 @@ import qualified Text.Parsec                       as Parsec
 -- e.g. @(rule -?- default)@
 --
 -- @(-?-) = flip 'optionG'@
-(-?-) :: Grammar a -> a -> Grammar a
+(-?-) :: G a -> a -> G a
 (-?-) = flip optionG
 
 -- | either one grammar or the other.
@@ -66,26 +68,26 @@ import qualified Text.Parsec                       as Parsec
 -- e.g. @(rule-|)@, using @-XPostfixOperators@
 --
 -- @(-|) = 'eitherG'@
-(-|) :: Grammar a -> Grammar b -> Grammar (Either a b)
+(-|) :: G a -> G b -> G (Either a b)
 (-|) = eitherG
 
 
 -- ================================================================ --
 
 -- | @= 'multipleG'@
-multiple :: Grammar a -> Grammar [a]
+multiple :: G a -> G [a]
 multiple = multipleG
 
 -- | @= 'manyG'@
-many :: Grammar a -> Grammar [a]
+many :: G a -> G [a]
 many = manyG
 
 -- | @= 'many0G'@
-many0 :: Grammar a -> Grammar [a]
+many0 :: G a -> G [a]
 many0 = many0G
 
 -- |
-multipleG :: Grammar a -> Grammar [a]
+multipleG :: G a -> G [a]
 multipleG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -96,7 +98,7 @@ multipleG grammar = Grammar
  self = multipleG grammar
 
 -- |
-multiple0G :: Grammar a -> Grammar [a]
+multiple0G :: G a -> G [a]
 multiple0G grammar = Grammar
  (Rule l r)
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -107,7 +109,7 @@ multiple0G grammar = Grammar
  self = multiple0G grammar
 
 -- |
-manyG :: Grammar a -> Grammar [a]
+manyG :: G a -> G [a]
 manyG grammar = Grammar
  (Rule l r)
  (oneOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -118,7 +120,7 @@ manyG grammar = Grammar
  self = manyG grammar
 
 -- |
-many0G :: Grammar a -> Grammar [a]
+many0G :: G a -> G [a]
 many0G grammar = Grammar
  (Rule l r)
  (zeroOrMoreDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -128,42 +130,36 @@ many0G grammar = Grammar
  r = multipleRHS grammar self
  self = many0G grammar
 
--- -- |
--- multipleRHS :: RHS a -> RHS [a]
--- multipleRHS r = pure [] <|> (:[]) <$> r  -- TODO horribly horrible, but the recursion causes non-termination.
--- -- multipleRHS r = pure [] <|> (:) <$> r <*> multipleRHS r
--- -- TODO you can't recur on RHS directly, you must recur through a Grammar, to terminate.
--- TODO horribly horrible, we shouldn't just ignore the RHS: we're not, the grammar contains it
+-- |
+multipleRHS :: G a -> G [a] -> R [a]
+multipleRHS c cs = pure [] <|> (:) <$> nont c <*> nont cs
+-- TODO erase R from G totally, removing this functions.
 
 -- |
-multipleRHS :: Grammar a -> Grammar [a] -> RHS [a]
-multipleRHS c cs = pure [] <|> (:) <$> liftGrammar c <*> liftGrammar cs
-
--- |
-oneOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+oneOrMoreDNSProduction :: DNSReifyingName -> DNSProduction DNSInfo DNSReifyingName t -> DNSProduction DNSInfo DNSReifyingName t
 oneOrMoreDNSProduction = yankDNSProduction DNSMultiple
 
--- | 'DNSMultiple' recognizes one or more, @('DNSOptional' . 'DNSMultiple') recognizes zero or more.
-zeroOrMoreDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+-- | 'DNSMultiple' recognizes one or more, @('DNSOptional' . 'DNSMultiple')@ recognizes zero or more.
+zeroOrMoreDNSProduction :: DNSReifyingName -> DNSProduction DNSInfo DNSReifyingName t -> DNSProduction DNSInfo DNSReifyingName t
 zeroOrMoreDNSProduction = yankDNSProduction (DNSOptional . DNSMultiple)
 
 
 -- ================================================================ --
 
 -- | @= 'optionalG'@
-optional :: Grammar a -> Grammar (Maybe a)
+optional :: G a -> G (Maybe a)
 optional = optionalG
 
 -- | @= 'optionG'@
-option :: a -> Grammar a -> Grammar a
+option :: a -> G a -> G a
 option = optionG
 
 -- | @= 'optionG' 'enumDefault'@
-optionalEnum :: (Enum a) => Grammar a -> Grammar a
+optionalEnum :: (Enum a) => G a -> G a
 optionalEnum = optionG enumDefault
 
 -- |
-optionG :: a -> Grammar a -> Grammar a
+optionG :: a -> G a -> G a
 optionG theDefault grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -173,7 +169,7 @@ optionG theDefault grammar = Grammar
  r = optionRHS theDefault grammar
 
 -- |
-optionalG :: Grammar a -> Grammar (Maybe a)
+optionalG :: G a -> G (Maybe a)
 optionalG grammar = Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
@@ -183,38 +179,38 @@ optionalG grammar = Grammar
  r = optionalRHS grammar
 
 -- -- |
--- optionalRHS :: RHS a -> RHS (Maybe a)
+-- optionalRHS :: R a -> R (Maybe a)
 -- optionalRHS r = pure Nothing <|> Just <$> r  -- TODO doesn't seem to preserve lower-order rule
 
 -- |
-optionalRHS :: Grammar a -> RHS (Maybe a)
-optionalRHS c = pure Nothing <|> Just <$> liftGrammar c
+optionalRHS :: G a -> R (Maybe a)
+optionalRHS c = pure Nothing <|> Just <$> nont c
 
 -- -- |
--- optionRHS :: a -> RHS a -> RHS a
+-- optionRHS :: a -> R a -> R a
 -- optionRHS x r = pure x <|> r
 
 -- |
-optionRHS :: a -> Grammar a -> RHS a
-optionRHS x c = pure x <|> liftGrammar c
+optionRHS :: a -> G a -> R a
+optionRHS x c = pure x <|> nont c
 
 
 -- |
-optionalDNSProduction :: DNSCommandName -> DNSProduction DNSInfo DNSCommandName t -> DNSProduction DNSInfo DNSCommandName t
+optionalDNSProduction :: DNSReifyingName -> DNSProduction DNSInfo DNSReifyingName t -> DNSProduction DNSInfo DNSReifyingName t
 optionalDNSProduction = yankDNSProduction DNSOptional
 
 
 -- ================================================================ --
 
 -- |
-maybeAtomR :: RHS a -> Perms RHS (Maybe a)
+maybeAtomR :: R a -> Perms R (Maybe a)
 maybeAtomR
  = maybeAtomG
  . set (gramGrammar .dnsProductionInfo .dnsInline) True
  . unsafeFellRHS
 
 -- |
-unsafeFellRHS :: RHS a -> Grammar a
+unsafeFellRHS :: R a -> G a
 unsafeFellRHS rhs = genericGrammar (unsafeLHSFromRHS rhs) rhs
 
 -- | changes the '_gramGrammar' (and thus the '_gramLHS'), but not the
@@ -226,17 +222,29 @@ unsafeFellRHS rhs = genericGrammar (unsafeLHSFromRHS rhs) rhs
 -- 'runPerms' (not by this function) acting upon 'maybeAtom'.
 --
 --
-maybeAtomG :: Grammar a -> Perms RHS (Maybe a)
-maybeAtomG grammar = (maybeAtom . liftGrammar) $ Grammar
+maybeAtomG :: G a -> Perms R (Maybe a)
+maybeAtomG grammar = (maybeAtom . nont) $ Grammar
  (Rule l r)
  (optionalDNSProduction (defaultDNSExpandedName l) (grammar ^. gramGrammar))
  (grammar ^. gramParser)
  where
- Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomG `appLHS`) (const $ liftGrammar grammar) (grammar ^. gramRule)
+ Rule l r = bimapRule (unsafeLHSFromName 'maybeAtomG `appLHS`) (const $ nont grammar) (grammar ^. gramRule)
 
+
+
+-- ================================================================ --
+
+-- |
+eitherG :: G a -> G b -> G (Either a b)
+eitherG a b  = set (gramGrammar .dnsProductionInfo .dnsInline) True $ genericGrammar
+ (unsafeLHSFromName 'eitherG `LHSApp` [(a^.gramLHS),(b^.gramLHS)])
+ (Left <$> nont a  <|>  Right <$> nont b)
+
+
+-- ================================================================ --
 
 -- | "yank"s (opposite of "hoist"?) a 'DNSProduction' down into a 'DNSRHS' by taking its 'DNSLHS',
--- and makes a new transformed 'DNSProduction'. and hints that it be 'dnsInline'd.
+-- making a new transformed 'DNSProduction'. and hints that it be 'dnsInline'd.
 --
 -- a helper function for defining higher-order productions.
 yankDNSProduction :: (DNSRHS n t -> DNSRHS n t) -> n -> DNSProduction DNSInfo n t -> DNSProduction DNSInfo n t
@@ -245,15 +253,3 @@ yankDNSProduction f n (DNSProduction i l _) = DNSProduction
  (DNSRule n)
  (f (DNSNonTerminal (SomeDNSLHS l)))
 
-
--- ================================================================ --
-
--- |
-eitherG :: Grammar a -> Grammar b -> Grammar (Either a b)
-eitherG a b  = set (gramGrammar .dnsProductionInfo .dnsInline) True $ genericGrammar
- (unsafeLHSFromName 'eitherG `LHSApp` [(a^.gramLHS),(b^.gramLHS)])
- (Left <$> liftGrammar a  <|>  Right <$> liftGrammar b)
-
--- TODO generalize to oneOfG, that takes a Record, and is implicitly
--- No, a Co-record! Google "CoRec" in the frames library.
--- (:&) won't look like (&) after the latter is renamed. It's a logical-or though, and (:&) looks like logical-and. We should probably just make another alias involving "|".

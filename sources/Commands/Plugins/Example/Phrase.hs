@@ -402,7 +402,7 @@ word_ = dragonGrammar 'word_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
  (freeParser anyWord)
 
-letter_ :: Grammar Char
+letter_ :: G Char
 letter_ = dragonGrammar 'letter_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
  (freeParser $ spaced anyLetter)
@@ -519,12 +519,12 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 phrase = pPhrase <$> phrase_
 phrase_ = Grammar
  (Rule l dependencies)
- (defaultDNSCommandProduction l gP)
+ (defaultDNSReifyingProduction l gP)
  (sensitiveParser (\context -> try (pP context <?> showLHS l)))
 
  where
  Just l = lhsFromName 'phrase
- dependencies = [] <$ liftGrammar (phraseA `eitherG` phraseB `eitherG` phraseC `eitherG` dictation)
+ dependencies = [] <$ nont (phraseA `eitherG` phraseB `eitherG` phraseC `eitherG` dictation)
  -- TODO the RHS of special grammars are ignored (so the eithers don't matter), except for extracting dependencies for serialization
 
  pP context                     -- merges the context-free Parsec.many the context-sensitive manyUntil
@@ -578,7 +578,7 @@ phraseC = 'phraseC <=> Dictated_ # "say" & dictation
 -- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
 
 type Keyword = String -- TODO
-keyword :: Grammar Keyword
+keyword :: G Keyword
 keyword = 'keyword <=>id#word_
 
 newtype Separator = Separator String  deriving (Show,Eq,Ord)
@@ -607,7 +607,7 @@ brackets = 'brackets
  <|> bracket '|'      # "norm"
  -- <|> Brackets "**" "**" # "bold"
 
-character :: Grammar Char
+character :: G Char
 character = 'character <=> empty
 
  <|> '`' # "grave"
@@ -697,5 +697,5 @@ character = 'character <=> empty
 @
 
 -}
-alphabetRHS = (asum . List.map (\c -> c <$ liftString [toUpper c]) $ ['a'..'z'])
+alphabetRHS = (asum . List.map (\c -> c <$ term [toUpper c]) $ ['a'..'z'])
 -- TODO What will we get back from Dragon anyway?

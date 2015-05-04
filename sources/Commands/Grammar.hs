@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeOperators                                                  #-}
 -- |
 module Commands.Grammar where
-import           Commands.Command.Types              ()
 import           Commands.Etc
 import           Commands.Grammar.Types
 import           Commands.Munging
@@ -26,26 +25,26 @@ import           Data.Typeable                       (Typeable)
 import           Language.Haskell.TH.Syntax          (Name)
 
 
-vocabulary :: [String] -> RHS String
+vocabulary :: (Functor p) => [String] -> RHS p r String
 vocabulary = asum . fmap str
 
-str :: String -> RHS String
-str s = s <$ liftString s
+str :: (Functor p) => String -> RHS p r String
+str s = s <$ term s
 
-chr :: Char -> RHS Char
-chr c = c <$ liftString [c]
+chr :: (Functor p) => Char -> RHS p r Char
+chr c = c <$ term [c]
 
 -- | a specialization, @int = 'con'@, because integer literals are 'Num'-constrained polymorphic types.
 -- in the context we will be using it, we need a concrete type for type inference.
-int :: Int -> RHS Int
+int :: (Functor p) => Int -> RHS p r Int
 int = con
 
-con :: (Show a) => a -> RHS a
+con :: (Show a, Functor p) => a -> RHS p r a
 con = transformedCon (intercalate " " . unCamelCase)
 
 -- | transform a 'Show'n constructor, before making it a 'Terminal'.
-transformedCon :: (Show a) => (String -> String) -> a -> RHS a
-transformedCon f c = c <$ (liftString . f . show) c
+transformedCon :: (Show a, Functor p) => (String -> String) -> a -> RHS p r a
+transformedCon f c = c <$ (term . f . show) c
 
 lhsOfType :: (Typeable a) => proxy a -> LHS
 lhsOfType = LHS . guiOf
@@ -72,18 +71,18 @@ unsafeLHSFromName = fromJust . lhsFromName
 -- warning: partial function:
 --
 -- * doesn't terminate on recursive 'RHS'
--- * doesn't distinguish between different 'Pure's
+-- * can't distinguish between different 'Pure's
 --
 -- TODO deracinate this abomination
-unsafeLHSFromRHS :: RHS x -> LHS
+unsafeLHSFromRHS :: RHS p r x -> LHS
 unsafeLHSFromRHS rhs = LHSInt (unsafeHashRHS rhs)
  where
- unsafeHashRHS :: RHS x -> Int
+ unsafeHashRHS :: RHS p r x -> Int
  unsafeHashRHS (Pure _)     = hash "Pure"
  unsafeHashRHS (Many rs)    = hash "Many" `hashWithSalt` fmap unsafeHashRHS rs
  unsafeHashRHS (fs `App` x) = hash "App"  `hashWithSalt` unsafeHashRHS fs `hashWithSalt` hashSymbol x
  unsafeHashRHS (fs :<*> xs) = hash ":<*>" `hashWithSalt` unsafeHashRHS fs `hashWithSalt` unsafeHashRHS xs
- hashSymbol :: GrammaticalSymbol x -> Int
+ hashSymbol :: Symbol p r x -> Int
  hashSymbol = symbol hash (hash . view gramLHS)
 
 -- | 'Identifier' for readability, 'hash'/'showHex' for uniqueness/compactness.
@@ -117,22 +116,26 @@ showLHS (l `LHSApp` ls) = intercalate "____" (showLHS l : fmap showLHS ls)
 --
 -- Note on Naming: the "reify" means "reifying the references between rules".
 --
-reifyGrammar :: Grammar x -> ReifiedGrammar
-reifyGrammar grammar = execState (reifyGrammar_ grammar) Map.empty
+-- this is slightly distinct from the @r@ type parameter,
+-- though "inducing a reification" (i.e. a function like @induceR :: 'RHS' p r x -> r@)
+-- may use this function.
+reifyGrammar :: Grammar p r x -> ReifiedGrammar p r
+reifyGrammar grammar = execState (reifyGrammar' grammar) Map.empty
 
-reifyGrammar_ :: Grammar x -> State ReifiedGrammar ()
-reifyGrammar_ grammar = do
+reifyGrammar' :: Grammar p r x -> State (ReifiedGrammar p r) ()
+reifyGrammar' grammar = do
  let Rule l r = grammar ^. gramRule
  visited <- gets $ Map.member l
  unless visited $ do
-  modify $ Map.insert l (Some grammar)
-  reifyRHS_ r
+  modify $ Map.insert l (SomeGrammar grammar)
+  reifyRHS' r
 
 -- TODO is this a traversal or something? over the functor
-reifyRHS_ :: RHS x -> State ReifiedGrammar ()
-reifyRHS_ (Pure _)     = return ()
-reifyRHS_ (Many rs)    = traverse_ reifyRHS_ rs
-reifyRHS_ (fs `App` x) = reifyRHS_ fs >> symbol (\_ -> return ()) reifyGrammar_ x
-reifyRHS_ (fs :<*> xs) = reifyRHS_ fs >> reifyRHS_ xs
+reifyRHS' :: RHS p r x -> State (ReifiedGrammar p r) ()
+reifyRHS' (Pure _)     = return ()
+reifyRHS' (Many rs)    = traverse_ reifyRHS' rs
+reifyRHS' (fs `App` x) = reifyRHS' fs >> symbol (\_ -> return ()) reifyGrammar' x
+reifyRHS' (fs :<*> xs) = reifyRHS' fs >> reifyRHS' xs
 
-type ReifiedGrammar = Map LHS (Some Grammar)
+type ReifiedGrammar p r = Map LHS (SomeGrammar p r)
+

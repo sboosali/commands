@@ -6,6 +6,7 @@ import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
 import           Commands.Graph
+import           Commands.Mixins.DNS13.Types
 
 import           Control.Lens
 import           Data.List.NonEmpty                (NonEmpty (..))

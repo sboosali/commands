@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs, NamedFieldPuns, RankNTypes #-}
 module Commands.Parse where
-import Commands.Command.Types              ()
 import Commands.Etc
 import Commands.Grammar
 import Commands.Grammar.Types
@@ -17,14 +16,14 @@ import Control.Monad                       ((>=>))
 import Data.Foldable                       (asum)
 
 
-sparser :: GrammaticalSymbol a -> Parser a
+sparser :: Symbol Parser r a -> Parser a
 sparser = symbol tparser gparser
 
 tparser :: String-> Parser a
 tparser s = freeParser $
  try (word s) *> pure undefined -- TODO make safe
 
-gparser :: Grammar a -> Parser a
+gparser :: Grammar Parser r a -> Parser a
 gparser g = SensitiveParser $ \context ->
  runSensitiveParser sp context <?> showLHS l
  where
@@ -68,7 +67,7 @@ gparser g = SensitiveParser $ \context ->
 --
 --
 -- TODO the parser returned is wrapped in a 'try'
-rparser :: RHS a -> Parser a
+rparser :: RHS Parser r a -> Parser a
 rparser (Pure a)  = freeParser $ pure a
 rparser (Many fs) = SensitiveParser $ \context -> try (asum $ ((flip runSensitiveParser) context) <$> (rparser <$> fs))
 rparser (f `App` x) = SensitiveParser $ \context -> let

@@ -72,9 +72,10 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Servers.Servant.Types"
   , "Commands.Servers.Servant.API"
 
-  , "Commands.Command"
-  , "Commands.Command.Types"
-  , "Commands.Command.Combinator"
+  , "Commands.DNS13OSX9"
+  , "Commands.DNS13OSX9.Types"
+  , "Commands.DNS13OSX9.Primitive"
+  , "Commands.DNS13OSX9.Combinator"
 
   , "Commands.Plugins.Example"
   , "Commands.Plugins.Example.Phrase"

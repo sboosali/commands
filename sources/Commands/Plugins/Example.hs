@@ -61,7 +61,7 @@ data Root
  deriving (Show,Eq)
 
 -- TODO currently throws "grammar too complex" :-(
-root :: Command Root
+root :: C Root
 root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
  <|> Repeat      # positive & root -- recursive is okay for parsec, only left recursion causes non-termination
  <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
@@ -105,7 +105,7 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
   _ -> always nothing
 
 always = const
-when :: [CompilerContext] -> Actions () -> (CompilerContext -> Actions ())
+when :: [Application] -> Actions () -> (Application -> Actions ())
 when theseContexts thisAction = \theContext -> do
  if theContext `List.elem` theseContexts
  then thisAction
@@ -510,11 +510,9 @@ region = 'region
 --
 -- so we can't embed the one into the other, but we'll just keep things simple with duplication.
 --
-key :: Grammar Key -- TODO
 key = 'key <=> empty
 
 data Click = Click Times Button deriving (Show,Eq)
-click :: Grammar Click
 click = 'click <=>
  Click # optionalEnum times & optionalEnum button & "click"
  -- type inference with the {&} sugar even works for:
@@ -524,16 +522,54 @@ click = 'click <=>
  --  and sum types are merged with <|> (after "tagging" with the constructor)
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = enumGrammar :: Grammar Times
+times = enumGrammar :: G Times
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button = qualifiedGrammar
 
+positive :: G Positive
+-- positive :: Grammar p r Positive
 positive = 'positive
- <=> Positive # (asum . fmap int) [1..9]
+ <=> Positive <$> (asum . fmap int) [1..9]
 
+{- the type annotation on positive was needed to disambiguate this type error, which I don't like:
 
+TODO find out if this is necessary. I'd like positive to be defined generically.
 
+sources/Commands/Plugins/Example.hs:531:15:
+    No instance for (AppRHS
+                       Parser DNSReifying (Alter (Symbol p0 r0) Int))
+      arising from a use of ‘#’
+    The type variables ‘p0’, ‘r0’ are ambiguous
+    Note: there is a potential instance available:
+      instance Functor p => AppRHS p r (RHS p r a)
+        -- Defined in ‘Commands.Sugar’
+    In the second argument of ‘(<=>)’, namely
+      ‘Positive # (asum . fmap int) [1 .. 9]’
+    In the expression:
+      'positive <=> Positive # (asum . fmap int) [1 .. 9]
+    In an equation for ‘positive’:
+        positive = 'positive <=> Positive # (asum . fmap int) [1 .. 9]
+
+sources/Commands/Plugins/Example.hs:531:18:
+    No instance for (Functor p0) arising from a use of ‘asum’
+    The type variable ‘p0’ is ambiguous
+    Note: there are several potential instances:
+      instance Functor m =>
+               Functor (MonadRandom-0.3.0.2:Control.Monad.Random.RandT g m)
+        -- Defined in ‘MonadRandom-0.3.0.2:Control.Monad.Random’
+      instance Functor p =>
+               Functor (Control.Applicative.Permutation.Branch p)
+        -- Defined in ‘Control.Applicative.Permutation’
+      instance Functor p => Functor (Perms p)
+        -- Defined in ‘Control.Applicative.Permutation’
+      ...plus 96 others
+    In the first argument of ‘(.)’, namely ‘asum’
+    In the expression: asum . fmap int
+    In the second argument of ‘(#)’, namely
+      ‘(asum . fmap int) [1 .. 9]’
+
+-}
 
 
 

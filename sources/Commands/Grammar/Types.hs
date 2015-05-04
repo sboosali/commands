@@ -3,92 +3,90 @@
 {-# LANGUAGE NamedFieldPuns, PolyKinds, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell, TypeOperators                             #-}
 module Commands.Grammar.Types where
--- import Commands.Command.Types
-import Commands.Backends.OSX.Types         (Actions, Application)
 import Commands.Etc
-import Commands.Frontends.Dragon13.Lens
-import Commands.Frontends.Dragon13.Types
-import Commands.Parse.Types
 import Control.Alternative.Free.Associated
 
 import Control.Lens
 import Data.Hashable                       (Hashable)
-import Numeric.Natural                     (Natural)
 
-import Data.Functor.Sum
 import GHC.Generics                        (Generic)
 
 
-type (:+:) = Sum
+{- |
 
-data Command a = Command
- { _comGrammar  :: Grammar a
- , _comCompiler :: Compiler a
+the type parameters are named:
+
+* @p@ for the parser
+* @r@ for the reified grammar
+* @d@ for the desugarer
+
+The type parameters are in ascending order of likeliness-to-change, for partial application.
+
+
+-}
+data Command p r d a = Command
+ { _comGrammar  :: Grammar p r a
+ , _comCompiler :: d a
  }
--- TODO  profunctor? does it matter? probably, I like thinking about it like a class: a class method to introduce, an instance method to eliminate.
-
--- newtype Compiler' a = Compiler' (a -> ReaderT CompilerContext Actions ())
-newtype Compiler' x a = Compiler' (Compiler a)
- -- deriving (Contravariant, Divisible?, Monad??)
-
-newtype Parser' x a = Parser' (Parser a)
-
--- |
-type Compiler a = a -> CompilerContext -> Actions ()
--- the unit (Actions ()) may cause hard to read type errors when using "copy", but avoids existential quantification.
--- can cache, when both arguments instantiate Eq?
-
-type CompilerContext = Application
-
--- TODO lol
-globalContext :: CompilerContext
-globalContext = ""
+-- TODO  profunctor? does it matter? probably, I like thinking about it like a class: a class method to introduce, an instance method to eliminate. we might want to abstract over this, if we don't force the desugarer to be an arrow type.
 
 
--- |
---
--- Grammar ~ LHS * DNSGrammar Text Text * Parser a
---
--- RHS ~ Alt Symbol ~ Const Word + Grammar ~ Const Word + (LHS * DNSGrammar Text Text * Parser a)
---
-data Grammar a = Grammar
- { _gramRule    :: Rule a            -- ^
- , _gramGrammar :: DNSCommandGrammar -- ^
- , _gramParser  :: Parser a          -- ^
+
+{- TODO
+data Command t p r d dx e a
+ = Command
+ { _comGrammar  :: Grammar t p r a
+ , _comCompiler :: d dx a
+ }
+
+t ~ String 
+exposing t might help the Interpreter,
+the p must be composeable, hence not (p ~ t -> a)
+but t should show up in p, anyway
+should we expose the DesugaringContext?
+exposing dx might help the Interpreter, as it could be unified with the current context in the state
+
+@e@ for any user-defined environment. Induced by the root grammar. can be accessed (read-only) during parser/grammar generation.
+
+e.g.
+Command t      p            r          d               dx          e
+Command String EarleyParser DNSGrammar (Op OSXActions) Application (Set Token)
+
+
+-}
+
+{- |
+
+
+
+
+
+TODO erase RHS (at each level of Grammar) or not?
+-}
+data Grammar p r a = Grammar
+ { _gramRule    :: Rule p r a -- ^
+ , _gramGrammar :: r          -- ^
+ , _gramParser  :: p a        -- ^
  }
  deriving (Functor)
 
-
-type DNSCommandGrammar = DNSCommandProduction
- -- DNSGrammar DNSInfo DNSCommandName DNSCommandToken
-
-type DNSCommandProduction = DNSProduction DNSInfo DNSCommandName DNSCommandToken
-
-defaultDNSCommandProduction :: LHS -> DNSCommandRHS -> DNSCommandProduction
-defaultDNSCommandProduction l r = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) r
-
-type DNSCommandRHS = DNSRHS DNSCommandName DNSCommandToken
-
-type DNSCommandName = DNSExpandedName LHS
-
--- | not 'Text' because user-facing "config" modules (e.g.
--- "Commands.Plugins.Example") can only use one of:
+-- |
 --
--- * OverloadedStrings
--- * type class sugar
---
-type DNSCommandToken = String
-
+-- as the reification @r@ and the 'LHS' are not a type constructors applied to @a@,
+-- they lose no info, and can be used "as is".
+-- even existentially quantified Application parsers (i.e. @Some p@) can be used
+-- when the result is ignored (e.g. with '*>').
+data SomeGrammar p r = forall x. SomeGrammar (Grammar p r x)
 
 -- |
-data Rule a = Rule
+data Rule p r a = Rule
  { _ruleLHS :: !LHS
- , _ruleRHS :: RHS a
+ , _ruleRHS :: RHS p r a
  }
  deriving (Functor)
 
 -- | mono in the first, poly in the second.
-bimapRule :: (LHS -> LHS) -> (RHS a -> RHS b) -> Rule a -> Rule b
+bimapRule :: (LHS -> LHS) -> (RHS p r a -> RHS p r b) -> Rule p r a -> Rule p r b
 bimapRule f g (Rule l r) = Rule (f l) (g r)
 
 -- |
@@ -103,118 +101,39 @@ instance Hashable LHS
 appLHS :: LHS -> LHS -> LHS
 appLHS lhs = (lhs `LHSApp`) . (:[])
 
--- |
+{- |
+
+'RHS's must never be (directly-)recursively defined, only 'Grammar's should be
+recursively defined. 'Grammar's are (like) 'RHS's tagged with unique
+'LHS's. this reifies the recursion
+(like searching a graph while tracking the visited set).
+Some functions on 'RHS's assume non-recursive 'RHS's, just
+like @('length' :: [a] -> Int)@ assumes non-infinite @[a]@.
+
+-}
+type RHS p r = Alter (Symbol p r)
+
+data Symbol p r a = Terminal String | NonTerminal (Grammar p r a) deriving Functor
+
+nont :: Grammar p r a -> RHS p r a
+nont = liftAlter . NonTerminal
+
+term :: String -> RHS p r a
+term = liftAlter . Terminal
+
+-- | eliminator
 --
--- (see <https://ro-che.info/articles/2013-03-31-flavours-of-free-applicative-functors.html flavours of free applicative functors> for background).
---
--- 'RHS's must never be recursively defined, only 'Command's can be
--- recursively defined. 'Command's are like 'RHS's tagged with unique
--- 'LHS's, providing a token to keep track of during evaluation
--- (like "searching a graph").
--- Some functions on 'RHS's assume non-recursive 'RHS's, just
--- like @('length' :: [a] -> Int)@ assumes non-recursive @[a]@.
--- ("data not codata"?)
---
---
-type RHS = Alter GrammaticalSymbol
-
--- {- |
-
--- the type parameters are named:
-
--- * @d@ for the desugarer
--- * @g@ for the reified grammar
--- * @p@ for the parser
-
--- -}
--- type RHS d g p = Alt (Symbol d g p)
--- data Symbol d g p a = Word String | Rule (Grammar d g p a) deriving Functor
--- rule :: Grammar a -> RHS a
--- rule = liftAlt . Rule
--- word :: String -> RHS a
--- word = liftAlt . Word
-
--- |
-type GrammaticalSymbol = Sum (Const Terminal) Grammar
-
--- |
-newtype Terminal = Terminal { unTerminal :: String }
- deriving (Show, Eq, Ord)
-
--- | exhaustive destructor.
---
--- (frees clients from @transformers@ imports. @PatternSynonyms@ in 7.10 can't check exhaustiveness and breaks haddock).
-symbol :: (String -> b) -> (Grammar a -> b) -> GrammaticalSymbol a -> b
-symbol f _ (InL (Const (Terminal s))) = f s
-symbol _ g (InR r) = g r
-
--- | constructor.
-fromWord :: Terminal -> GrammaticalSymbol a
-fromWord = InL . Const
-
--- | constructor.
-fromGrammar :: Grammar a -> GrammaticalSymbol a
-fromGrammar = InR
-
-liftGrammar :: Grammar a -> RHS a
-liftGrammar = liftAlter . fromGrammar
--- TODO rename to rule
-
-liftString :: String -> RHS a
-liftString = liftAlter . fromWord . Terminal
--- TODO rename to word
-
--- | a name, with the level of its expansion.
---
--- '_dnsExpansion' tracks which level a recursive 'DNSProduction' has been expanded to.
---
--- when the '_dnsExpansion' is @Nothing@, the 'DNSProduction' will not be expanded.
---
--- when the '_dnsExpansion' is @Just 0@, the 'DNSProduction' will only
--- hold base case 'DNSAlternative's, not the recursive 'DNSAlternative's.
---
-data DNSExpandedName n = DNSExpandedName
- { _dnsExpansion    :: Maybe Natural
- , _dnsExpandedName :: n
- }
- deriving (Show,Eq,Ord,Functor)
-
--- | yet un-expanded
-defaultDNSExpandedName :: n -> DNSExpandedName n
-defaultDNSExpandedName = DNSExpandedName Nothing
-
--- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
---
---
-data DNSInfo = DNSInfo
- { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
- , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
- }
- deriving (Show,Eq,Ord)
-
--- | no expansion and no inlining.
-defaultDNSInfo :: DNSInfo
-defaultDNSInfo = DNSInfo 0 False
-
+symbol :: (String -> b) -> (Grammar p r a -> b) -> Symbol p r a -> b
+symbol f _ (Terminal s) = f s
+symbol _ g (NonTerminal r) = g r
 
 
 makeLenses ''Grammar
 makeLenses ''Command
 makeLenses ''Rule
 
-makeLenses ''DNSExpandedName
-makeLenses ''DNSInfo
-
-
-gramLHS :: Lens' (Grammar a) LHS
+gramLHS :: Lens' (Grammar p r a) LHS
 gramLHS = gramRule . ruleLHS
 
-gramRHS :: Lens' (Grammar a) (RHS a)
+gramRHS :: Lens' (Grammar p r a) (RHS p r a)
 gramRHS = gramRule . ruleRHS
-
-gramExpand :: Lens' (Grammar a) Natural
-gramExpand = gramGrammar.dnsProductionInfo.dnsExpand
-
-gramInline :: Lens' (Grammar a) Bool
-gramInline = gramGrammar.dnsProductionInfo.dnsInline
-

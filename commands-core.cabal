@@ -89,9 +89,12 @@ library
   Commands.Servers.Servant.Types
   Commands.Servers.Servant.API
 
-  Commands.Command
-  Commands.Command.Types
-  Commands.Command.Combinator
+  Commands.Mixins.DNS13.Types
+
+  Commands.Mixins.DNS13OSX9
+  Commands.Mixins.DNS13OSX9.Types
+  Commands.Mixins.DNS13OSX9.Primitive
+  Commands.Mixins.DNS13OSX9.Combinator
 
   Commands.Plugins.Example
   Commands.Plugins.Example.Phrase
@@ -104,6 +107,7 @@ library
   Commands.Instances
   Commands.Munging
   Commands.Graph
+
   Control.Alternative.Free.Associated
 
  c-sources:        cbits/objc_actor.m

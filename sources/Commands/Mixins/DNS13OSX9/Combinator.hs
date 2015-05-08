@@ -12,21 +12,21 @@ hence, 'LHSApp'.
 
 -}
 module Commands.Mixins.DNS13OSX9.Combinator where
-import           Commands.Mixins.DNS13.Types
-import           Commands.Mixins.DNS13OSX9.Types
-import           Commands.Mixins.DNS13OSX9.Primitive
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Mixins.DNS13.Types
+import           Commands.Mixins.DNS13OSX9.Primitive
+import           Commands.Mixins.DNS13OSX9.Types
 import           Commands.Parse.Types
 import           Commands.Parsec
 
 import           Control.Applicative
 import           Control.Applicative.Permutation
 import           Control.Lens
-import qualified Text.Parsec                       as Parsec
+import qualified Text.Parsec                         as Parsec
 
 
 -- | one or more of the grammar.

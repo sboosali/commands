@@ -62,6 +62,9 @@ library
   Commands.Grammar
   Commands.Grammar.Types
 
+  Commands.Symbol
+  Commands.Symbol.Types
+
   Commands.Parse
   Commands.Parse.Types
   Commands.Parsec
@@ -136,6 +139,7 @@ library
   , semigroups                ==0.16.*
   , action-permutations       ==0.0.*
   , split                     ==0.2.2.*
+  , kan-extensions            ==4.2.*
 
   , Earley                    ==0.7.*
   , parsec                    ==3.1.*

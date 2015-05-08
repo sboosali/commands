@@ -42,6 +42,9 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
   [ "Commands.Core"
 
+  , "Commands.Symbol"
+  , "Commands.Symbol.Types"
+
   , "Commands.Grammar.Types"
   , "Commands.Grammar"
 

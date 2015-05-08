@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Mixins.DNS13OSX9.Primitive where
-import Commands.Mixins.DNS13.Types
-import Commands.Mixins.DNS13OSX9.Types
 import           Commands.Backends.OSX.Types
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Optimize
@@ -11,6 +9,8 @@ import           Commands.Frontends.Dragon13.Serialize
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Grammar
 import           Commands.Grammar.Types
+import           Commands.Mixins.DNS13.Types
+import           Commands.Mixins.DNS13OSX9.Types
 import           Commands.Munging
 import           Commands.Parse
 import           Commands.Parse.Types
@@ -236,7 +236,7 @@ transformedGrammar f = genericGrammar
  (asum . fmap (transformedCon f) $ constructors)
 
 -- | a default 'Grammar' for 'String' @newtype@s.
--- 
+--
 -- the user might want to parse/recognize an arbitrary but dynamic/large subset of all possible strings.
 -- For example:
 --
@@ -253,8 +253,8 @@ transformedGrammar f = genericGrammar
 -- newtype Place = Place String deriving (Show,Eq)
 -- instance IsString Place where fromString = Place
 -- @
--- 
--- 
+--
+--
 vocabularyGrammar :: (IsString a, Functor p) => [String] -> RHS p r a
 vocabularyGrammar = fmap fromString . vocabulary
 

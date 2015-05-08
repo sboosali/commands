@@ -8,5 +8,5 @@ module Commands.Mixins.DNS13OSX9
 import Commands.Mixins.DNS13OSX9.Types
 -- import Commands.Mixins.OSX9.Types
 import Commands.Mixins.DNS13.Types
-import Commands.Mixins.DNS13OSX9.Primitive
 import Commands.Mixins.DNS13OSX9.Combinator
+import Commands.Mixins.DNS13OSX9.Primitive

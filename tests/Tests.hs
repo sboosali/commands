@@ -52,6 +52,8 @@ modules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
   , "Commands.Parse"
   , "Commands.Parsec"
 
+  , "Commands.Parsers.Earley"
+
   , "Commands.Frontends.Dragon13"
   , "Commands.Frontends.Dragon13.Types"
   , "Commands.Frontends.Dragon13.Lens"

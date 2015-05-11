@@ -741,3 +741,15 @@ main = do
  attemptParse edit "kill for line" --
  attemptParse edit "kill"
 
+--  (runEarleyProduction._ruleParser) edit' "kill"          -- Edit Cut Forwards Line
+--  (runEarleyProduction._ruleParser) edit' "kill for line" -- Edit Cut Whole    That
+
+-- action' = "action" <~> Cut      <$ word "kill"
+-- slice'  = "slice"  <~> Forwards <$ word "for"
+-- region' = "region" <~> Line     <$ word "line"
+-- edit' :: _
+-- edit' = "edit"
+--  <~> Edit Cut Forwards Line <$ word "kill"
+--  <|> Edit <$> rule action' <*> (rule slice' `opt'` Whole) <*> (rule region' `opt'` That)
+
+-- lhs <~> rhs = Rule lhs (induceDNSProduction lhs rhs) (induceEarleyProduction lhs rhs)

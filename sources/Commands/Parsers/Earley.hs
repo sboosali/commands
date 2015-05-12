@@ -3,10 +3,11 @@
 module Commands.Parsers.Earley where
 import           Commands.Symbol.Types
 
-import qualified Data.List.NonEmpty    as NonEmpty
+-- import qualified Data.List.NonEmpty    as NonEmpty
 import qualified Text.Earley           as E
 
 import           Control.Applicative
+import           Control.Lens          (view)
 
 
 {- |
@@ -32,17 +33,15 @@ induceEarleyProduction lhs = EarleyProduction . (E.<?> lhs) . runRHS fromSymbol
   Terminal i                                  -> E.symbol i
   NonTerminal (Rule _ _ (EarleyProduction p)) -> p
   -- we can ignore the l: if the parser was automatically induced, <?> has been already called, as above; if the parser was manually written by the user, it is included exactly.
-  Opt         x                            -> optional                   (fromSymbol x)
-  Many        x                            -> many                       (fromSymbol x)
-  Some        x                            -> NonEmpty.fromList <$> some (fromSymbol x)
--- NonEmpty.fromListh is safe because Prod's some is non-empty by definition:
+
+-- NonEmpty.fromList is safe because Prod's some is non-empty by definition:
 -- instance Alternative (Prod r e t) where ... some p = (:) <$> p <*> many p
 
 runEarleyProduction :: forall l a. (forall z. EarleyProduction z l String a) -> String -> ([a], E.Report l [String])
 runEarleyProduction p s = E.fullParses (E.parser (E.rule (unEarleyProduction p)) (words s))
 
--- runParser :: forall l a. (forall z. Rule z l String a) -> String -> ([a], E.Report l [String])
--- runParser (Rule _ _ p) = runEarleyProduction p
+runParser :: forall r l a. (forall z. Rule (EarleyProduction z l) r l String a) -> String -> ([a], E.Report l [String])
+runParser x = runEarleyProduction $ view ruleParser x
 
 -- TODO understand:
 -- when (1) the type is (inferred to be) rank1 (i.e. forall l a z. EarleyProduction z l String a), not rank2 (i.e. forall l a. (forall z. EarleyProduction z l String a))

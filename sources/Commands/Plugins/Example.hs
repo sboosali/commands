@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules     #-}
 {-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards               #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections         #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections, PartialTypeSignatures        #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
@@ -10,7 +10,9 @@ import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
--- import Commands.Symbol.Types
+import qualified Commands.Symbol.Types as S
+import qualified Commands.Frontends.Dragon13.Induce as S
+import qualified Commands.Parsers.Earley as S
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
@@ -657,101 +659,107 @@ attemptInterpret = ()
 
 main = do
 
- putStrLn ""
- let rootG = (root^.comGrammar)
- attemptSerialize rootG
- -- attemptSerialize phrase
+--  putStrLn ""
+--  let rootG = (root^.comGrammar)
+--  attemptSerialize rootG
+--  -- attemptSerialize phrase
 
- putStrLn ""
- attemptParse phraseC "say 638 Pine St., Redwood City 94063"
+--  putStrLn ""
+--  attemptParse phraseC "say 638 Pine St., Redwood City 94063"
 
- putStrLn ""
- -- Error (line 1, column 1): unexpected 's'
- -- expecting positive__Commands.Plugins.Example__commands-core-0.0.0, "replace", "no", "no way", click__Commands.Plugins.Example__commands-core-0.0.0, edit__Commands.Plugins.Example__commands-core-0.0.0 or end of input
- attemptParse rootG "say 638 Pine St., Redwood City 94063"
- -- when we remove the alternatives which are listed in the error above:
- -- Phrase_ (List [List [Atom (Right (PWord "638")),Atom (Right (PWord "Pine")),Atom (Right (PWord "St.,")),Atom (Right (PWord "Redwood")),Atom (Right (PWord "City")),Atom (Right (PWord "94063"))]])
+--  putStrLn ""
+--  -- Error (line 1, column 1): unexpected 's'
+--  -- expecting positive__Commands.Plugins.Example__commands-core-0.0.0, "replace", "no", "no way", click__Commands.Plugins.Example__commands-core-0.0.0, edit__Commands.Plugins.Example__commands-core-0.0.0 or end of input
+--  attemptParse rootG "say 638 Pine St., Redwood City 94063"
+--  -- when we remove the alternatives which are listed in the error above:
+--  -- Phrase_ (List [List [Atom (Right (PWord "638")),Atom (Right (PWord "Pine")),Atom (Right (PWord "St.,")),Atom (Right (PWord "Redwood")),Atom (Right (PWord "City")),Atom (Right (PWord "94063"))]])
 
- -- prefix succeeds, but the whole should fail
- -- should it fail? If it backtracks sufficiently, the wildcard (dictation in phrase, a later alternative) can match it
- -- Otherwise, any prefix must be escaped (e.g. by "lit")
- failingParse rootG "no bad"
- -- when we remove the alternatives which are listed in the error above:
- -- should fail, but succeeded:
- -- "input  = \"no BAD\""
- -- "output = Phrase_ (List [List [Atom (Right (PWord \"no\"))],Atom (Right (PAcronym \"BAD\"))])"
+--  -- prefix succeeds, but the whole should fail
+--  -- should it fail? If it backtracks sufficiently, the wildcard (dictation in phrase, a later alternative) can match it
+--  -- Otherwise, any prefix must be escaped (e.g. by "lit")
+--  failingParse rootG "no bad"
+--  -- when we remove the alternatives which are listed in the error above:
+--  -- should fail, but succeeded:
+--  -- "input  = \"no BAD\""
+--  -- "output = Phrase_ (List [List [Atom (Right (PWord \"no\"))],Atom (Right (PAcronym \"BAD\"))])"
 
- attemptParse (multipleG rootG) "no no 1 replace this and that with that and this"
- attemptParse click "click"
- -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
- print $ getWords (rootG ^. gramGrammar)
-
-
---  , ""
- putStrLn ""
- traverse_ attemptMunge_
-  [ "coal server space tick local"  -- :server 'local --
--- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
- -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
-  , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
-  -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
-  , "class unit test spell M T A"  -- UnitTestMTA
-  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
-  , "class spell M T A bid optimization"  -- MTABidOptimization
-  , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
-  , "class M T A bid optimization"  -- MTABidOptimization
-  , "class spell M TA bid optimization"  -- MTABidOptimization
-  , "lit say camel say some words"  -- say someWords
-  , "upper paste"
-  , "camel paste" -- "clipboard contents"
-  , "class paste" -- "clipboard contents"
-  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
-  , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
-  , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
-  ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+--  attemptParse (multipleG rootG) "no no 1 replace this and that with that and this"
+--  attemptParse click "click"
+--  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
+--  print $ getWords (rootG ^. gramGrammar)
 
 
- putStrLn ""
- traverse_ (attemptParse $ root^.comGrammar)
-  [ "no"
-  , "replace this and that with that and this"  -- "this and that" -> "that and this"
-  , "replace paste with blank"                  --  ~ delete the clipboard between here and the end of the buffer
-  , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
-  ]
-
- putStrLn ""
- attemptCompile root "emacs" "replace clipboard contents with paste"
-
- attemptParse move  "back word"
- attemptParse move  "up line"
- attemptParse rootG "back word"
- attemptParse rootG "up line"
-
- -- the keys are in the right order, and multiple modifiers applied to each
- putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)
- putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
- -- runActions $ google "some words" -- it works
-
- putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
- putStrLn $ showActions $ editEmacs (Edit Cut Backwards Word_)
-
- attemptParse edit "cop"
- attemptParse edit "word"
-
- attemptParse rootG "kill for line" --
- attemptParse edit "kill for line" --
- attemptParse edit "kill"
+-- --  , ""
+--  putStrLn ""
+--  traverse_ attemptMunge_
+--   [ "coal server space tick local"  -- :server 'local --
+-- -- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
+--  -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
+--   , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+--   -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+--   , "class unit test spell M T A"  -- UnitTestMTA
+--   , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
+--   , "class spell M T A bid optimization"  -- MTABidOptimization
+--   , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
+--   , "class M T A bid optimization"  -- MTABidOptimization
+--   , "class spell M TA bid optimization"  -- MTABidOptimization
+--   , "lit say camel say some words"  -- say someWords
+--   , "upper paste"
+--   , "camel paste" -- "clipboard contents"
+--   , "class paste" -- "clipboard contents"
+--   , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
+--   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
+--   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
+--   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
 
 
---  (runEarleyProduction._ruleParser) edit' "kill"          -- Edit Cut Forwards Line
---  (runEarleyProduction._ruleParser) edit' "kill for line" -- Edit Cut Whole    That
+--  putStrLn ""
+--  traverse_ (attemptParse $ root^.comGrammar)
+--   [ "no"
+--   , "replace this and that with that and this"  -- "this and that" -> "that and this"
+--   , "replace paste with blank"                  --  ~ delete the clipboard between here and the end of the buffer
+--   , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
+--   ]
 
--- action' = "action" <~> Cut      <$ word "kill"
--- slice'  = "slice"  <~> Forwards <$ word "for"
--- region' = "region" <~> Line     <$ word "line"
--- edit' :: _
--- edit' = "edit"
---  <~> Edit Cut Forwards Line <$ word "kill"
---  <|> Edit <$> rule action' <*> (rule slice' `opt'` Whole) <*> (rule region' `opt'` That)
+--  putStrLn ""
+--  attemptCompile root "emacs" "replace clipboard contents with paste"
 
--- lhs <~> rhs = Rule lhs (induceDNSProduction lhs rhs) (induceEarleyProduction lhs rhs)
+--  attemptParse move  "back word"
+--  attemptParse move  "up line"
+--  attemptParse rootG "back word"
+--  attemptParse rootG "up line"
+
+--  -- the keys are in the right order, and multiple modifiers applied to each
+--  putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)
+--  putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
+--  -- runActions $ google "some words" -- it works
+
+--  putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
+--  putStrLn $ showActions $ editEmacs (Edit Cut Backwards Word_)
+
+--  attemptParse edit "cop"
+--  attemptParse edit "word"
+
+--  attemptParse rootG "kill for line" --
+--  attemptParse edit "kill for line" --
+--  attemptParse edit "kill"
+
+ testEarley
+
+testEarley = do
+ print $ S.runParser edit' "kill"          -- Edit Cut    Forwards Line
+ print $ S.runParser edit' "kill for line" -- Edit Cut    Forwards Line
+ print $ S.runParser edit' "del"           -- Edit Delete Whole    That
+
+action' = "action"
+ <~> Cut      <$ S.word "kill"
+ <|> Delete      <$ S.word "del"
+slice'  = "slice"  <~> Forwards <$ S.word "for"
+region' = "region" <~> Line     <$ S.word "line"
+edit' :: _
+edit' = "edit"
+ <~> Edit Cut Forwards Line <$ S.word "kill"
+ <|> Edit <$> S.rule action' <*> (S.optionA Whole $ S.rule slice') <*> (S.optionA That $ S.rule region')
+
+lhs <~> rhs = S.Rule lhs (S.induceDNSProduction lhs rhs) (S.induceEarleyProduction lhs rhs)
+infix 2 <~>

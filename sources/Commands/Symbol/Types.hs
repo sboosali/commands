@@ -1,14 +1,16 @@
-{-# LANGUAGE DeriveFunctor, FlexibleContexts, GADTs, LambdaCase  #-}
-{-# LANGUAGE LiberalTypeSynonyms, RankNTypes, StandaloneDeriving #-}
-{-# LANGUAGE TypeOperators                                       #-}
+{-# LANGUAGE DeriveFunctor, FlexibleContexts, GADTs, LambdaCase #-}
+{-# LANGUAGE LiberalTypeSynonyms, PatternSynonyms, RankNTypes   #-}
+{-# LANGUAGE StandaloneDeriving, TemplateHaskell, TypeOperators #-}
 module Commands.Symbol.Types where
 
-import Data.Functor.Coyoneda
-import Data.List.NonEmpty
-import Data.Profunctor
+import           Control.Lens
+import           Data.Functor.Coyoneda
+import           Data.List.NonEmpty
+import qualified Data.List.NonEmpty    as NonEmpty
+import           Data.Profunctor
 
-import Control.Applicative
-import Data.Monoid
+import           Control.Applicative
+import           Data.Monoid
 
 
 {- | a command pairs a rule with
@@ -87,11 +89,27 @@ dimapRule
  -> Rule p r l i' a'
 dimapRule into from f (Rule l r p) = Rule l (fmap into r) (dimap from f p)
 
-{- | a right-hand side.
+{- | a right-hand side in a
+<https://en.wikipedia.org/wiki/Extended_Backus-Naur_Form EBNF>.
 
 an Alternative, as @'Alter' f@ is the "free alternative" of any functor @f@.
 
-'RHS' and 'Rule' and (this specialized) 'Symbol' are conceptually mutually recursive:
+EBNF features:
+
+* "terminals" and "non-terminals" come from 'Symbol's constructors.
+* "alternation" comes from 'RHS's 'Alternative' instance.
+* "sequencing" comes from 'RHS's 'Applicative' instance.
+* "optionality" and "repetition" come from 'Alter's constructors (i.e. 'Opt', 'Many', 'Some').
+* "definition" comes from the 'Rule' product-type and the @induce*@ functions.
+* "grouping" just comes from Haskell's precedence/parentheses.
+* *no* "exceptions"
+
+this type is really more of a <http://bnfc.digitalgrammars.com/ labeled BNF>:
+
+* a constructor on the left of '<$>' labels the grammatical sequence.
+* the type of '<*>' is heterogeneous, which lets us capture non-terminals of different types
+
+'RHS' and 'Rule' and (specialized) 'Symbol' are conceptually mutually recursive:
 
 * 'RHS' *will* hold a @'Symbol' ('Rule' _) _@
 * @'Symbol' ('Rule' _) _@ *may* hold a 'Rule' (in the 'NonTerminal' case)
@@ -131,6 +149,9 @@ foldRHS
  -> b
  -> (b -> b -> b)
  -> ([b] -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> (b -> b)
  -> RHS p r l i a
  -> b
 foldRHS f = foldAlter (\(Coyoneda _ x) -> f x)
@@ -140,47 +161,22 @@ foldRHS f = foldAlter (\(Coyoneda _ x) -> f x)
 -}
 type SymbolF n t = Coyoneda (Symbol n t)
 
-{- | a grammatical symbol for <https://en.wikipedia.org/wiki/Extended_Backus-Naur_Form EBNF>.
+{- | a grammatical symbol.
 
 the type parameters:
 
-* @n@ for "name" or "non-terminal". when @n@ contains a @Symbol n t a@ somewhere (e.g. like), different 'Symbol's\' (represented as 'NonTerminal's) recursion is direct. when @n@ doesn't (e.g. @n ~ String@ or @n ~ Unique@), any recursion should be indirect. you should always explicitly reify recursion through 'NonTerminal's, however you represent the @n@.
+* @n@ for "name" or "non-terminal". when @n@ contains a @Symbol n t a@ somewhere (e.g. like TODO), the recursion between different 'Symbol's (represented as 'NonTerminal's) is direct. when @n@ doesn't (e.g. @n ~ String@ or @n ~ Unique@), any recursion should be indirect. you should always explicitly reify recursion through 'NonTerminal's, however you represent the @n@.
 
 * @t@ for "terminal" (e.g. @t ~ String@ for phrases tokenized into words)
 
-the constructors:
-
-* 'Terminal': @"..."@.
-* 'NonTerminal': @\<...>@.
-* 'Opt': @(...)?@ i.e. zero or one of the thing. like Alternative's @optional@ function.
-* 'Many': @(...)*@ i.e. zero or more of the thing. like Alternative's @many@ method.
-* 'Some': @(...)+@ i.e. one or more of the thing. like Alternative's @some@ method.
-
-EBNF features:
-
-* "grouping" is comes from the AST.
-* "alternation" comes from 'RHS's 'Alternative' instance.
-* "sequencing" comes from 'RHS's 'Applicative' instance.
-* "optionality" and "repetition" come from the constructors (i.e. 'Opt', 'Many', 'Some').
-* "definition" comes from the 'Rule' product-type.
-* *no* "exceptions"
-
-this type is really more of a <http://bnfc.digitalgrammars.com/ labeled BNF>:
-
-* the type of '<*>' is heterogeneous, which lets us capture non-terminals of different types
-* a constructor on the left of '<$>' labels the sequence.
-
 because the strictness annotation @!n@ only forces evaluation to weak-head-normal-form, Haskell's non-strictness should still let us safely build directly-recursive Symbols.
 
-\*not* a Functor, every constructor violates "parametric polymorphism" (when you try to write fmap).
+\*not* a Functor, as a constructor ('Terminal') violates "parametric polymorphism" (when you try to write fmap).
 
 -}
 data Symbol n t a where
-  Terminal    :: !t              -> Symbol n t t
-  NonTerminal :: !(n t a)        -> Symbol n t a
-  Opt         :: !(Symbol n t a) -> Symbol n t (Maybe a)
-  Many        :: !(Symbol n t a) -> Symbol n t [a]
-  Some        :: !(Symbol n t a) -> Symbol n t (NonEmpty a)
+ Terminal    :: !t              -> Symbol n t t
+ NonTerminal :: !(n t a)        -> Symbol n t a
 
 liftSymbol :: Symbol (Rule p r l) i a -> RHS p r l i a
 liftSymbol = liftAlter . liftCoyoneda
@@ -206,26 +202,31 @@ rule = liftSymbol . NonTerminal
 the constructors:
 
 * @(':<*>')@ is just a hack to embed an Alter on the right and not just the left: avoids left-distributing over possibly infinitely many alternatives. which, for example, would force any interpretation as a search to be depth first (where "interpretation" means the output of any function @interpret = 'runAlter' $ \case ...@). this is why I can't just use <https://hackage.haskell.org/package/free-4.10.0.1/docs/Control-Alternative-Free.html#t:Alt this free alternative>.
+* 'Many' for 'many'
+* 'Some' for 'some'
+* 'Opt' can't override 'optional', as @optional@ is a function, not a method. see 'optionalA'.
 
 -}
 data Alter f a where
-  -- Applicative
-  Pure        ::                                   a -> Alter f a
-  Apply       :: !(Alter f (x -> a)) -> !(f x)       -> Alter f a
-  (:<*>)      :: !(Alter f (x -> a)) -> !(Alter f x) -> Alter f a
+ -- Applicative
+ Pure        ::                                   a -> Alter f a
+ Apply       :: !(Alter f (x -> a)) -> !(f x)       -> Alter f a
+ (:<*>)      :: !(Alter f (x -> a)) -> !(Alter f x) -> Alter f a
+ -- (:<*>)      :: !((x -> a)) -> !(Alter f x) -> Alter f a
 
-  -- Alternative/Monoid
-  Empty       ::                                        Alter f a
-  Alter       ::                        ![Alter f a] -> Alter f a
- -- TODO? (NonEmpty Alter f a)
+ -- Alternative/Monoid
+ Alter       ::                        ![Alter f a] -> Alter f a
  -- TODO? pattern Empty = Alter []
- -- TODO? crystallize alternative methods:
-  -- Opt         :: !(Alter f (Maybe x    -> a)) -> Alter f (Maybe x)    -> Alter f a
-  -- Many        :: !(Alter f ([x]        -> a)) -> Alter f [x]          -> Alter f a
-  -- Some        :: !(Alter f (NonEmpty x -> a)) -> Alter f (NonEmpty x) -> Alter f a
-  -- optional is a function, not a method :-(
+ -- TODO? (NonEmpty Alter f a)
+
+ -- Coyoneda'd
+ Opt         :: !(Maybe x    -> a) -> Alter f x -> Alter f a
+ Many        :: !([x]        -> a) -> Alter f x -> Alter f a
+ Some        :: !(NonEmpty x -> a) -> Alter f x -> Alter f a
 
 deriving instance (Functor (Alter f))
+
+pattern Empty = Alter []
 
 {- |
 
@@ -278,6 +279,10 @@ instance Functor f => Applicative (Alter f) where
  _       <*> Empty             = Empty                            -- Annihilation
  txa     <*> Alter txs         = txa :<*> Alter txs               -- NOT Distributivity
 
+ txa     <*> (Opt  ysa ty)     = txa :<*> Opt  ysa ty -- TODO correct?
+ txa     <*> (Many ysa ty)     = txa :<*> Many ysa ty
+ txa     <*> (Some ysa ty)     = txa :<*> Some ysa ty
+
  txa     <*> (tyx `Apply` fy)  = ((.) <$> txa <*> tyx) `Apply` fy -- Composition
  txa     <*> (tyx :<*>    ty)  = ((.) <$> txa <*> tyx) :<*>    ty -- Composition
 
@@ -294,11 +299,92 @@ instance Functor f => Applicative (Alter f) where
 --
 -- or must I?
 
+instance (Functor f) => Monoid (Alter f a) where
+ mempty = Empty
+ mappend = (<|>)
+
 {- |
 
 see the <http://hackage.haskell.org/package/base-4.7.0.2/docs/Control-Applicative.html#t:Alternative Alternative Laws>
 
 doesn't use its @(Functor f)@ constraint, because we don't left-distribute sequencing (i.e. '<*>') over alternation (i.e. '<|>').
+
+distinguishes between 'Some' and @(:) <$> x <*> 'Many' x@ (and vice versa). so these equations are violated:
+
+@
+some x = (:) <$> x <*> many x
+many x = some x <|> pure []
+@
+
+but should be satisfied when lawfully interpreted...
+
+1:
+
+@
+'runAlter' u ('many' x)
+many (runAlter u x) -- (see below)
+some (runAlter u x) <|> pure [] -- by assumption, (runAlter u x) is Alternative
+some (runAlter u x) <|> runAlter u (Pure []) -- by definition of runAlter (TODO is it injective like that? maybe it must be trivial/unlawful when not injective?)
+TODO
+(id . NonEmpty.fromList) <$> some (runAlter u x)
+NonEmpty.fromList <$> some (runAlter u x)
+runAlter u (Some id x)
+TODO
+some x = fmap NonEmpty.toList (Some id x)
+TODO
+NonEmpty.fromList \<$> some (runAlter u x)
+Some id x
+TODO
+runAlter u (fmap NonEmpty.toList (Some id x)) <|> runAlter u (Pure []) --
+runAlter u (fmap NonEmpty.toList (Some id x) <|> Pure []) -- by distribution (see below)
+runAlter u (some x <|> pure []) -- by definitions of some and pure
+@
+
+2:
+
+@
+TODO
+'NonEmpty.fromList' '<$>' 'runAlter' ('some' x)
+NonEmpty.fromList \<$>  ((:) <$> x <*> many x)
+NonEmpty.fromList \<$>
+NonEmpty.fromList \<$>
+@
+
+given:
+
+@
+runAlter u (many x)
+runAlter u (Many id x) -- by definition
+id \<$> many (runAlter u x) -- by definition
+many (runAlter u x) -- by Functor identity
+@
+
+and:
+
+@
+runAlter u (some x)
+runAlter u (Some id x) -- by definition
+(id . 'NonEmpty.fromList') \<$> some (runAlter u x) -- by definition
+NonEmpty.fromList \<$> some (runAlter u x) -- identity
+@
+
+and:
+
+@
+runAlter u (f <|> g)
+runAlter u (Alter [f, g]) -- by definition
+foldr (<|>) empty (runAlter u <$> [f, g]) -- by a case of runAlter (not bidirectional)
+foldr (<|>) empty [runAlter u f, runAlter u g]
+runAlter u f <|> runAlter u g
+@
+
+and:
+
+@ TODO run commutes with fmap
+runAlter u (fmap f x)
+TODO
+fmap f (runAlter u x)
+@
 
 when neither @x@ nor @y@ are 'Empty', then:
 
@@ -308,6 +394,33 @@ let Alter zs = x \<|> y
 
 successfully pattern-matches.
 
+the cast:
+
+@
+fmap 'NonEmpty.fromList' . ('some' :: Alter f a -> Alter f [a])
+@
+
+is safe:
+
+@
+fmap NonEmpty.fromList . (some :: Alter f a -> Alter f [a])
+fmap NonEmpty.fromList . fmap 'NonEmpty.toList' . 'Some' id  -- by definition
+fmap (NonEmpty.fromList . 'NonEmpty.toList') . 'Some' id  -- by homomorphism (Alter is a Functor)
+fmap id . Some id  -- (see below)
+Some id  -- fmap id = id
+@
+
+since:
+
+@
+(\\(a:as) -> a :| as) . (\\(a :| as) -> a : as)
+\\(a :| as) -> (\\(a:as) -> a :| as) ((\\~(a :| as) -> a : as) (a :| as))   -- by definition of compose
+\\(a :| as) -> (\\(a:as) -> a :| as) (a : as)   -- application
+\\(a :| as) -> (a :| as)   -- application
+(id :: NonEmpty a -> NonEmpty a)  -- NonEmpty is a product-type
+id
+@
+
 -}
 instance Functor f => Alternative (Alter f) where
  empty = Empty
@@ -315,15 +428,38 @@ instance Functor f => Alternative (Alter f) where
  Empty <|> y = y                                  -- Left-Identity
  x <|> Empty = x                                  -- Right-Identity
  x <|> y = Alter (toAlterList x <> toAlterList y) -- Associativity
+ {-# INLINE (<|>) #-}
+
+ many = Many id
+ {-# INLINE many #-}
+ some = fmap NonEmpty.toList . Some id
+ {-# INLINE some #-}
+
+{-# RULES "NonEmpty.fromList some/Alter"  forall x.  fmap NonEmpty.fromList (fmap NonEmpty.toList (Some id x))  =  Some id x
+  #-}
+
+ -- TODO safe with bottom? at least, when x is bottom, (Some id x) is bottom too, being a strict constructor.
+ -- (the pragmas are for fun)
+
+-- | a reified 'optional' for the Free 'Alter'native.
+optionalA :: Alter f a -> Alter f (Maybe a)
+optionalA = Opt id
+{-# INLINE optionalA #-}
+
+optionA :: a -> Alter f a -> Alter f a
+optionA x = Opt (maybe x id)
+{-# INLINE optionA #-}
 
 toAlterList :: Alter f a -> [Alter f a]
 toAlterList (Alter xs) = xs
 toAlterList Empty      = []
 toAlterList x          = [x]
+{-# INLINE toAlterList #-}
 
 -- |
 liftAlter :: f a -> Alter f a
 liftAlter f = Pure id `Apply` f
+{-# INLINE liftAlter #-}
 
 {- |
 
@@ -340,6 +476,7 @@ f
 -}
 fellAlter :: (Alternative f) => Alter f a -> f a
 fellAlter = runAlter id
+{-# INLINE fellAlter #-}
 
 {- | fold an Alter down to a value, by acting on the functor.
 
@@ -347,31 +484,49 @@ like 'runAlter' where @(g ~ Const b)@ but not, as 'Const' is not 'Alternative'.
 
 -}
 foldAlter
- :: (forall x. f x -> b) -- ^ how to fold the functor
- -> b             -- ^ a @one@ (a multiplicative-identity-like-thing), i.e. how to interpret 'pure _'
- -> (b -> b -> b) -- ^ a @multiply@, i.e. how to interpret '<*>'
- -> ([b] -> b) -- ^ a @sum@mation, i.e. how to interpret 'empty' (when the input's empty) and '<|>' (when the input's nonempty)
+ :: (forall x. f x -> b) -- ^ how to "fold down" the functor
+ -> b             -- ^ a @unit@, i.e. how to interpret @'pure' _@
+ -> (b -> b -> b) -- ^ @mul@, i.e. how to interpret '<*>'
+ -> ([b] -> b) -- ^ @add@, i.e. how to interpret 'empty' (when the input's empty) and '<|>' (when the input's nonempty)
+ -> (b -> b)   -- ^ how to interpret 'Opt'
+ -> (b -> b)   -- ^ how to interpret 'Many'
+ -> (b -> b)   -- ^ how to interpret 'Some'
  -> Alter f a
  -> b
-foldAlter u one multiply summing = \case
- Pure _      -> one
- f `Apply` x -> foldAlter u one multiply summing f `multiply` u x
- f :<*>  g   -> foldAlter u one multiply summing f `multiply` foldAlter u one multiply summing g
- Empty       -> summing []
- Alter fs    -> summing $ fmap (foldAlter u one multiply summing) fs
+foldAlter u unit mul add opt_ many_ some_ = \case
+ Pure _      -> unit
+ f `Apply` x -> foldAlter u unit mul add opt_ many_ some_ f `mul` u x
+ f :<*>  g   -> foldAlter u unit mul add opt_ many_ some_ f `mul` foldAlter u unit mul add opt_ many_ some_ g
 
--- | '<>' interprets '<*>', and 'mempty' interprets 'pure' (like <http://hackage.haskell.org/package/base-4.8.0.0/docs/src/Control-Applicative.html#line-84 @instance Monoid m =\> Applicative ('Const' m)@>)
-foldAlterMonoid
- :: Monoid m
- => (forall x. f x -> m)
- -> ([m] -> m)
- -> Alter f a
- -> m
-foldAlterMonoid f = foldAlter f mempty mappend
+ Alter fs  -> add   (foldAlter u unit mul add opt_ many_ some_ <$> fs)
+ Opt  _ f  -> opt_  (foldAlter u unit mul add opt_ many_ some_ f)
+ Many _ f  -> many_ (foldAlter u unit mul add opt_ many_ some_ f)
+ Some _ f  -> some_ (foldAlter u unit mul add opt_ many_ some_ f)
+
+-- -- | '<>' interprets '<*>', and 'mempty' interprets 'pure' (like <http://hackage.haskell.org/package/base-4.8.0.0/docs/src/Control-Applicative.html#line-84 @instance Monoid m =\> Applicative ('Const' m)@>)
+-- foldAlter_monoid
+--  :: Monoid m
+--  => (forall x. f x -> m)
+--  -> ([m] -> m)
+--  -> Alter f a
+--  -> m
+-- foldAlter_monoid f = foldAlter f mempty mappend
 
 {- | interpret an Alter as some Alternative, by acting on the functor.
 
 'Alt' satisfies associativity modulo 'runAlt' (I think).
+
+assumes @'NonEmpty.fromList' <$> ('some' x :: Alternative g => g [a])@ is safe for the Alternative returned. it holds for the default @some@:
+
+@
+some v = some_v
+where
+many_v = some_v <|> pure []
+some_v = (:) <$> v <*> many_v
+
+some v = (:) <$> v <*> ...
+@
+
 
 -}
 runAlter
@@ -379,12 +534,15 @@ runAlter
  => (forall x. f x -> g x)
  -> Alter f a
  -> g a
-runAlter _ (Pure a)      = pure a
-runAlter u (f `Apply` x) = runAlter u f <*> u x
-runAlter u (f :<*>    g) = runAlter u f <*> runAlter u g
-runAlter _ Empty         = empty
-runAlter u (Alter fs)    = foldr (<|>) empty (runAlter u <$> fs)
+runAlter u = \case
+ Pure a      -> pure a
+ f `Apply` x -> runAlter u f <*> u x
+ f :<*>    g -> runAlter u f <*> runAlter u g
 
--- mapAlter :: (f a -> f b) -> Alter f a -> Alter f b
--- -- possible? with an inverse too?
+ Alter fs  -> foldr (<|>) empty (runAlter u <$> fs)
+ Opt  f x  -> f                       <$> optional (runAlter u x)
+ Many f x  -> f                       <$> many     (runAlter u x)
+ Some f x  -> (f . NonEmpty.fromList) <$> some     (runAlter u x)
 
+makeLenses ''Rule
+makeLenses ''Command

@@ -14,12 +14,12 @@ import Data.Maybe                          (catMaybes, fromMaybe, mapMaybe)
 
 -- | "induce"s a production from a left-hand side and a right-hand side, which can then be "serialize"d into text.
 --
--- 'RHS's instantiate @Alternative@, and so may be @empty@. but 'DNSProduction's take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ (i.e. 'zeroDNSRHS') for empty 'RHS's (later optimized away).
+-- 'RHS's instantiate @Alternative@, and so may be @empty@. but 'DNSProduction's take @NonEmpty (DNSRHS n t)@. we must use Dragon's @{emptyList}@ (i.e. 'ZeroDNSRHS') for empty 'RHS's (later optimized away).
 induceDNSProduction :: Rule p DNSReifying x -> DNSProduction DNSInfo DNSReifyingName DNSReifyingToken
 induceDNSProduction (Rule l r) = DNSProduction defaultDNSInfo lhs rhs
  where
  lhs = (DNSRule . defaultDNSExpandedName) l
- rhs = (fromMaybe zeroDNSRHS . induceDNSProduction_RHS) r
+ rhs = (fromMaybe ZeroDNSRHS . induceDNSProduction_RHS) r
 
 -- |
 induceDNSProduction_RHS :: RHS p DNSReifying x -> Maybe (DNSRHS DNSReifyingName DNSReifyingToken)

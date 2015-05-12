@@ -187,7 +187,7 @@ serializeProductions (export :| productions)
 -- <rule> exported  = "token";
 --
 serializeExport :: DNSProduction i DNSName DNSText -> Doc
-serializeExport (DNSProduction _ l (nonemptyDNSRHS -> toList -> rs))
+serializeExport (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 -- |
@@ -196,7 +196,7 @@ serializeExport (DNSProduction _ l (nonemptyDNSRHS -> toList -> rs))
 -- <rule>  = "token";
 --
 serializeProduction :: DNSProduction i DNSName DNSText -> Doc
-serializeProduction (DNSProduction _ l (nonemptyDNSRHS -> toList -> rs))
+serializeProduction (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
 {- |

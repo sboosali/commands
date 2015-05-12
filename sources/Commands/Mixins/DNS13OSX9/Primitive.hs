@@ -258,11 +258,11 @@ transformedGrammar f = genericGrammar
 vocabularyGrammar :: (IsString a, Functor p) => [String] -> RHS p r a
 vocabularyGrammar = fmap fromString . vocabulary
 
--- | the empty grammar. See 'unitDNSRHS'.
+-- | the empty grammar. See 'UnitDNSRHS'.
 epsilon :: G ()
 epsilon = Grammar (Rule l r) g p
  where
  Just l = lhsFromName 'epsilon
  r = empty
- g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) unitDNSRHS  -- TODO def method
+ g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) UnitDNSRHS  -- TODO def method
  p = freeParser parserUnit

@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
-{-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, RankNTypes      #-}
-{-# LANGUAGE StandaloneDeriving, ViewPatterns                            #-}
+{-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
+{-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc
 
@@ -112,6 +112,9 @@ instance Bifoldable    (DNSProduction i) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSProduction i) where
  bitraverse f g (DNSProduction i l rs) = DNSProduction i <$> traverse f l <*> bitraverse f g rs
 
+
+-- ================================================================ --
+
 -- |
 --
 --
@@ -166,55 +169,71 @@ instance Plated (DNSRHS n t) where
 instance (IsString t) => (IsString (DNSRHS n t)) where
  fromString = DNSTerminal . DNSToken . fromString
 
+-- sequencing or alternation?
+instance Monoid (DNSRHS n t) where
+ mempty = UnitDNSRHS
+
+ UnitDNSRHS `mappend` y = y
+ x `mappend` UnitDNSRHS = x
+ x `mappend` y = DNSSequence (asDNSSequence x <> asDNSSequence y)
+
 -- | the "additive identity" i.e.:
 --
--- * identity to 'DNSAlternatives'
--- * annihilator to 'DNSSequence'
+-- * pseudo-identity to 'DNSAlternatives'
+-- * pseudo-annihilator to 'DNSSequence'
 --
--- ("verified" by experimenting with Dragon NaturallySpeaking)
+-- ("pseudo" because the differences are "observable" in Haskell, and thus aren't relied upon by this package. but "verified" (by experimenting) with at least one external system (Dragon NaturallySpeaking). should hold in any reasonable interpretation of a BNF-like grammar.)
+--
+-- pattern ZeroDNSRHS = 'DNSNonTerminal' ('SomeDNSLHS' ('DNSBuiltinList' 'DNSEmptyList'))
+--
+pattern ZeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
+-- On the Implementation:
 --
 -- these properties are used at different stages of building the
 -- grammar (e.g. "Commands.Frontends.Dragon13.Render" and
 -- "Commands.Frontends.Dragon13.Optimize"). these stages use different
 -- name types (i.e. the @n@ in @DNSRHS n t@): not the same one, and
 -- not just Strings. Thus, we need a parametrically polymorphic
--- 'zeroDNSRHS':
+-- 'ZeroDNSRHS':
 --
 -- @
--- zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS n t
+-- DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS n t
 -- @
 --
 -- rather than the simple but non-@n@-polymorphic:
 --
 --
 -- @
--- zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t
+-- DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t
 -- @
 --
 --
-zeroDNSRHS :: DNSRHS n t
-zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
+
+asDNSAlternatives :: DNSRHS n t -> NonEmpty (DNSRHS n t)
+asDNSAlternatives = \case
+ DNSAlternatives rs -> rs
+ r -> r :| []
 
 -- | the "multiplicative identity":
 --
--- * identity to 'DNSSequence'
+-- * pseudo-identity to 'DNSSequence'
 --
--- ("verified" by experimenting with Dragon NaturallySpeaking)
+--
 --
 --  Dragon NaturallySpeaking's grammatical format is EBNF-like, but there's no "epsilon production" (i.e. the production that matches the empty string, always succeeding). I tried @'DNSToken' ""@, but that raised an error. with a "epsilon" primitive, it seems to me easy to implement the Multiple:
 --
--- @<multiple_x> = <eps> | x <multiple_x>@
+-- @\<multiple_x> = \<eps> | x \<multiple_x>@
 --
 -- and Optional:
 --
--- @<optional_x> = <eps> | x@
+-- @\<optional_x> = \<eps> | x@
 --
 -- productions. abusing notation, let's rewrite the higher-order
 -- 'DNSOptional' production as:
 --
 -- @optional(x) = 1 + x@
 --
--- and the 'zeroDNSRHS' as:
+-- and the 'ZeroDNSRHS' as:
 --
 -- @0@
 --
@@ -229,16 +248,16 @@ zeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 --
 -- thus:
 --
--- @unitDNSRHS = 'DNSOptional' 'zeroDNSRHS'@
+-- @pattern UnitDNSRHS = 'DNSOptional' 'ZeroDNSRHS'@
 --
--- denotationally, we have equational reasoning. operationally, I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (that fails), but then the option is matched (always succeeds).
+-- "denotationally", we have the above equational reasoning. "operationally", I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (failing), but then the option is matched (always succeeding).
 --
-unitDNSRHS :: DNSRHS n t
-unitDNSRHS = DNSOptional zeroDNSRHS
+pattern UnitDNSRHS = DNSOptional ZeroDNSRHS
 
-nonemptyDNSRHS :: DNSRHS n t -> NonEmpty (DNSRHS n t)
-nonemptyDNSRHS (DNSAlternatives rs) = rs
-nonemptyDNSRHS r = r :| []
+asDNSSequence :: DNSRHS n t -> NonEmpty (DNSRHS n t)
+asDNSSequence = \case
+ DNSSequence rs -> rs
+ r -> r :| []
 
 
 -- ================================================================ --
@@ -345,6 +364,10 @@ data LHSKind = LHSRule | LHSList
 --
 -- for promotion by @DataKinds@.
 data LHSSide = LHSDefined | LHSBuiltin
+
+-- | for readable @doctest@s
+instance (IsString n) => (IsString (DNSLHS LHSRule LHSDefined n)) where
+ fromString = DNSRule . fromString
 
 
 -- ================================================================ --

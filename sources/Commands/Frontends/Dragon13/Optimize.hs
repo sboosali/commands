@@ -142,7 +142,7 @@ expandProductionCycleTo
 expandProductionCycleTo ls d p@(DNSProduction i l r)
   = [DNSProduction i l $ expandRHSAt ls d r]
  <> fmap (\k -> expandProductionAt ls k p) (reverse [1..d])
- <> [DNSProduction i (expandLHSAt 0 l) $ defaultDNSExpandedName `first` zeroDNSRHS]
+ <> [DNSProduction i (expandLHSAt 0 l) $ defaultDNSExpandedName `first` ZeroDNSRHS]
 
 expandProductionAt :: (Eq n) => DNSExpanded n t -> Natural -> DNSProductionOptimizeable n t -> DNSProductionOptimizeable n t
 expandProductionAt ls d (DNSProduction i l r) = DNSProduction i (expandLHSAt d l) (expandRHSAt ls (d-1) r)
@@ -324,6 +324,6 @@ simplifyRHS = rewrite $ \case
  DNSMultiple (DNSMultiple r) -> Just $ DNSMultiple r -- TODO  valid?
  DNSOptional (DNSOptional r) -> Just $ DNSOptional r -- TODO  valid?
  -- terminates:
- DNSAlternatives (NonEmpty.partition (==zeroDNSRHS) -> ((_:_), rs)) ->
-   Just $ maybe zeroDNSRHS DNSAlternatives (NonEmpty.nonEmpty rs)
+ DNSAlternatives (NonEmpty.partition (==ZeroDNSRHS) -> ((_:_), rs)) ->
+   Just $ maybe ZeroDNSRHS DNSAlternatives (NonEmpty.nonEmpty rs)
  _ -> Nothing

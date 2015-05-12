@@ -10,6 +10,7 @@ import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
+-- import Commands.Symbol.Types
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
@@ -740,6 +741,7 @@ main = do
  attemptParse rootG "kill for line" --
  attemptParse edit "kill for line" --
  attemptParse edit "kill"
+
 
 --  (runEarleyProduction._ruleParser) edit' "kill"          -- Edit Cut Forwards Line
 --  (runEarleyProduction._ruleParser) edit' "kill for line" -- Edit Cut Whole    That

@@ -12,8 +12,8 @@ import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 generates:
 
 * nested binary 'DNSSequence's
-* extra 'unitDNSRHS's
-* extra 'zeroDNSRHS's
+* extra 'UnitDNSRHS's
+* extra 'ZeroDNSRHS's
 
 which should be collapsed/pruned away.
 
@@ -23,16 +23,15 @@ induceDNSProduction
  -> RHS p r l i x               -- ^ note: @r@ is polymorphic, thus ignored
  -> DNSProduction DNSInfo l i
 induceDNSProduction lhs = DNSProduction defaultDNSInfo (DNSRule lhs) . foldRHS
- fromSymbol
- unitDNSRHS
+ induceDNSSymbol
+ UnitDNSRHS
  (\x y -> DNSSequence (x :| [y]))
- (maybe zeroDNSRHS DNSAlternatives . nonEmpty)
+ (maybe ZeroDNSRHS DNSAlternatives . nonEmpty)
+ DNSOptional
+ (DNSOptional . DNSMultiple)
+ DNSMultiple
 
- where
- fromSymbol :: Symbol (Rule p r l) i x -> DNSRHS l i
- fromSymbol = \case
-  Terminal    i             -> DNSTerminal    (DNSToken i)
-  NonTerminal (Rule l _ _)  -> DNSNonTerminal (SomeDNSLHS (DNSRule l))
-  Opt         x             -> DNSOptional                 (fromSymbol x)
-  Many        x             -> (DNSOptional . DNSMultiple) (fromSymbol x)
-  Some        x             -> DNSMultiple                 (fromSymbol x)
+induceDNSSymbol :: Symbol (Rule p r l) i x -> DNSRHS l i
+induceDNSSymbol = \case
+ Terminal    i             -> DNSTerminal    (DNSToken i)
+ NonTerminal (Rule l _ _)  -> DNSNonTerminal (SomeDNSLHS (DNSRule l))

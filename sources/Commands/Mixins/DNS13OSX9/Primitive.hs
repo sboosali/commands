@@ -1,51 +1,53 @@
 {-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Mixins.DNS13OSX9.Primitive where
-import           Commands.Backends.OSX.Types
-import           Commands.Etc
-import           Commands.Frontends.Dragon13.Optimize
-import           Commands.Frontends.Dragon13.Render
-import           Commands.Frontends.Dragon13.Serialize
-import           Commands.Frontends.Dragon13.Types
-import           Commands.Grammar
-import           Commands.Grammar.Types
-import           Commands.Mixins.DNS13.Types
+import           Commands.Backends.OSX.Types     hiding (Command)
+import           Commands.Core
+import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9.Types
-import           Commands.Munging
-import           Commands.Parse
-import           Commands.Parse.Types
-import           Commands.Parsec                       (parserUnit)
+import           Commands.Parsers.Earley
 
 import           Control.Lens
-import           Data.Bifunctor                        (second)
-import qualified Data.List                             as List
-import           Data.List.NonEmpty                    (NonEmpty (..))
-import qualified Data.Text.Lazy                        as T
+import           Data.Bifunctor                  (second)
+import           Data.List.NonEmpty              (NonEmpty (..))
+import qualified Data.List.NonEmpty              as NonEmpty
+import qualified Data.Text.Lazy                  as T
 
-import           Control.Applicative
-import           Control.Exception                     (SomeException (..))
+import           Control.Exception               (SomeException (..))
 import           Data.Char
-import           Data.Foldable                         (asum)
-import qualified Data.Map                              as Map
+import           Data.Foldable                   (asum)
 import           Data.Proxy
-import           Data.Typeable                         (Typeable)
-import           GHC.Exts                              (IsString (..))
-import           Language.Haskell.TH.Syntax            (Name)
+import           Data.Tree
+import           Data.Typeable
+import           GHC.Exts                        (IsString (..))
+import           Language.Haskell.TH.Syntax      (Name)
 
 
-interpret :: C a -> Application -> String -> Either SomeException (Actions ())
+infix 1 <%>
+infix 2 <=>
+
+(<=>) :: Name -> H z a -> R z a
+name <=> r = genericGrammar l r
+ where
+ Just l = lhsFromName name
+
+(<%>) :: R z a -> (a -> Application -> Actions_) -> C z ApplicationDesugarer Actions_ a
+(<%>) rule f = Command rule (ApplicationDesugarer f)
+
+
+interpret :: (forall z. C z ApplicationDesugarer Actions_ a) -> Application -> String -> Either SomeException Actions_
 -- TODO EitherT?
-interpret c x s = case (c^.comGrammar) `parses` s of
+interpret c x s = case (c^.comRule) `parses` s of
  Left  e -> Left e
  Right a -> Right $ (c `compiles` a) x
 
--- |
+-- | given a user's grammar, optimize it, validate it, serialize it.
 --
 -- 'DNSImport's all 'DNSBuiltinRules', whether used or not.
 --
 -- = INTERNALS
 --
--- this function doesn't simply project the 'Grammar'
+-- this function doesn't simply project the 'Rule'
 -- onto its 'DNSProduction' with '_gramGrammar',
 -- the way 'parses' simply extracts what it needs with '_gramParser'.
 -- instead, this function expects the '_gramRule' to be correct, from
@@ -81,98 +83,77 @@ interpret c x s = case (c^.comGrammar) `parses` s of
 --
 -- a Kleisli arrow.
 --
-serialized :: Grammar p DNSReifying x -> Either [SomeException] SerializedGrammar
-serialized grammar = do
- let g = second T.pack . optimizeGrammar $ DNSGrammar (getDescendentProductions grammar) [] dnsHeader
- eg <- escapeDNSGrammar g
- return $ serializeGrammar eg
+serialized :: R z x -> Either [SomeException] SerializedGrammar
+serialized rule = do
+ let uG = DNSGrammar (getDescendentProductions rule) [] dnsHeader
+ let oG = second T.pack (optimizeGrammar uG)
+ vG <- escapeDNSGrammar oG
+ return$ serializeGrammar vG
  -- TODO let grammar store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
--- | the transitive dependencies of a grammar. doesn't double count the 'dnsExport' when it's its own descendent.
-getDescendentProductions :: Grammar p DNSReifying x -> NonEmpty DNSReifyingProduction
-getDescendentProductions grammar = export :| List.delete export productions
+-- | a production and its transitive dependencies. removes duplicates. doesn't check for cycles.
+getDescendentProductions :: (Eq l) => Rule p DNSReifying l i x -> NonEmpty (DNSReifyingProduction l i)
+getDescendentProductions rule = NonEmpty.nubBy equalDNSProduction (export :| nonExports)
  where
- export = grammar^.gramGrammar
- productions = ((\(SomeGrammar grammar) -> grammar^.gramGrammar) <$> (Map.elems . reifyGrammar $ grammar))
--- TODO store productions, grammars, commands?
+ export = (rule^.ruleDNSProduction)
+ nonExports = flatten =<< (rule^.ruleDNSDescendents)
 
--- -- | the non-transitive dependencies of a grammar.
--- getChildrenProductions :: Grammar x -> NonEmpty DNSReifyingProduction
--- getChildrenProductions = view (gramGrammar.dnsProductions)
+parses :: (forall z. R z a) -> String -> Possibly a
+parses rule s = NonEmpty.head <$> runRuleParser rule (words s)
 
-
-parses :: Grammar Parser r a -> String -> Possibly a
-parses grammar = parsing (grammar ^. gramParser)
-
-compiles :: Command p r ApplicationDesugarer a -> a -> Application -> Actions ()
-(c `compiles` a) x = runApplicationDesugarer (c^.comCompiler) a x
+compiles :: C z ApplicationDesugarer Actions_ a -> a -> Application -> Actions_
+(c `compiles` a) x = runApplicationDesugarer (c^.comDesugar) a x
 -- c `compiles` a `with` x
 -- compiles :: Command a -> a -> Actions ()
 -- c `compiles` a = (c^.comCompiler) a globalContext
 
-{- TODO open imports with RecordWildCards and data
-
-how to handle Grammar versus Command?
-
-maybe something like this (less ugly) :
-
-data CommandI p i r s b a =
- { serialized :: Grammar p i r s b a   -> Possibly s
- , parses     :: Grammar p i r s b a   -> i -> Possibly a
- , compiles   :: Command p i r s d b a -> a -> b
- }
-
-iEarleyDNS13OSX9 :: CommandI String EarleyParser DNSReifying SerializedGrammar ApplicationDesugarer
-iEarleyDNS13OSX9 = CommandI{..}
- where
- serialized =
- parses =
- compiles =
-
-import Commands.Mixins.DNS13OSX9 (iEarleyDNS13OSX9)
-CommandI{..} = iEarleyDNS13OSX9
-
-maybe make this whole dang module a pseudo-Module record. ugg
-
--}
 
 -- |
 --
 -- the 'RHS' is "erased" into a grammar and a parser.
-genericGrammar :: LHS -> R a -> G a
-genericGrammar l r = Grammar (Rule l r) g p
+genericGrammar :: LHS -> H z a -> R z a
+genericGrammar lhs rhs = Rule lhs g p
  where
  -- g = bimap T.pack T.pack $ renderRHS r
- g = induceDNSProduction (Rule l r)
- p = rparser r
+ g = induceDNSReified       lhs rhs
+ p = induceEarleyProduction lhs rhs
 
--- | builds a special 'Grammar' directly, not indirectly via 'Rule'.
+-- | manually construct a special rule.
 --
 -- warning: partial function:
 --
 -- * match fails on non-global 'Name's
-specialGrammar :: Name -> R a -> DNSReifying -> Parser a -> G a
-specialGrammar name r g p = Grammar (Rule l r) g p
+specialGrammar :: Name -> DNSReifying LHS String -> P z a
+ -> Rule (EarleyProduction z LHS) DNSReifying LHS String a
+ -- the z's must be shared, hence no R alias
+specialGrammar name g p = Rule l g p
  where
- Just l = lhsFromName name
+ Just l = lhsFromName name      -- failed pattern match error messages contain a source location
+
+-- | automatically generated a grammar from a type: the left-hand side comes from the type, and the right-hand side comes from the 'Show'n and transformed 'constructors'.
+transformedGrammar :: forall z a. (Typeable a, Enum a, Show a) => (String -> String) -> R z a
+transformedGrammar f = genericGrammar
+ (lhsOfType (Proxy :: Proxy a))
+ (asum . fmap (transformedCon f) $ constructors)
 
 -- | helper function for conveniently using Dragon NaturallySpeaking built-ins.
-dragonGrammar :: Name -> DNSReifyingRHS -> Parser a -> G a
-dragonGrammar name rhs p = Grammar
- (Rule l empty)
- (DNSProduction (set dnsInline True defaultDNSInfo) (DNSRule (defaultDNSExpandedName l)) rhs)
+dragonGrammar :: Name -> DNSReifyingRHS LHS String -> P z a
+ -> Rule (EarleyProduction z LHS) DNSReifying LHS String a
+dragonGrammar name r p = Rule
+ l
+ (DNSReifying $ Node (set (dnsProductionInfo.dnsInline) True (defaultDNSProduction l r)) [])
  p
  where
- Just l = lhsFromName name
+ Just l = lhsFromName name      -- failed pattern match error messages contain a source location
 
 -- | a default 'Grammar' for 'Enum's.
 --
 -- with 'Enum's, we can get the "edit only once" property: edit the @data@ definition, then 'terminal' builds the 'Rule', and then the functions on 'Rule's build the 'Parser's and 'DNSGrammar's. with 'Typeable', but without TemplateHaskell.
 --
--- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Grammar's can always be defined with an LHS that comes from the term, e.g. with '<=>'.
+-- the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Grammar's can always be defined with an LHS that comes from the term, e.g. with '<=>' (as Haskell values' names are disjoint from Haskell types').
 --
 --
-enumGrammar :: (Typeable a, Enum a, Show a) => G a
+enumGrammar :: (Typeable a, Enum a, Show a) => R z a
 enumGrammar = transformedGrammar (overCamelCase id)
 
 -- | a default 'Grammar' for simple ADTs.
@@ -201,7 +182,7 @@ enumGrammar = transformedGrammar (overCamelCase id)
 --
 --
 --
-qualifiedGrammar :: forall a. (Typeable a, Enum a, Show a) => G a
+qualifiedGrammar :: forall z a. (Typeable a, Enum a, Show a) => R z a
 qualifiedGrammar = qualifiedGrammarWith occ
  where
  GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
@@ -218,22 +199,16 @@ qualifiedGrammar = qualifiedGrammarWith occ
 -- ["up","down","left","right"]
 --
 --
-qualifiedGrammarWith :: (Typeable a, Enum a, Show a) => String -> G a
+qualifiedGrammarWith :: (Typeable a, Enum a, Show a) => String -> R z a
 qualifiedGrammarWith affix = transformedGrammar (overCamelCase (filter (/= fmap toLower affix)))
 
 -- | strips out data typename like 'qualifiedGrammar', and @_@'s, and numbers.
 -- makes it easy to generate generic terminals (like @"left"@),
 -- without conflicting with.common symbols (like 'Left').
-tidyGrammar :: forall a. (Typeable a, Enum a, Show a) => G a
+tidyGrammar :: forall z a. (Typeable a, Enum a, Show a) => R z a
 tidyGrammar = transformedGrammar (overCamelCase (filter (/= fmap toLower occ)) . filter (/= '_'))
  where
  GUI _ _ (Identifier occ) = guiOf (Proxy :: Proxy a)
-
--- | automatically generated a grammar from a type: the left-hand side comes from the type, and the right-hand side comes from the 'Show'n and transformed 'constructors'.
-transformedGrammar :: forall a. (Typeable a, Enum a, Show a) => (String -> String) -> G a
-transformedGrammar f = genericGrammar
- (lhsOfType (Proxy :: Proxy a))
- (asum . fmap (transformedCon f) $ constructors)
 
 -- | a default 'Grammar' for 'String' @newtype@s.
 --
@@ -255,14 +230,13 @@ transformedGrammar f = genericGrammar
 -- @
 --
 --
-vocabularyGrammar :: (IsString a, Functor p) => [String] -> RHS p r a
+vocabularyGrammar :: (IsString a, Functor (p String)) => [String] -> RHS p r l String a
 vocabularyGrammar = fmap fromString . vocabulary
 
--- | the empty grammar. See 'UnitDNSRHS'.
-epsilon :: G ()
-epsilon = Grammar (Rule l r) g p
+-- | the empty grammar. See 'UnitDNSRHS' (always matches, recognizing nothing) and 'unitEarleyParser' (always succeeds, parsing nothing).
+epsilon :: R z ()
+epsilon = Rule l g p
  where
- Just l = lhsFromName 'epsilon
- r = empty
- g = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) UnitDNSRHS  -- TODO def method
- p = freeParser parserUnit
+ l = unsafeLHSFromName 'epsilon
+ g = defaultDNSReifying l UnitDNSRHS
+ p = unitEarleyParser

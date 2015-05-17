@@ -3,10 +3,7 @@ module Commands.Frontends.Dragon13.Optimize where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
-import           Commands.Grammar
-import           Commands.Grammar.Types
-import           Commands.Graph
-import           Commands.Mixins.DNS13.Types
+import           Commands.LHS
 
 import           Control.Lens
 import           Data.List.NonEmpty                (NonEmpty (..))
@@ -25,24 +22,25 @@ import           Data.Monoid                       ((<>))
 import           Numeric.Natural
 
 
--- |
+-- | a grammar can be normalized/optimized with its @i@ and @n@ type parameters.
 type DNSGrammarOptimizeable n t = DNSGrammar DNSInfo (DNSExpandedName n) t
 
--- |
+-- | see 'simplifyGrammar'.
 type DNSProductionOptimizeable n t = DNSProduction DNSInfo (DNSExpandedName n) t
 
+-- | see 'vocabularizeGrammar'
 type DNSVocabularyOptimizeable n t = DNSVocabulary DNSInfo (DNSExpandedName n) t
 
--- |
+-- | see ''. an edge in an adjacency graph.
 type DNSAdjacency n t = Adjacency (SomeDNSLHS (DNSExpandedName n)) (DNSProductionOptimizeable n t)
 
--- |
+-- | see 'expandGrammar'
 type DNSExpanded n t = [SomeDNSLHS (DNSExpandedName n)]
 
--- |
+-- | see 'inlineGrammar'. quick access to the right-hand side of a production to be inlined.
 type DNSInlined n t = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS (DNSExpandedName n) t)
 
--- |
+-- | see 'vocabularizeGrammar'
 type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList LHSDefined (DNSExpandedName n))
 
 
@@ -66,7 +64,6 @@ optimizeGrammar
  . vocabularizeGrammar
  . inlineGrammar
  . simplifyGrammar
-
 
 
 -- ================================================================ --

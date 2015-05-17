@@ -14,39 +14,17 @@ you can import this module to your "configuration" module, which should just def
 -}
 module Commands.Core
  ( module Commands.Etc
-
- , module Commands.Mixins.DNS13OSX9
- , module Commands.Mixins.DNS13OSX9.Types
- , module Commands.Mixins.DNS13OSX9.Combinator
-
- , module Commands.Grammar.Types
+ , module Commands.Symbol.Types
  , module Commands.Grammar
-
- , module Commands.Graph
-
  , module Commands.Munging
-
- , module Commands.Sugar
-
- , module Commands.Parse.Types
- , module Commands.Parse
- , module Commands.Parsec
-
- , module Control.Alternative.Free.Associated
+ , module Commands.LHS
+ -- , module Control.Alternative.Free.
  ) where
 
 import Commands.Etc
 import Commands.Grammar
-import Commands.Grammar.Types
-import Commands.Graph
-import Commands.Instances                   ()
-import Commands.Mixins.DNS13OSX9
-import Commands.Mixins.DNS13OSX9.Combinator
-import Commands.Mixins.DNS13OSX9.Types
+import Commands.Instances    ()
+import Commands.LHS
 import Commands.Munging
-import Commands.Parse
-import Commands.Parse.Types
-import Commands.Parsec                      hiding (Empty, lower, option,
-                                             optional, runParser, tab, upper)
-import Commands.Sugar
-import Control.Alternative.Free.Associated
+import Commands.Symbol.Types
+-- TODO import Control.Alternative.Free.

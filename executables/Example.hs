@@ -20,5 +20,5 @@ mainWith = \case
  _ -> Example.main
  -- OSX.main
 
-theModel :: Server.CmdModel Example.Root
+theModel :: Server.CmdModel z Example.Root
 theModel = (Server.CmdModel Example.root (Example.Phrase_ . Example.asPhrase) "emacs")

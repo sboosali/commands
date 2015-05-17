@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                                #-}
+{-# LANGUAGE ConstraintKinds, DataKinds, DeriveGeneric               #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                             #-}
 module Commands.Etc where
 import           Commands.Instances           ()
 
@@ -17,7 +18,9 @@ import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches)
+import           Data.Graph
 import           Data.List                    (nub)
+import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
@@ -44,6 +47,24 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 --
 --
 type Possibly a = forall m. (MonadThrow m) => m a
+
+-- | the superclass constraints on 'Exception'. uses @ConstraintKinds@.
+--
+-- when you see
+--
+-- @
+-- myHandler :: (Exceptional a) => a -> ...
+-- @
+--
+-- it implies the provenance of those constraints is something like:
+--
+-- @
+-- data MyError a = ...
+-- instance ('Typeable' a, 'Show' a) => 'Exception' (MyError a)
+-- @
+--
+-- this helps with reading/refactoring heavily-constrained types.
+type Exceptional a = (Typeable a, Show a)
 
 failed :: String -> Possibly a
 failed = throwM . userError
@@ -143,13 +164,13 @@ hashAlphanumeric = flip showHex "" . abs . hash
 
 -- | existentially-quantify any unary type-constructor
 --
--- >>> :t Some Nothing
--- Some Nothing :: Some Maybe
+-- >>> :t Any Nothing
+-- Any Nothing :: Any Maybe
 --
--- >>> case Some [] of Some xs -> length xs
+-- >>> case Any [] of Any xs -> length xs
 -- 0
 --
-data Some f = forall x. Some (f x)
+data Any f = forall x. Any (f x)
 
 
 nonemptyHead :: Lens' (NonEmpty a) a
@@ -195,3 +216,41 @@ prismException = prism' SomeException fromException
 handles :: [Handler a] -> IO a -> IO a
 handles = flip catches
 
+type Adjacency k n = (n, k, [k])
+
+{- | the maximal cycles of a directed graph (represented as an adjacency list)
+
+wraps 'stronglyConnComp'
+
+>>> :{
+let graph = [ ("non recursive",        "N", [])
+            , ("self recursive",       "S", ["S"])
+            , ("mutually recursive A", "A", ["B"])
+            , ("mutually recursive B", "B", ["A","C"])
+            , ("mutually recursive C", "C", ["A","S","N"])
+            ]
+:}
+
+>>> cycles graph
+[["self recursive"],["mutually recursive A","mutually recursive B","mutually recursive C"]]
+
+properties:
+
+* the output @[[n]]@ is disjoint i.e. the cycles are maximal
+* each output element @n@ comes from the input @Graph n e@ (but not the converse e.g. the output can be empty)
+* when input an acyclic graph, the empty list is output (a singleton means the node has an edge to itself i.e. self-recursion) (in particular, the empty graph, lists, trees, DAGs)
+* when input a complete graph, the singleton list of (the list of) vertices is output
+
+TODO verify:
+\as -> Set.fromList (map fst $ as) == Set.fromList (flattenSCCs . stronglyConnComp $ as)
+i.e. it preserves the exact input nodes. which means that the partial 'find' can be safely assumed total.
+
+
+-}
+cycles :: Ord k => [Adjacency k n] -> [[n]]
+cycles = sccs2cycles . stronglyConnComp
+
+sccs2cycles :: [SCC n] -> [[n]]
+sccs2cycles = mapMaybe $ \case
+ AcyclicSCC _ -> Nothing
+ CyclicSCC ns -> Just ns

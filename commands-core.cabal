@@ -57,17 +57,20 @@ library
 
  hs-source-dirs: sources
  exposed-modules:
+  Commands
+
   Commands.Core
 
-  Commands.Grammar
-  Commands.Grammar.Types
+  Commands.Etc
+  Commands.Etc.Generics
+  Commands.Instances
+  Commands.LHS 
+  Commands.Munging
 
   Commands.Symbol
   Commands.Symbol.Types
-
-  Commands.Parse
-  Commands.Parse.Types
-  Commands.Parsec
+--  Commands.Symbol.Proofs
+  Commands.Grammar
 
   Commands.Parsers.Earley
 
@@ -75,7 +78,6 @@ library
   Commands.Frontends.Dragon13.Types
   Commands.Frontends.Dragon13.Lens
   Commands.Frontends.Dragon13.Text
-  Commands.Frontends.Dragon13.Render
   Commands.Frontends.Dragon13.Optimize
   Commands.Frontends.Dragon13.Shim
   Commands.Frontends.Dragon13.Serialize
@@ -95,24 +97,16 @@ library
   Commands.Servers.Servant.Types
   Commands.Servers.Servant.API
 
-  Commands.Mixins.DNS13.Types
-
   Commands.Mixins.DNS13OSX9
   Commands.Mixins.DNS13OSX9.Types
   Commands.Mixins.DNS13OSX9.Primitive
   Commands.Mixins.DNS13OSX9.Combinator
 
-  Commands.Plugins.Example
-  Commands.Plugins.Example.Phrase
-
   Commands.Sugar
   Commands.Sugar.Press
 
-  Commands.Etc
-  Commands.Etc.Generics
-  Commands.Instances
-  Commands.Munging
-  Commands.Graph
+  Commands.Plugins.Example
+  Commands.Plugins.Example.Phrase
 
   Control.Alternative.Free.Associated
 
@@ -146,6 +140,7 @@ library
 
   , Earley                    ==0.7.*
   , parsec                    ==3.1.*
+  , ListLike                  ==4.2.*
 
   , text                      ==1.2.*
   , wl-pprint-text            ==1.1.*

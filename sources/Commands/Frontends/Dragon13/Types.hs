@@ -4,17 +4,21 @@
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc
+import Commands.LHS
+import Commands.Symbol.Types (RHS, Rule)
 
-import Control.Lens.Plated (Plated (..))
+import Control.Lens.Plated   (Plated (..))
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
-import Data.List.NonEmpty  (NonEmpty (..))
+import Data.List.NonEmpty    (NonEmpty (..))
 import Data.Semigroup
 
-import Data.Char           (toLower)
+import Data.Char             (toLower)
 import Data.Traversable
-import GHC.Exts            (IsString (..))
+import Data.Tree
+import GHC.Exts              (IsString (..))
+import Numeric.Natural
 
 
 -- ================================================================ --
@@ -54,7 +58,7 @@ import GHC.Exts            (IsString (..))
 data DNSGrammar i n t = DNSGrammar
  { _dnsProductions  :: NonEmpty (DNSProduction i n t)
  , _dnsVocabularies :: [DNSVocabulary i n t]
- , _dnsImports      :: [DNSImport n] -- TODO  a Set, or remove duplicates later
+ , _dnsImports      :: [DNSImport n] -- TODO  a Set, or remove duplicates later. a Set has no duplicates by construction, though does constrain the non-terminal type
  -- TODO _dnsExports  :: NonEmpty (DNSProduction i n t)
  -- TODO _dnsP? :: (DNSProduction i n t)
  -- TODO dnsProductions = dnsExports <> _dnsP?
@@ -74,15 +78,18 @@ instance Bitraversable (DNSGrammar i) where -- valid Bitraversable?
 
 -- ================================================================ --
 
--- |
+-- | you can only import 'LHSRule's, but of either 'LHSSide'dness.
 --
--- you can only import 'LHSRule's, but of either 'LHSSide'dness.
+--
 data DNSImport n = forall s. DNSImport (DNSLHS LHSRule s n)
+-- a type alias would demand ImpredicativeTypes for the [DNSImport n]
+--
 -- A newtype constructor cannot have existential type variables
--- Can't make a derived instance of ‘Show (DNSImport n)’:
+
 instance (Show n) => Show (DNSImport n) where showsPrec d (DNSImport l) = showsPrecNewtype d "DNSImport" l
 instance (Eq   n) => Eq   (DNSImport n) where DNSImport l1 ==        DNSImport l2 = l1 `equalDNSLHS`   l2
 instance (Ord  n) => Ord  (DNSImport n) where DNSImport l1 `compare` DNSImport l2 = l1 `compareDNSLHS` l2
+-- "Can't make a derived instance of ‘Show (DNSImport n)’"
 
 instance Functor     DNSImport where fmap     = fmapDefault
 instance Foldable    DNSImport where foldMap  = foldMapDefault
@@ -398,4 +405,86 @@ instance (IsString t) => (IsString (DNSToken t)) where
 
 
 -- ================================================================ --
--- lenses
+
+-- | a right-hand side that can be reified. See 'Commands.Frontends.Dragon13.Induce.induceDNSReified'.
+--
+-- (simplifies refactoring)
+type DNSReifiableRHS  p = RHS  p DNSReifying DNSReifyingName DNSReifyingToken
+type DNSReifiableRule p = Rule p DNSReifying DNSReifyingName DNSReifyingToken
+
+{- | the type that will be reifying 'RHS'.
+
+each production is paired with its (transitive) dependencies. you can read:
+
+@
+DNSReifying ('Node' p ps)
+@
+
+as: "the production @p@ depends on the productions/dependencies in @ps@".
+
+unlike a 'DNSGrammar':
+
+* the dependencies are direct references in the 'subForest',
+not indirect references keyed upon 'SomeDNSLHS'
+* the 'rootLabel' holds exactly one 'DNSProduction'
+
+
+-}
+newtype DNSReifying l i = DNSReifying { _dnsReifyingDescendents :: (Tree (DNSReifyingProduction l i)) }
+ deriving (Show,Eq)
+-- it's not really reification then, if your references are still direct
+
+defaultDNSReifying :: l -> DNSReifyingRHS l i -> DNSReifying l i
+defaultDNSReifying l r = DNSReifying $ Node (defaultDNSProduction l r) []
+
+type DNSReifyingProduction l i = DNSProduction DNSInfo (DNSExpandedName l) i
+
+defaultDNSProduction :: l -> DNSReifyingRHS l i -> DNSReifyingProduction l i
+defaultDNSProduction l r = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) r
+
+type DNSReifyingRHS l i = DNSRHS (DNSExpandedName l) i
+
+type DNSReifyingName = DNSExpandedName LHS
+
+-- | not 'Text' because user-facing "config" modules (e.g.
+-- "Reifyings.Plugins.Example") can only use *one* of:
+--
+-- * OverloadedStrings
+-- * type class sugar
+--
+-- as we need to trigger a class @String@ instantiates.
+-- TODO can we make this work with defaulting?
+type DNSReifyingToken = String
+
+-- | a name, with the level of its expansion.
+--
+-- '_dnsExpansion' tracks which level a recursive 'DNSProduction' has been expanded to.
+--
+-- when the '_dnsExpansion' is @Nothing@, the 'DNSProduction' will not be expanded.
+--
+-- when the '_dnsExpansion' is @Just 0@, the 'DNSProduction' will only
+-- hold base case 'DNSAlternative's, not the recursive 'DNSAlternative's.
+--
+data DNSExpandedName n = DNSExpandedName
+ { _dnsExpansion    :: Maybe Natural
+ , _dnsExpandedName :: n
+ }
+ deriving (Show,Eq,Ord,Functor)
+
+-- | yet un-expanded
+defaultDNSExpandedName :: n -> DNSExpandedName n
+defaultDNSExpandedName = DNSExpandedName Nothing
+
+-- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
+--
+--
+data DNSInfo = DNSInfo
+ { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
+ , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
+ }
+ deriving (Show,Eq,Ord)
+
+-- | no expansion and no inlining.
+defaultDNSInfo :: DNSInfo
+defaultDNSInfo = DNSInfo 0 False
+

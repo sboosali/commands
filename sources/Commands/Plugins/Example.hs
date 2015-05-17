@@ -1,18 +1,20 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules     #-}
-{-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
-{-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards               #-}
-{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections, PartialTypeSignatures        #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules  #-}
+{-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns               #-}
+{-# LANGUAGE PartialTypeSignatures, PatternSynonyms, PostfixOperators #-}
+{-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables         #-}
+{-# LANGUAGE TemplateHaskell, TupleSections                           #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
 import           Commands.Core
 import           Commands.Frontends.Dragon13
+import           Commands.LHS
+import           Commands.Mixins.DNS13OSX9
+import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
-import qualified Commands.Symbol.Types as S
-import qualified Commands.Frontends.Dragon13.Induce as S
-import qualified Commands.Parsers.Earley as S
+import           Commands.Symbol.Types
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
@@ -64,9 +66,10 @@ data Root
  deriving (Show,Eq)
 
 -- TODO currently throws "grammar too complex" :-(
-root :: C Root
-root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
- <|> Repeat      # positive & root -- recursive is okay for parsec, only left recursion causes non-termination
+root :: C z ApplicationDesugarer Actions_ Root
+-- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
+root = 'root <=> empty
+ -- <|> Repeat      # positive & root-- TODO no recursion for now
  <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
  -- TODO <|> ReplaceWith # "replace" & phrase & "with" & (phrase <|>? "blank")
  <|> Undo        # "no"         -- order matters..
@@ -74,17 +77,12 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
  <|> Click_      # click
  <|> Edit_       # edit
  <|> Move_       # move
- <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has prefix
+ <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has "say" prefix
  <|> Phrase_     # phrase  -- must be last, phrase falls back to wildcard.
-
  -- <|> Roots       # (multipleC root)
 -- TODO <|> Frozen # "freeze" & root
 
  <%> \case
-
--- TODO Frozen r -> \case
---    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
---  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
 
   ReplaceWith this that -> \case
    "emacs" -> runEmacsWithP "replace-regexp" [this, that]
@@ -105,7 +103,12 @@ root = set (comGrammar.gramExpand) 1 $ 'root <=> empty
   Phrase_ p -> always $ do
    insert =<< munge p
 
+-- TODO Frozen r -> \case
+--    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
+--  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
+
   _ -> always nothing
+
 
 always = const
 when :: [Application] -> Actions () -> (Application -> Actions ())
@@ -525,13 +528,12 @@ click = 'click <=>
  --  and sum types are merged with <|> (after "tagging" with the constructor)
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = enumGrammar :: G Times
+times = enumGrammar -- :: R_ Times
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button = qualifiedGrammar
 
-positive :: G Positive
--- positive :: Grammar p r Positive
+-- positive :: R_ Positive
 positive = 'positive
  <=> Positive <$> (asum . fmap int) [1..9]
 
@@ -583,21 +585,22 @@ sources/Commands/Plugins/Example.hs:531:18:
 
 
 
--- it seems to be synchronous, even with threaded I guess?
-attemptAsynchronously :: Int -> IO () -> IO ()
-attemptAsynchronously seconds action = do
- (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
-   Left error     -> print error
-   Right Nothing  -> putStrLn "..."
-   Right (Just _) -> return ()
-  )
+-- -- it seems to be synchronous, even with threaded I guess?
+-- attemptAsynchronously :: Int -> IO () -> IO ()
+-- attemptAsynchronously seconds action = do
+--  (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
+--    Left error     -> print error
+--    Right Nothing  -> putStrLn "..."
+--    Right (Just _) -> return ()
+--   )
 
-attempt = attemptAsynchronously 1
+-- attempt = attemptAsynchronously 1
 
--- attemptCompile command text = do
---  a <- attemptParse (view comGrammar root) text
---  return $ (view comCompiler root) a
+-- -- attemptCompile command text = do
+-- --  a <- attemptParse (view comGrammar root) text
+-- --  return $ (view comCompiler root) a
 
+attemptMunge_ :: String -> IO ()
 attemptMunge_ s = do
  putStrLn ""
  print s
@@ -612,60 +615,62 @@ attemptMunge_ s = do
    print $ splatted_p
    print $ munged_p
 
-attemptParse grammar s = do
+attemptParse :: (Show a) => (forall  z. R z a) -> String -> IO ()
+attemptParse rule s = do
  putStrLn ""
- attempt $ handleParse (grammar ^. gramParser) s
+ x <- runRuleParser rule (words s)
+ print x
 
-failingParse grammar s = do
- putStrLn ""
- attempt $ case grammar `parses` s of
-  Left e  -> do
-   putStrLn "should fail, and it did:"
-   putStrLn $ "error = " <> show e
-  Right a -> do
-   putStrLn "should fail, but succeeded:"
-   putStrLn $ "input  = " <> show s
-   putStrLn $ "output = " <> show a
+-- failingParse grammar s = do
+--  putStrLn ""
+--  attempt $ case grammar `parses` s of
+--   Left e  -> do
+--    putStrLn "should fail, and it did:"
+--    putStrLn $ "error = " <> show e
+--   Right a -> do
+--    putStrLn "should fail, but succeeded:"
+--    putStrLn $ "input  = " <> show s
+--    putStrLn $ "output = " <> show a
 
-attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
+-- attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
 
-attemptNameRHS = attempt . print . showLHS . unsafeLHSFromRHS
+-- attemptNameRHS = attempt . print . showLHS
 
-printSerializedGrammar SerializedGrammar{..} = do
- replicateM_ 3 $ putStrLn ""
- T.putStrLn $ display serializedRules
- putStrLn ""
- T.putStrLn $ display serializedLists
+-- printSerializedGrammar SerializedGrammar{..} = do
+--  replicateM_ 3 $ putStrLn ""
+--  T.putStrLn $ display serializedRules
+--  putStrLn ""
+--  T.putStrLn $ display serializedLists
 
-attemptCompile c x s = case r `parses` s of
-  Left  e -> print e
-  Right a -> do
-   putStrLn ""
-   print a
-   putStrLn $ showActions $ (c `compiles` a) x
- where r = c ^. comGrammar
+-- attemptCompile c x s = case r `parses` s of
+--   Left  e -> print e
+--   Right a -> do
+--    putStrLn ""
+--    print a
+--    putStrLn $ showActions $ (c `compiles` a) x
+--  where r = c ^. comRule
 
-attemptPython g = do
- let Right sg = serialized g
- let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
- PythonFile pf <- shimmySerialization addresses sg
- runActions $ setClipboard (T.unpack pf)
- T.putStrLn $ pf
- -- TODO why does the unary Test fail? Optimization?
+-- attemptPython g = do
+--  let Right sg = serialized g
+--  let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
+--  PythonFile pf <- shimmySerialization addresses sg
+--  runActions $ setClipboard (T.unpack pf)
+--  T.putStrLn $ pf
+--  -- TODO why does the unary Test fail? Optimization?
 
-attemptInterpret = ()
+-- attemptInterpret = ()
 
 
 
 main = do
 
---  putStrLn ""
+ putStrLn ""
 --  let rootG = (root^.comGrammar)
 --  attemptSerialize rootG
 --  -- attemptSerialize phrase
 
---  putStrLn ""
---  attemptParse phraseC "say 638 Pine St., Redwood City 94063"
+ putStrLn ""
+ attemptParse phraseC "say 638 Pine St., Redwood City 94063"
 
 --  putStrLn ""
 --  -- Error (line 1, column 1): unexpected 's'
@@ -689,28 +694,28 @@ main = do
 --  print $ getWords (rootG ^. gramGrammar)
 
 
--- --  , ""
---  putStrLn ""
---  traverse_ attemptMunge_
---   [ "coal server space tick local"  -- :server 'local --
--- -- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
---  -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
---   , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
---   -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
---   , "class unit test spell M T A"  -- UnitTestMTA
---   , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
---   , "class spell M T A bid optimization"  -- MTABidOptimization
---   , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
---   , "class M T A bid optimization"  -- MTABidOptimization
---   , "class spell M TA bid optimization"  -- MTABidOptimization
---   , "lit say camel say some words"  -- say someWords
---   , "upper paste"
---   , "camel paste" -- "clipboard contents"
---   , "class paste" -- "clipboard contents"
---   , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
---   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
---   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
---   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+--  , ""
+ putStrLn ""
+ traverse_ attemptMunge_
+  [ "coal server space tick local"  -- :server 'local --
+-- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
+ -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
+  , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+  -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+  , "class unit test spell M T A"  -- UnitTestMTA
+  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
+  , "class spell M T A bid optimization"  -- MTABidOptimization
+  , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
+  , "class M T A bid optimization"  -- MTABidOptimization
+  , "class spell M TA bid optimization"  -- MTABidOptimization
+  , "lit say camel say some words"  -- say someWords
+  , "upper paste"
+  , "camel paste" -- "clipboard contents"
+  , "class paste" -- "clipboard contents"
+  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
+  , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
+  , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
+  ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
 
 
 --  putStrLn ""
@@ -744,22 +749,6 @@ main = do
 --  attemptParse edit "kill for line" --
 --  attemptParse edit "kill"
 
- testEarley
-
-testEarley = do
- print $ S.runParser edit' "kill"          -- Edit Cut    Forwards Line
- print $ S.runParser edit' "kill for line" -- Edit Cut    Forwards Line
- print $ S.runParser edit' "del"           -- Edit Delete Whole    That
-
-action' = "action"
- <~> Cut      <$ S.word "kill"
- <|> Delete      <$ S.word "del"
-slice'  = "slice"  <~> Forwards <$ S.word "for"
-region' = "region" <~> Line     <$ S.word "line"
-edit' :: _
-edit' = "edit"
- <~> Edit Cut Forwards Line <$ S.word "kill"
- <|> Edit <$> S.rule action' <*> (S.optionA Whole $ S.rule slice') <*> (S.optionA That $ S.rule region')
-
-lhs <~> rhs = S.Rule lhs (S.induceDNSProduction lhs rhs) (S.induceEarleyProduction lhs rhs)
-infix 2 <~>
+ attemptParse edit "kill"          -- Edit Cut    Forwards Line
+ attemptParse edit "kill for line" -- Edit Cut    Forwards Line
+ attemptParse edit "del"           -- Edit Delete Whole    That

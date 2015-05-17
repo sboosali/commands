@@ -21,7 +21,7 @@ when writing keyboard shortcuts, watch out for shadowed bindings like:
 * @press 'i' where :: Integer@
 
 -}
-module Commands.Sugar.Press where
+module Commands.Sugar.Press where -- TODO move aliases to Commands.Sugar.Aliases. They keep polluting the namespace.
 import Commands.Backends.OSX.DSL
 import Commands.Backends.OSX.Types
 

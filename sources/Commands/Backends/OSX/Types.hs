@@ -8,8 +8,42 @@ import Data.Monoid        ((<>))
 import Foreign.C.Types
 
 
+type Actions_ = Actions ()
+
+-- | a platform-agnostic free monad, which can be executed by platform-specific bindings.
+type Actions = Free ActionF
+
+-- | the "Action Functor".
+data ActionF k
+ = SendKeyPress    [Modifier] Key                   k
+ | SendText        String                           k -- ^ a logical grouping for debugging and optimizing
+ | SendMouseClick  [Modifier] Positive MouseButton  k
+
+ | GetClipboard                                     (ClipboardContents -> k)
+ | SetClipboard    ClipboardContents                k
+ | CurrentApplication                               (Application -> k)
+ | OpenApplication Application                      k
+ | OpenURL         URL                              k
+
+ | Delay           Time                             k
+ -- TODO  | Annihilate      SomeException                       -- no k, it annihilates the action, for mzero and MonadThrow
+ -- TODO   | PerformIO       (IO a)                           (a -> k)
+ deriving (Functor)
+
+type ClipboardContents = String
+
+type Application = String
+-- newtype Application = Application String  deriving (Show,Eq,Ord)
+
+type URL = String
+-- newtype URL = URL String  deriving (Show,Eq,Ord)
+
+type Time = Int
+-- units package
+
+
 -- | desugars the thing into Actions, given an Application.
-newtype ApplicationDesugarer a = ApplicationDesugarer { runApplicationDesugarer :: a -> Application -> Actions () }
+newtype ApplicationDesugarer b a = ApplicationDesugarer { runApplicationDesugarer :: a -> Application -> b }
 -- the concrete unit @(Actions ())@ will cause type-errors when your do-block returns non-unit types (like @(copy :: Actions String)@), but avoids existential quantification.
 
 {- | relates a Haskell type with a Objective-C type:
@@ -177,38 +211,6 @@ data Key
  | F20Key
 
  deriving (Show,Eq,Ord)
-
--- | a platform-agnostic free monad, which can be executed by platform-specific bindings.
-type Actions = Free ActionF
-
--- | the "Action Functor".
-data ActionF k
- = SendKeyPress    [Modifier] Key                   k
- | SendText        String                           k -- ^ a logical grouping for debugging and optimizing
- | SendMouseClick  [Modifier] Positive MouseButton  k
-
- | GetClipboard                                     (ClipboardContents -> k)
- | SetClipboard    ClipboardContents                k
- | CurrentApplication                               (Application -> k)
- | OpenApplication Application                      k
- | OpenURL         URL                              k
-
- | Delay           Time                             k
- -- TODO  | Annihilate      SomeException                       -- no k, it annihilates the action, for mzero and MonadThrow
- -- TODO   | PerformIO       (IO a)                           (a -> k)
- deriving (Functor)
-
-type ClipboardContents = String
-
-type Application = String
--- newtype Application = Application String  deriving (Show,Eq,Ord)
-
-type URL = String
--- newtype URL = URL String  deriving (Show,Eq,Ord)
-
-type Time = Int
--- units package
-
 
 {- |
 

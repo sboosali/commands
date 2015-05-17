@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Commands.Servers.Servant.Types where
-import Commands.Backends.OSX.Types     (Application)
+import Commands.Backends.OSX.Types     (Actions_, Application,
+                                        ApplicationDesugarer)
 import Commands.Mixins.DNS13OSX9.Types (C)
 
 import Data.Aeson
@@ -17,8 +18,8 @@ State that configures the server's handlers, and may be updated by clients.
 '_modContext' can be updated by clients and used by the '_modCommand', concurrently.
 
 -}
-data CmdModel a = CmdModel
- { _modCommand :: C a
+data CmdModel z a = CmdModel
+ { _modCommand :: C z ApplicationDesugarer Actions_ a
  , _modDefault :: String -> a   -- ^ what a failed parse should default to
   -- TODO (should move _modDefault into the parser, to make it total? But then we can't report errors unless the Either was desugar into an Action error, with ThrowA or something)
  , _modContext :: Application   -- ^ the current context (e.g. the current application).

@@ -1,18 +1,21 @@
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, MultiWayIf #-}
-{-# LANGUAGE PostfixOperators, TemplateHaskell                         #-}
+{-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell    #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
+
 import           Commands.Core
 import           Commands.Frontends.Dragon13
+import           Commands.Mixins.DNS13OSX9
+import           Commands.Parsers.Earley
 
 import           Control.Lens                hiding (from, ( # ), (&))
-import           Data.List.NonEmpty          (NonEmpty (..), fromList)
+import           Data.List.NonEmpty          (NonEmpty (..))
 import qualified Data.List.NonEmpty          as NonEmpty
 import           Data.Semigroup
 
 import           Control.Applicative
 import           Data.Char
-import           Data.Foldable               (Foldable (..), asum)
+import           Data.Foldable               (Foldable (..))
 import qualified Data.List                   as List
 import           Data.Traversable
 import           Data.Typeable               (Typeable)
@@ -392,32 +395,6 @@ surroundWith (Brackets l r) as = do
 
 
 
-
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = dragonGrammar 'dictation
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (sensitiveParser (\context -> Dictation <$> anyBlack `manyUntil` context))
-
-word_ = dragonGrammar 'word_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
- (freeParser anyWord)
-
-letter_ :: G Char
-letter_ = dragonGrammar 'letter_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (freeParser $ spaced anyLetter)
-
--- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
--- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
---  Letters # (letter-+)
- -- TODO greedy (many) versus non-greedy (manyUntil)
-
--- |
--- TODO spacing, casing, punctuation; are all weird when letters are recognized by Dragon NaturallySpeaking.
-anyLetter = oneOf ['A'..'Z']
--- anyLetter = anyChar
--- anyLetter = (\c -> c <$ [toUpper c]) <$> ['a'..'z'])
-
 -- |
 --
 -- 'Phrase_' is the unassociated concrete syntax list
@@ -509,77 +486,73 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
  fromPAtom :: PAtom -> Phrase
  fromPAtom = Atom . Right
 
--- | its custom parser and grammar are implemented differently, but should behave consistently.
---
--- (its special parser threads the context differently than the generic parser would.)
---
--- TODO erase this horror from time
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- |
 --
 -- transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
 phrase = pPhrase <$> phrase_
-phrase_ = Grammar
- (Rule l dependencies)
- (defaultDNSReifyingProduction l gP)
- (sensitiveParser (\context -> try (pP context <?> showLHS l)))
 
- where
- Just l = lhsFromName 'phrase
- dependencies = [] <$ nont (phraseA `eitherG` phraseB `eitherG` phraseC `eitherG` dictation)
- -- TODO the RHS of special grammars are ignored (so the eithers don't matter), except for extracting dependencies for serialization
-
- pP context                     -- merges the context-free Parsec.many the context-sensitive manyUntil
-    = ([]    <$  (case context of Some q -> (try . lookAhead) q *> pure (error "pP"))) -- terminate.
-  <|> ((:)   <$> pAB             <*> pP context)  -- continue. e.g. can escape "say" with "lit"
-  <|> ((:[]) <$> pC context) -- terminate.
-  <|> ((:)   <$> (pDxAB context) <*> pP context)  -- continue
- pAB = pA <|> pB
- pDxAB context = Dictated_ <$> pD (case context of Some q -> Some (pAB <|> (q *> pure (error "pDxAB"))))
- -- pAB context = (pA context <||> pB context)
- -- pD'AB context = ((Right . Dictated) <$> pD) `manyUntil` (pAB <|> context)
- pA         = try $ runSensitiveParser (phraseA   ^. gramParser) (error "pA") -- context free
- pB         = try $ runSensitiveParser (phraseB   ^. gramParser) (error "pB") -- context free
- pC context = try $ runSensitiveParser (phraseC   ^. gramParser) context             -- context-sensitive
- pD context = try $ runSensitiveParser (dictation ^. gramParser) context            -- context-sensitive
- -- pB' = (Dictated . Dictation) <$> anyWord `manyUntil` pB
-
- gP = (DNSSequence $ fromList
-  [ (DNSOptional . DNSMultiple) (DNSAlternatives $ fromList [gA, gB, gD])
-  ,                              DNSAlternatives $ fromList [gC, gB, gD]
-  ])
- gA = (DNSNonTerminal . SomeDNSLHS) $ phraseA   ^. gramGrammar.dnsProductionLHS
- gB = (DNSNonTerminal . SomeDNSLHS) $ phraseB   ^. gramGrammar.dnsProductionLHS
- gC = (DNSNonTerminal . SomeDNSLHS) $ phraseC   ^. gramGrammar.dnsProductionLHS
- gD = (DNSNonTerminal . SomeDNSLHS) $ dictation ^. gramGrammar.dnsProductionLHS
+-- |
+--
+phrase_ :: R z [Phrase_]
+phrase_ = 'phrase <=>
+ (\xs x -> xs <> [x]) # ((phraseA -|- phraseB -|- phraseD)-*) & (phraseB -|- phraseC -|- phraseD)
 
 -- | a sub-phrase where a phrase to the right is certain.
 --
 -- this ordering prioritizes the escaping Escaped_/Quoted_ over the
 -- escaped, e.g. "quote greater equal unquote".
+phraseA :: R z Phrase_
 phraseA = 'phraseA <=> empty
  <|> Escaped_    # "lit" & keyword
  <|> Quoted_     # "quote" & dictation & "unquote"
  <|> Pasted_     # "paste"
  <|> Blank_      # "blank"
- <|> (Spelled_ . (:[])) # letter_
+ <|> (Spelled_) # letter_
  <|> (Spelled_ . (:[])) # character
  <|> Separated_  # separator
  <|> Cased_      # casing
  <|> Joined_     # joiner
  <|> Surrounded_ # brackets
 -- | a sub-phrase where a phrase to the right is possible.
+
+phraseB :: R z Phrase_
 phraseB = 'phraseB <=> empty
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
  -- <|> Spelled_  # "spell" & letters -- only, not characters
  <|> Spelled_  # "spell" & (character-+)
  <|> Capped_   # "caps" & (character-+)
  -- <$> alphabetRHS
+
 -- | a sub-phrase where a phrase to the right is impossible.
+phraseC :: R z Phrase_
 phraseC = 'phraseC <=> Dictated_ # "say" & dictation
--- TODO maybe consolidate phrases ABC into a phrase parser, with the same grammar, but which injects different constructors i.e. different views into the same type
+
+-- | injects dictation into phrase_
+phraseD :: R z Phrase_
+phraseD = 'phraseD <=> Dictated_ # dictation
 
 type Keyword = String -- TODO
-keyword :: G Keyword
-keyword = 'keyword <=>id#word_
+keyword :: R z Keyword
+keyword = 'keyword <=> id#word_
 
 newtype Separator = Separator String  deriving (Show,Eq,Ord)
 separator = 'separator <=> empty
@@ -588,6 +561,7 @@ separator = 'separator <=> empty
  <|> Separator "," # "comma"
 
 casing = enumGrammar
+
 joiner = 'joiner
  <=> (\c -> Joiner [c]) # "join" & character
  <|> Joiner "_" # "snake"
@@ -596,6 +570,8 @@ joiner = 'joiner
  <|> Joiner ""  # "squeeze"
  <|> CamelJoiner # "camel"
  <|> ClassJoiner # "class"
+
+brackets :: R z Brackets
 brackets = 'brackets
  <=> bracket          # "round" & character
  <|> Brackets "(" ")" # "par"
@@ -607,7 +583,6 @@ brackets = 'brackets
  <|> bracket '|'      # "norm"
  -- <|> Brackets "**" "**" # "bold"
 
-character :: G Char
 character = 'character <=> empty
 
  <|> '`' # "grave"
@@ -697,5 +672,25 @@ character = 'character <=> empty
 @
 
 -}
-alphabetRHS = (asum . List.map (\c -> c <$ term [toUpper c]) $ ['a'..'z'])
+-- alphabetRHS :: Functor (p i) => RHS p r l String Char
+alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z']
 -- TODO What will we get back from Dragon anyway?
+
+
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+dictation = dragonGrammar 'dictation
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
+ (EarleyProduction $ Dictation <$> many anyToken)
+
+word_ = dragonGrammar 'word_
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
+ (EarleyProduction $ anyToken)
+
+letter_ = dragonGrammar 'letter_
+ (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
+ (EarleyProduction $ anyLetter)
+
+-- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
+-- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
+--  Letters # (letter-+)
+ -- TODO greedy (many) versus non-greedy (manyUntil)

@@ -1,7 +1,9 @@
-{-# LANGUAGE DataKinds, TupleSections, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, RankNTypes, TupleSections, TypeFamilies #-}
+{-# LANGUAGE TypeOperators                                      #-}
 module Commands.Servers.Servant.API where
 import Commands.Backends.OSX          hiding (Application, Command)
 import Commands.Core
+import Commands.Mixins.DNS13OSX9
 import Commands.Servers.Servant.Types
 
 import Control.Lens
@@ -11,11 +13,10 @@ import Network.Wai.Handler.Warp       (Port, run)
 import Servant
 
 import Control.Monad.IO.Class         (liftIO)
--- import qualified Data.Map                       as Map
 
 
--- makeInterpreter :: -> Interpreter
--- makeInterpreter
+-- makeServantInterpreter :: -> Interpreter
+-- makeServantInterpreter
 
 
 {- | this handler:
@@ -26,45 +27,28 @@ import Control.Monad.IO.Class         (liftIO)
 
 
 -}
-handleInterpret :: (Show v) => CmdModel v -> String -> Response ()
-handleInterpret (CmdModel command def context) text = do
- liftIO $ putStrLn text
- let v = parse command text
+handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
+handleInterpret cm s = do
+ liftIO $ putStrLn s
+ let v = either (const $ (_modDefault cm) s) id $ ((_modCommand cm)^.comRule) `parses` s
  liftIO $ print v
- let as = (command `compiles` v) context
+ let as = ((_modCommand cm) `compiles` v) (_modContext cm)
  liftIO $ putStrLn $ showActions as
  liftIO $ runActions as
  return ()
- where
- parse c s = either (const $ def s) id $ (c ^. comGrammar) `parses` s
 
--- handleInterpret :: CmdModel a -> String -> Response ()
--- handleInterpret (CmdModel _c _ax) s = do
---  liftIO $ putStrLn s
---  let p = c ^. comGrammar
---  let failure _e = do
---   liftIO $ print s
---   left (400, ())
---  let success x = do
---   liftIO $ print $ showActions ((c `compiles` x) context)
---   right ()
---  let result = p `parses` s
---  mapEitherT failure success result
-
--- attemptInterpret c context s = do
---  let p = c ^. comGrammar
---  x <- mapEitherT (\e -> (400, show e)) id $ p `parses` s
---  let a = (c `compiles` x) cx
---  liftIO $ print $ showActions a
---  return $ (200, ())
-
- -- where
- -- onFailure = (\e -> (400, show e))
- -- onSuccess = (\x -> (200, showActions $ (c `compiles` x) context))
- -- result = p `parses` s
- -- mapEitherT onFailure onSuccess result
- -- hoistEither
-
+-- handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
+-- handleInterpret (CmdModel command def context) text = do
+--
+-- can't bind the rank2 field to command:
+--
+-- Couldn't match type ‘z0’ with ‘z’
+--       because type variable ‘z’ would escape its scope
+--     This (rigid, skolem) type variable is bound by
+--       a type expected by the context: R z a
+--       at sources/Commands/Servers/Servant/API.hs:33:41-72
+--     Expected type: C z ApplicationDesugarer Actions_ a
+--       Actual type: C z0 ApplicationDesugarer Actions_ a
 
 type Response = EitherT (Int, String) IO
 
@@ -84,15 +68,23 @@ type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post ()
 natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
-natlinkHandlers :: (Show a) => CmdModel a -> Server NatlinkAPI
+natlinkHandlers :: (Show a) => (forall z. CmdModel z a) -> Server NatlinkAPI
 natlinkHandlers = postRecognition
 
-postRecognition :: (Show a) => CmdModel a -> DGNRecognition -> Response ()
+postRecognition :: (Show a) => (forall z. CmdModel z a) -> DGNRecognition -> Response ()
 postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
-natlinkApplication :: (Show a) => CmdModel a -> Application
-natlinkApplication = serve natlinkAPI . natlinkHandlers
+natlinkApplication :: (Show a) => (forall z. CmdModel z a) -> Application
+natlinkApplication cm = serve natlinkAPI $ natlinkHandlers cm
 
-serveNatlink :: (Show a) => Port -> CmdModel a -> IO ()
-serveNatlink port = run port . natlinkApplication
-
+serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
+serveNatlink port cm = run port $ natlinkApplication cm
+-- I think is relevant that ($) is specially typed
+-- point-free doesn't work:
+--
+-- serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
+-- serveNatlink port = run port . natlinkApplication
+    -- Cannot instantiate unification variable ‘a0’
+    -- with a type involving foralls:
+    --   forall (z :: * -> * -> * -> *). CmdModel z a
+    --   Perhaps you want ImpredicativeTypes

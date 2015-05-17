@@ -5,12 +5,12 @@ module Commands.Symbol.Types where
 
 import           Control.Lens
 import           Data.Functor.Coyoneda
-import           Data.List.NonEmpty
+import           Data.List.NonEmpty(NonEmpty (..))
 import qualified Data.List.NonEmpty    as NonEmpty
-import           Data.Profunctor
 
 import           Control.Applicative
 import           Data.Monoid
+import           Data.Foldable                 (asum)
 
 
 {- | a command pairs a rule with
@@ -67,6 +67,14 @@ data Rule p r l i a = Rule
  , _ruleParser  :: p i a        -- ^ a parser that consumes @i@'s and produces an @a@. should be a (convariant) Functor.
  }
  deriving (Functor)
+
+{- | use:
+
+* as both the reification ('_ruleReified') and the left-hand side ('_ruleLHS') don't depend on the existentially-quantified parameter, they lose no info, and can be used "as is".
+* existentially-quantified parsers ('_ruleParser') can be used
+when the result is ignored (e.g. with '*>').
+-}
+data SomeRule p r l i = forall x. SomeRule (Rule p r l i x)
 
 -- | 'Rule' is "invariant" in @i@.
 --
@@ -141,7 +149,7 @@ runRHS
  => (forall x. Symbol (Rule p r l) i x -> f x)
  -> RHS p r l i a
  -> f a
-runRHS f = runAlter (\(Coyoneda g x) -> fmap g (f x))
+runRHS h = runAlter (\(Coyoneda g x) -> fmap g (h x))
 
 -- | see 'foldAlter'
 foldRHS
@@ -155,6 +163,10 @@ foldRHS
  -> RHS p r l i a
  -> b
 foldRHS f = foldAlter (\(Coyoneda _ x) -> f x)
+
+-- | see 'foldAlter_Monoid'
+foldRHS_Monoid :: Monoid m => (forall x. Symbol (Rule p r l) i x -> m) -> RHS p r l i a -> m
+foldRHS_Monoid f = foldAlter_Monoid (\(Coyoneda _ x) -> f x)
 
 {- | a Functor, as @'Coyoneda' f@ is the "free functor" of any (!) type constructor @f@.
 
@@ -224,9 +236,13 @@ data Alter f a where
  Many        :: !([x]        -> a) -> Alter f x -> Alter f a
  Some        :: !(NonEmpty x -> a) -> Alter f x -> Alter f a
 
+pattern Empty = Alter []
+
 deriving instance (Functor (Alter f))
 
-pattern Empty = Alter []
+instance (Functor f) => Monoid (Alter f a) where
+ mempty = Empty
+ mappend = (<|>)
 
 {- |
 
@@ -276,8 +292,9 @@ instance Functor f => Applicative (Alter f) where
  -- Pure f <*> Pure x          = fmap f (Pure x) = Pure (f x)     -- Homomorphism
  txa     <*> Pure x            = fmap ($ x) txa                   -- Interchange
 
- _       <*> Empty             = Empty                            -- Annihilation
- txa     <*> Alter txs         = txa :<*> Alter txs               -- NOT Distributivity
+ Empty   <*> _                 = Empty                            -- left-Annihilation (?)
+ _       <*> Empty             = Empty                            -- right-Annihilation
+ txa     <*> Alter txs         = txa :<*> Alter txs               -- NO left-Distributivity
 
  txa     <*> (Opt  ysa ty)     = txa :<*> Opt  ysa ty -- TODO correct?
  txa     <*> (Many ysa ty)     = txa :<*> Many ysa ty
@@ -298,10 +315,6 @@ instance Functor f => Applicative (Alter f) where
 -- f     <*> (g' :<*>    x')  = ((.) <$> f <*> g') :<*>    x'
 --
 -- or must I?
-
-instance (Functor f) => Monoid (Alter f a) where
- mempty = Empty
- mappend = (<|>)
 
 {- |
 
@@ -437,9 +450,9 @@ instance Functor f => Alternative (Alter f) where
 
 {-# RULES "NonEmpty.fromList some/Alter"  forall x.  fmap NonEmpty.fromList (fmap NonEmpty.toList (Some id x))  =  Some id x
   #-}
-
  -- TODO safe with bottom? at least, when x is bottom, (Some id x) is bottom too, being a strict constructor.
- -- (the pragmas are for fun)
+
+ -- (the pragmas are just for fun)
 
 -- | a reified 'optional' for the Free 'Alter'native.
 optionalA :: Alter f a -> Alter f (Maybe a)
@@ -452,7 +465,6 @@ optionA x = Opt (maybe x id)
 
 toAlterList :: Alter f a -> [Alter f a]
 toAlterList (Alter xs) = xs
-toAlterList Empty      = []
 toAlterList x          = [x]
 {-# INLINE toAlterList #-}
 
@@ -461,7 +473,7 @@ liftAlter :: f a -> Alter f a
 liftAlter f = Pure id `Apply` f
 {-# INLINE liftAlter #-}
 
-{- |
+{- | gets rid of the @Alter@, when @f@ is already @Alternative@.
 
 left-inverse to 'liftAlter':
 
@@ -481,6 +493,8 @@ fellAlter = runAlter id
 {- | fold an Alter down to a value, by acting on the functor.
 
 like 'runAlter' where @(g ~ Const b)@ but not, as 'Const' is not 'Alternative'.
+
+warning: observes differences that runAlter doesn't; like @some x@ verses @(:) \<$> x \<*> many x@.
 
 -}
 foldAlter
@@ -503,20 +517,13 @@ foldAlter u unit mul add opt_ many_ some_ = \case
  Many _ f  -> many_ (foldAlter u unit mul add opt_ many_ some_ f)
  Some _ f  -> some_ (foldAlter u unit mul add opt_ many_ some_ f)
 
--- -- | '<>' interprets '<*>', and 'mempty' interprets 'pure' (like <http://hackage.haskell.org/package/base-4.8.0.0/docs/src/Control-Applicative.html#line-84 @instance Monoid m =\> Applicative ('Const' m)@>)
--- foldAlter_monoid
---  :: Monoid m
---  => (forall x. f x -> m)
---  -> ([m] -> m)
---  -> Alter f a
---  -> m
--- foldAlter_monoid f = foldAlter f mempty mappend
+-- | 'mappend' interprets '<*>', and 'mempty' interprets @'pure' _@ (like <http://hackage.haskell.org/package/base-4.8.0.0/docs/src/Control-Applicative.html#line-84 @instance Monoid m =\> Applicative ('Const' m)@>). 'mconcat' also interprets '<|>'.
+foldAlter_Monoid :: Monoid m => (forall x. f x -> m) -> Alter f a -> m
+foldAlter_Monoid f = foldAlter f mempty mappend mconcat id id id
 
 {- | interpret an Alter as some Alternative, by acting on the functor.
 
-'Alt' satisfies associativity modulo 'runAlt' (I think).
 
-assumes @'NonEmpty.fromList' <$> ('some' x :: Alternative g => g [a])@ is safe for the Alternative returned. it holds for the default @some@:
 
 @
 some v = some_v
@@ -539,7 +546,9 @@ runAlter u = \case
  f `Apply` x -> runAlter u f <*> u x
  f :<*>    g -> runAlter u f <*> runAlter u g
 
- Alter fs  -> foldr (<|>) empty (runAlter u <$> fs)
+ -- Alter [] -> empty
+ -- Alter [f,g]  -> runAlter u f <|> runAlter u g
+ Alter fs  -> asum (runAlter u `map` fs)
  Opt  f x  -> f                       <$> optional (runAlter u x)
  Many f x  -> f                       <$> many     (runAlter u x)
  Some f x  -> (f . NonEmpty.fromList) <$> some     (runAlter u x)

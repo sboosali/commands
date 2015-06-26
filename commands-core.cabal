@@ -108,6 +108,8 @@ library
   Commands.Plugins.Example
   Commands.Plugins.Example.Phrase
 
+  Data.RefCache
+
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
  includes:         cbits/objc_actor.h
@@ -126,6 +128,7 @@ library
 -- transformers is a boot package, and has been bumped. So I both can import Data.Functor.Sum and run doctest.
 -- https://downloads.haskell.org/~ghc/7.10.1/docs/html/users_guide/release-7-10-1.html
   , transformers              ==0.4.2.*
+  , ghc-prim  ==0.4.0.0
 
   , vinyl  ==0.5.*
   , exceptions                ==0.6.*

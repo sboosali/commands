@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables         #-}
 {-# LANGUAGE TemplateHaskell, TupleSections                           #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
+{-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example where
 import           Commands.Backends.OSX           hiding (Command)
 import qualified Commands.Backends.OSX           as OSX
@@ -15,6 +16,7 @@ import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
 import           Commands.Symbol.Types
+import qualified Data.RefCache                   as RefCache
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
@@ -24,6 +26,7 @@ import qualified Data.Aeson                      as J
 import           Data.Bifunctor                  (second)
 import           Data.Bitraversable
 import qualified Data.ByteString.Lazy.Char8      as B
+import           Data.IORef
 import           Data.List.NonEmpty              (NonEmpty (..), fromList)
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Text.Lazy                  as T
@@ -48,9 +51,9 @@ import           Data.Foldable                   (Foldable (..), asum,
 import qualified Data.List                       as List
 import qualified Data.Map                        as Map
 import           Data.Monoid                     ((<>))
+import           Data.Unique
 import           Prelude                         hiding (foldl, foldr1)
 import           System.Timeout                  (timeout)
--- import qualified Data.Map as Map (Map)
 
 
 data Root
@@ -714,7 +717,7 @@ printSerializedGrammar SerializedGrammar{..} = do
 
 
 
-main = do
+realMain = do
 
  putStrLn ""
  let rootG = (root^.comRule)
@@ -818,3 +821,18 @@ main = do
  attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
  -- Earley is too slow without sharing, even with phraseW
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+main = do
+ realMain

@@ -109,6 +109,7 @@ library
   Commands.Plugins.Example.Phrase
 
   Data.RefCache
+  Data.HRefCache
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
@@ -142,6 +143,7 @@ library
   , Earley                    ==0.7.*
   , parsec                    ==3.1.*
   , ListLike                  ==4.2.*
+  , data-reify ==0.6.*
 
   , text                      ==1.2.*
   , wl-pprint-text            ==1.1.*
@@ -219,8 +221,9 @@ executable example
   "-with-rtsopts=-N"
 
  build-depends:
-  commands-core,
   base ==4.8.*
+  , commands-core
+  , data-reify ==0.6.*
 
 
 

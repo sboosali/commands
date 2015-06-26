@@ -5,7 +5,6 @@ import           Commands.Backends.OSX.Types     hiding (Command)
 import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9.Types
-import           Commands.Parsers.Earley
 
 import           Control.Lens
 import           Data.Bifunctor                  (second)
@@ -91,7 +90,7 @@ serialized rule = do
  return$ serializeGrammar vG
  -- TODO let grammar store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.
 
--- | a production and its transitive dependencies. removes duplicates. doesn't check for cycles.
+-- | a production and its transitive dependencies. removes duplicates. doesn't detect cycles.
 getDescendentProductions :: (Eq l) => Rule p DNSReifying l i x -> NonEmpty (DNSReifyingProduction l i)
 getDescendentProductions rule = NonEmpty.nubBy equalDNSProduction (export :| nonExports)
  where

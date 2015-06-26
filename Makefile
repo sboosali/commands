@@ -24,6 +24,9 @@ run:
 serve:
 	cabal run serve
 
+bench:
+	cabal configure --enable-benchmarks && cabal bench
+
 test:
 # cabal install ../commands-core --force-reinstall --enable-tests
 # cabal exec -- ghc-pkg unregister commands-core-0.0.0
@@ -56,6 +59,4 @@ clean:
 fresh: clean
 	rm -fr dist
 
-.PHONY: default clean fresh all build test document style check
-
-# # # # # # # # # # # # # # # # # # 
+.PHONY: default clean fresh all build test document style check bench

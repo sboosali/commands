@@ -86,7 +86,7 @@ root = 'root <=> empty
 
   ReplaceWith this that -> \case
    "emacs" -> runEmacsWithP "replace-regexp" [this, that]
-   "intellij" -> do
+   "Intellij" -> do
     press M r
     (insert =<< munge this) >> press tab
     slot =<< munge that
@@ -174,7 +174,11 @@ execute_extended_command = press C w -- non-standard: make this configurable? Im
 
 eval_expression = press M ':'
 
--- | as it opens a minibuffer, it needs @(setq enable-recursive-minibuffers t)@ to work when already in a minibuffer.
+{- | generates actions to evaluate a stringly-typed s-expression in Emacs, just like @M-:@.
+
+since it opens a minibuffer in Emacs, it needs @(setq enable-recursive-minibuffers t)@ to work when the current buffer is already a minibuffer.
+
+-}
 evalEmacs :: ElispSexp -> Actions ()
 evalEmacs sexp = do
  eval_expression
@@ -189,21 +193,23 @@ type ElispSexp = String
 -- prettySexp :: ElispSexp -> String
 -- prettySexp = undefined
 
-runEmacs :: String -> Actions ()
-runEmacs f = runEmacsWith f []
+{- | generates actions to execute an interactive command in Emacs, just like @M-x@.
 
-{- | pseudo-rpc:
+a pseudo-rpc for Emacs:
 
 * "rpc" because you can call emacs commands (I.e. interactive functions) with arguments
 
 * "pseudo" because the return type is unit: the communication is via one-way keyboard-shortcuts, rather than a two-way channel like a network connection.
 
-no "type"-checking or ararity-checking.
+no "type"-checking or arity-checking.
 
-as it opens a minibuffer, it needs @(setq enable-recursive-minibuffers t)@ to work when already in a minibuffer.
+since it opens a minibuffer in Emacs, it needs @(setq enable-recursive-minibuffers t)@ to work when the current buffer is already a minibuffer.
 
 -}
-runEmacsWith :: String -> [String] -> Actions ()
+runEmacsWith
+ :: String                      --  ^ the name of the interactive command
+ -> [String]                    --  ^ the arguments that would be manually entered, one at a time, in a minibuffer
+ -> Actions ()
 runEmacsWith f xs = do
  execute_extended_command -- non-standard: make this configurable? ImplicitParams?
  slot f
@@ -215,15 +221,27 @@ runEmacsWith f xs = do
 -- print a list of all interactive commands, tokenize by splitting on "-".
 -- http://stackoverflow.com/questions/29953266/emacs-list-the-names-of-every-interactive-command
 
+-- | like 'runEmacsWith', but takes no arguments.
+runEmacs :: String -> Actions ()
+runEmacs f = runEmacsWith f []
+
+-- | like 'runEmacsWith', but takes string-returning-actions as arguments.
+--
+-- e.g. @runEmacsWithA "regexp-search" ['getClipboard']@
 runEmacsWithA :: String -> [Actions String] -> Actions ()
 runEmacsWithA f as = do
  xs <- traverse id as
  runEmacsWith f xs
 
+-- | like 'runEmacsWith', but takes phrases as arguments $
+--
+-- e.g. @runEmacsWithP "regexp-search" ['PAtom' 'Pasted']@
 runEmacsWithP :: String -> [Phrase] -> Actions ()
 runEmacsWithP f ps = do
  xs <- traverse munge ps
  runEmacsWith f xs
+
+-- the indirection (i.e. @data 'Move'@, not just a @String@) makes it easy to reinterpret in many ways (e.g. moveEmacs, moveIntelliJ, moveChromd , etc).
 
 moveEmacs :: Move -> Actions ()
 moveEmacs = \case
@@ -374,7 +392,6 @@ editEmacs = \case
  _ -> nothing
 
 
-
 data Move
  = Move Direction Region
  | MoveTo Endpoint Region
@@ -382,9 +399,20 @@ data Move
 move = 'move
  <=> Move   # direction & region
  <|> MoveTo # endpoint & region
--- boilerplate.
+-- TODO scrap this boilerplate.
+--
 -- can't scrap it with GHC.generics because the grammars are values not instance methods.
+-- but maybe we can:
+ -- with singleton stuff (?)
+ -- with reflection, by building a new instance at runtime?
+ -- given all children derive Generic and/or Data, by building a new generic grammar for each
+ -- given all children derive Grammatical. and DeriveAnyClass makes this easier! deriving (Generic, Grammatical)
+--
 -- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
+-- move = defaultRule 'move
+-- defaultRule "move"
+-- spliceRule ''Move
+--
 
 -- | Slice and Direction both have too many values.
 data Endpoint = Beginning | Ending deriving (Bounded,Enum,Eq,Ord,Read,Show)
@@ -395,6 +423,8 @@ endpoint = 'endpoint
 -- | orthogonal directions in three-dimensional space.
 data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
 direction = tidyGrammar
+ -- <=> Up_ # "up"
+ -- <|> ...
 -- direction = transformedGrammar (filter (/= '_'))
 -- direction = qualifiedGrammarWith "_"
 
@@ -413,7 +443,7 @@ slice = 'slice
 
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
-edit = 'edit <=> empty
+
  -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @# "kill"@)
  -- prefixes (e.g. "kill") must come before their superstrings (e.g. "kill for line").
  -- otherwise, the prefix is committed prematurely, and parsec won't backtrack.
@@ -423,10 +453,12 @@ edit = 'edit <=> empty
  -- "cop" -> Edit Copy Whole That
  -- "kill" -> Edit Cut Forwards Line, not Edit Cut Whole That
  -- "kill for line" -> Edit Cut Forwards Line, not {unexpected 'f', expecting end of input}
- <|> Edit Cut Forwards Line # "kill"
+
+edit = 'edit
+ <=> Edit Cut Forwards Line # "kill" -- TODO this is why I abandoned parsec: it didn't backtrack sufficiently
 
  -- generic
- <|> Edit # action              & (slice -?- Whole) & (region -?- That) -- e.g. "cop" -> "cop that"
+ <|> Edit # action              & (slice -?- Whole) & (region -?- That) -- e.g. "cop" -> "cop whole that"
  <|> Edit # (action -?- Select) & (slice -?- Whole) & region            -- e.g. "word" -> "select whole word"
 
 -- TODO ensure no alternative is empty, necessary? yes it is
@@ -585,41 +617,71 @@ sources/Commands/Plugins/Example.hs:531:18:
 
 
 
--- -- it seems to be synchronous, even with threaded I guess?
--- attemptAsynchronously :: Int -> IO () -> IO ()
--- attemptAsynchronously seconds action = do
---  (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
---    Left error     -> print error
---    Right Nothing  -> putStrLn "..."
---    Right (Just _) -> return ()
---   )
+-- it seems to be synchronous, even with threaded I guess?
+attemptAsynchronously :: Int -> IO () -> IO ()
+attemptAsynchronously seconds action = do
+ (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
+   Left error     -> print error
+   Right Nothing  -> putStrLn "..."
+   Right (Just _) -> return ()
+  )
 
--- attempt = attemptAsynchronously 1
+attempt = attemptAsynchronously 1
 
--- -- attemptCompile command text = do
--- --  a <- attemptParse (view comGrammar root) text
--- --  return $ (view comCompiler root) a
-
-attemptMunge_ :: String -> IO ()
-attemptMunge_ s = do
+attemptMunge :: String -> IO ()
+attemptMunge s = do
+ putStrLn ""
+ putStrLn ""
  putStrLn ""
  print s
- case phrase_ `parses` s of
-  Left e  -> print e
-  Right raw_p -> do
+ attempt $ runRuleParser phrase_ (words s) >>= \case
+  (raw_p :| _) -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
    let munged_p   = mungePhrase splatted_p defSpacing
-   print $ raw_p
-   print $ pasted_p
-   print $ splatted_p
-   print $ munged_p
+   ol [ show raw_p
+      , show pasted_p
+      , show splatted_p
+      , show munged_p
+      ]
+
+attemptMungeAll :: String -> IO ()
+attemptMungeAll s = do
+ putStrLn ""
+ putStrLn ""
+ putStrLn ""
+ print s
+ attempt $ runRuleParser phrase_ (words s) >>= \case
+  (raw_p :| raw_ps) -> do
+   let pasted_p   = pPhrase raw_p
+   let splatted_p = splatPasted pasted_p ("clipboard contents")
+   let munged_p   = mungePhrase splatted_p defSpacing
+   ol [ show raw_p
+      , List.intercalate "\n , " $ map show $ raw_ps
+      , show pasted_p
+      , show splatted_p
+      , show munged_p
+      ]
+
+-- pseudo HTML ordered list
+ol xs = ifor_ xs $ \i x -> do
+ putStrLn ""
+ putStrLn $ fold [show i, ". ", x]
 
 attemptParse :: (Show a) => (forall  z. R z a) -> String -> IO ()
 attemptParse rule s = do
  putStrLn ""
- x <- runRuleParser rule (words s)
- print x
+ attempt $ runRuleParser rule (words s) >>= \case
+  x :| _ -> print x
+
+-- TODO remove the [{emptyList}]
+attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
+
+printSerializedGrammar SerializedGrammar{..} = do
+ replicateM_ 3 $ putStrLn ""
+ T.putStrLn $ display serializedRules
+ putStrLn ""
+ T.putStrLn $ display serializedLists
 
 -- failingParse grammar s = do
 --  putStrLn ""
@@ -631,16 +693,6 @@ attemptParse rule s = do
 --    putStrLn "should fail, but succeeded:"
 --    putStrLn $ "input  = " <> show s
 --    putStrLn $ "output = " <> show a
-
--- attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
-
--- attemptNameRHS = attempt . print . showLHS
-
--- printSerializedGrammar SerializedGrammar{..} = do
---  replicateM_ 3 $ putStrLn ""
---  T.putStrLn $ display serializedRules
---  putStrLn ""
---  T.putStrLn $ display serializedLists
 
 -- attemptCompile c x s = case r `parses` s of
 --   Left  e -> print e
@@ -665,12 +717,12 @@ attemptParse rule s = do
 main = do
 
  putStrLn ""
---  let rootG = (root^.comGrammar)
---  attemptSerialize rootG
---  -- attemptSerialize phrase
+ let rootG = (root^.comRule)
+ attemptSerialize rootG
+ -- attemptSerialize phrase
 
- putStrLn ""
- attemptParse phraseC "say 638 Pine St., Redwood City 94063"
+ -- putStrLn ""
+ -- attemptParse phraseC "say 638 Pine St., Redwood City 94063"
 
 --  putStrLn ""
 --  -- Error (line 1, column 1): unexpected 's'
@@ -692,30 +744,6 @@ main = do
 --  attemptParse click "click"
 --  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
 --  print $ getWords (rootG ^. gramGrammar)
-
-
---  , ""
- putStrLn ""
- traverse_ attemptMunge_
-  [ "coal server space tick local"  -- :server 'local --
--- "curly spaced coal server tick local coal key value"  -- {:server 'local :key value}
- -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
-  , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
-  -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
-  , "class unit test spell M T A"  -- UnitTestMTA
-  , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
-  , "class spell M T A bid optimization"  -- MTABidOptimization
-  , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
-  , "class M T A bid optimization"  -- MTABidOptimization
-  , "class spell M TA bid optimization"  -- MTABidOptimization
-  , "lit say camel say some words"  -- say someWords
-  , "upper paste"
-  , "camel paste" -- "clipboard contents"
-  , "class paste" -- "clipboard contents"
-  , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
-  , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
-  , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
-  ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
 
 
 --  putStrLn ""
@@ -749,6 +777,44 @@ main = do
 --  attemptParse edit "kill for line" --
 --  attemptParse edit "kill"
 
- attemptParse edit "kill"          -- Edit Cut    Forwards Line
- attemptParse edit "kill for line" -- Edit Cut    Forwards Line
- attemptParse edit "del"           -- Edit Delete Whole    That
+
+
+
+
+
+--  putStrLn ""
+--  traverse_ attemptMunge_
+--   [ "coal server space tick local"  -- :server 'local --
+-- -- "curly eah I was I had fun a I didn't care about the delays them happy to talk I felt like you wanted toto your thingspaced coal server tick local coal key value"  -- {:server 'local :key value}
+--  -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
+--   , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+--   -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
+--   , "class unit test spell M T A"  -- UnitTestMTA
+--   , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
+--   , "class spell M T A bid optimization"  -- MTABidOptimization
+--   , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
+--   , "class M T A bid optimization"  -- MTABidOptimization
+--   , "class spell M TA bid optimization"  -- MTABidOptimization
+--   , "lit say camel say some words"  -- say someWords
+--   , "upper paste"
+--   , "camel paste" -- "clipboard contents"
+--   , "class paste" -- "clipboard contents"
+--   , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
+--   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
+--   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
+--   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
+
+
+
+ -- attemptParse edit "kill"          -- Edit Cut    Forwards Line
+ -- attemptParse edit "kill for line" -- Edit Cut    Forwards Line
+ -- attemptParse edit "del"           -- Edit Delete Whole    That
+
+ -- putStrLn ""
+ -- attemptMungeAll "coal server space tick local"
+
+ attemptMunge "par round grave camel lit with async break break action"
+
+ attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
+ -- Earley is too slow without sharing, even with phraseW
+

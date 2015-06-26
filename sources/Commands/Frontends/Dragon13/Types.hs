@@ -420,7 +420,7 @@ each production is paired with its (transitive) dependencies. you can read:
 DNSReifying ('Node' p ps)
 @
 
-as: "the production @p@ depends on the productions/dependencies in @ps@".
+as: "the production @p@ depends on the productions in @ps@".
 
 unlike a 'DNSGrammar':
 
@@ -428,11 +428,10 @@ unlike a 'DNSGrammar':
 not indirect references keyed upon 'SomeDNSLHS'
 * the 'rootLabel' holds exactly one 'DNSProduction'
 
-
 -}
 newtype DNSReifying l i = DNSReifying { _dnsReifyingDescendents :: (Tree (DNSReifyingProduction l i)) }
  deriving (Show,Eq)
--- it's not really reification then, if your references are still direct
+-- TODO it's not really reification then, if your references are still direct
 
 defaultDNSReifying :: l -> DNSReifyingRHS l i -> DNSReifying l i
 defaultDNSReifying l r = DNSReifying $ Node (defaultDNSProduction l r) []

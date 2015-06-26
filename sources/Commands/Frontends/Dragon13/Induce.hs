@@ -8,6 +8,22 @@ import Data.List.NonEmpty                (NonEmpty (..), nonEmpty)
 import Data.Tree
 
 
+
+-- deriveDNSGrammar :: Grammar p DNSReifying l i a -> DNSGrammar DNSInfo l i
+-- deriveDNSGrammar
+--  = fmap (DNSGrammar (getDescendentProductions rule) [] dnsHeader
+--  . maybe to list
+--  . map getDescendentProductions
+--  . map (\(Rule l r _) -> induceDNSReified l r)
+--  . flattenGrammar
+
+-- -- | a production and its transitive dependencies. removes duplicates. doesn't detect cycles.
+-- getDescendentProductions :: (Eq l) => Rule p DNSReifying l i x -> NonEmpty (DNSReifyingProduction l i)
+-- getDescendentProductions rule = NonEmpty.nubBy equalDNSProduction (export :| nonExports)
+--  where
+--  export = (rule^.ruleDNSProduction)
+--  nonExports = flatten =<< (rule^.ruleDNSDescendents)
+
 {- |
 
 the core glue between `commands-core` and `commands-frontends-dragon13`.

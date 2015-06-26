@@ -6,7 +6,6 @@ module Commands.Plugins.Example.Phrase where
 import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
-import           Commands.Parsers.Earley
 
 import           Control.Lens                hiding (from, ( # ), (&))
 import           Data.List.NonEmpty          (NonEmpty (..))
@@ -514,7 +513,12 @@ phrase = pPhrase <$> phrase_
 --
 phrase_ :: R z [Phrase_]
 phrase_ = 'phrase <=>
- (\xs x -> xs <> [x]) # ((phraseA -|- phraseB -|- phraseD)-*) & (phraseB -|- phraseC -|- phraseD)
+ (\ps p -> ps <> [p]) # ((phraseA -|- phraseB -|- phraseW)-*) & (phraseB -|- phraseC -|- phraseD)
+
+ -- = Rule
+ -- (unsafeLHSFromName 'phrase)
+ -- (induceDNSReified (((phraseA -|- phraseB -|- phraseD)-*) & (phraseB -|- phraseC -|- phraseD)))
+ -- (induceEarleyProduction)
 
 -- | a sub-phrase where a phrase to the right is certain.
 --
@@ -532,8 +536,8 @@ phraseA = 'phraseA <=> empty
  <|> Cased_      # casing
  <|> Joined_     # joiner
  <|> Surrounded_ # brackets
--- | a sub-phrase where a phrase to the right is possible.
 
+-- | a sub-phrase where a phrase to the right is possible.
 phraseB :: R z Phrase_
 phraseB = 'phraseB <=> empty
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
@@ -545,6 +549,10 @@ phraseB = 'phraseB <=> empty
 -- | a sub-phrase where a phrase to the right is impossible.
 phraseC :: R z Phrase_
 phraseC = 'phraseC <=> Dictated_ # "say" & dictation
+
+-- | injects dictation into phrase_
+phraseW :: R z Phrase_
+phraseW = 'phraseD <=> (Dictated_ . Dictation . (:[])) # word_
 
 -- | injects dictation into phrase_
 phraseD :: R z Phrase_
@@ -680,7 +688,7 @@ alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z']
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = dragonGrammar 'dictation
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (EarleyProduction $ Dictation <$> many anyToken)
+ (EarleyProduction $ Dictation <$> some anyToken)
 
 word_ = dragonGrammar 'word_
  (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))

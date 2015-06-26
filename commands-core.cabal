@@ -61,12 +61,6 @@ library
 
   Commands.Core
 
-  Commands.Etc
-  Commands.Etc.Generics
-  Commands.Instances
-  Commands.LHS 
-  Commands.Munging
-
   Commands.Symbol
   Commands.Symbol.Types
 --  Commands.Symbol.Proofs
@@ -105,10 +99,14 @@ library
   Commands.Sugar
   Commands.Sugar.Press
 
+  Commands.Etc
+  Commands.Etc.Generics
+  Commands.Instances
+  Commands.LHS 
+  Commands.Munging
+
   Commands.Plugins.Example
   Commands.Plugins.Example.Phrase
-
-  Control.Alternative.Free.Associated
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
@@ -167,13 +165,6 @@ library
   , parallel                  ==3.2.*
   , hashable                  ==1.2.*
 
-
---               , aeson-pretty  ==0.7.*,
--- use wl-pprint-text directly
---               , transformers  ==0.3.*
--- do not use: different transformers versions breaks doctest
-
- -- base language which the package is written in
  default-language: Haskell2010
 
  ghc-options:
@@ -245,43 +236,6 @@ benchmark command
   lens,
   deepseq,
   criterion,
+  semigroups                ==0.16.*,
 
   base
-
-
-
--- sources/Commands/Parsec.hs:34:49:
---     Couldn't match type ‘Identity’
---                   with ‘transformers-0.3.0.0:Data.Functor.Identity.Identity’
---     NB: ‘Identity’
---           is defined in ‘Data.Functor.Identity’
---               in package ‘transformers-0.4.2.0’
---         ‘transformers-0.3.0.0:Data.Functor.Identity.Identity’
---           is defined in ‘Data.Functor.Identity’
---               in package ‘transformers-0.3.0.0’
---     Expected type: Parsec.Parsec String () a
---       Actual type: Parsec a
---     In the first argument of ‘Parsec.parse’, namely ‘p’
---     In the second argument of ‘($)’, namely ‘Parsec.parse p s s’
-
-
--- http://haskell.org/cabal/users-guide/
-
--- $ cabal sandbox init
--- $ time cabal install --only-dependencies --enable-tests
--- $ cabal build
-
--- $ cabal repl
--- # loads modules in `exposed-modules` under `library` (into ghci)
--- Commands>
-
--- $ cabal install --enable-tests
--- $ cabal configure --enable-tests
--- $ cabal build && cabal test
--- # runs tests in the `main` function in the file in `main-is` under `test-suite`
-
--- $ cabal haddock && open dist/doc/html/commands-core/index.html
--- # .cabal-sandbox/share/doc/$COMPILER/$PACKAGE-VERSION/html/$MODULE
-
--- # find dist/build/
--- # rm -fr dist/

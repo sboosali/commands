@@ -1,14 +1,14 @@
-{-# LANGUAGE DeriveGeneric, DeriveDataTypeable, RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, RankNTypes #-}
 module Commands.LHS where
 import Commands.Etc
 
 import Data.Hashable
 
-import GHC.Generics                        (Generic)
-import           Data.Typeable                       (Typeable)
-import           Language.Haskell.TH.Syntax          (Name)
-import Data.List (intercalate)
-import           Data.Monoid                         ((<>))
+import Data.List                  (intercalate)
+import Data.Monoid                ((<>))
+import Data.Typeable              (Typeable)
+import GHC.Generics               (Generic)
+import Language.Haskell.TH.Syntax (Name)
 
 
 -- |

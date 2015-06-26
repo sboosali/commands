@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeOperators                                                  #-}
 -- |
 module Commands.Grammar where
--- import           Commands.Etc
 import           Commands.Munging      (unCamelCase)
 import           Commands.Symbol.Types
 

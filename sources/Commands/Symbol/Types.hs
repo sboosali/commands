@@ -13,6 +13,8 @@ import           Data.Monoid
 import           Data.Foldable                 (asum)
 
 
+
+
 {- | a command pairs a rule with
 
 the type parameters:

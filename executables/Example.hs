@@ -76,11 +76,11 @@ sharingMain = do
  -- print =<< reifyGraph [0,0,0::Int]
  -- print =<< reifyGraph [shared,shared,shared]
 
- print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Int]  -- unshared
- -- [1,1,1]
+ print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Integer]  -- unshared
+ -- [3,3,3]
 
- -- let shared = 0
- -- {-# NOINLINE shared #-}
+ print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Int]  -- TODO shared by which optimization?
+ -- [1,1,1]
 
  print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [shared,shared,shared]  --
  -- [3,3,3]

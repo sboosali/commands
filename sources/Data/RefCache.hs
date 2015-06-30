@@ -1,5 +1,6 @@
-{-# LANGUAGE AutoDeriveTypeable, BangPatterns, LambdaCase, RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, TupleSections, TypeFamilies         #-}
+
+{-# LANGUAGE AutoDeriveTypeable, LambdaCase, RankNTypes       #-}
+{-# LANGUAGE ScopedTypeVariables, TupleSections, TypeFamilies #-}
 {- |
 
 usage:
@@ -13,15 +14,17 @@ import Data.RefCache (RefCache)
 module Data.RefCache
  ( RefCache
  , empty
+ , newCache
  , insert
  , lookup
  , cacheByRef
  , traverseShared
+ , cacheIOByRef
  , traverseSharedIO
  ) where
 
+import           Control.Exception     (evaluate)
 import           Control.Monad
-import           Data.Functor.Compose
 import           Data.IntMap           (IntMap)
 import qualified Data.IntMap           as IntMap
 import           Data.IORef
@@ -39,7 +42,7 @@ the value type @v@ has a functional dependency on the key type @k@.
 is abstract.
 
 -}
-newtype RefCache k v = RefCache (IntMap [(StableName k, v)])
+newtype RefCache k v = RefCache (IntMap [(StableName k, IORef v)])
 -- TODO type role nominal RefCache
 
 {- |
@@ -47,31 +50,48 @@ newtype RefCache k v = RefCache (IntMap [(StableName k, v)])
 empty :: RefCache k v
 empty = RefCache IntMap.empty
 
-insert :: k -> v -> RefCache k v -> IO (StableName k, RefCache k v)
-insert !x v m = do
- k <- makeStableName x  -- the BangPattern has evaluated x to WHNF
- return$ (k, insertRef k v m)
+newCache :: IO (IORef (RefCache k v))
+newCache = newIORef empty
+
+insert
+ :: k -- ^ strict in the key
+ -> v
+ -> RefCache k v
+ -> IO (StableName k, RefCache k v)
+insert x y m = do
+ k <- forceStableName x
+ v <- newIORef y
+ return (k, insertRef k v m)
 
 {- |
 
 -}
-insertRef :: StableName k -> v -> RefCache k v -> RefCache k v
+insertRef :: StableName k -> IORef v -> RefCache k v -> RefCache k v
 insertRef k v (RefCache m) = RefCache(IntMap.insertWith (++) (hashStableName k) [(k, v)] m)
 
-lookup :: k -> RefCache k v -> IO (Maybe v)
-lookup !x m = do
- k <- makeStableName x  -- the BangPattern has evaluated x to WHNF
- return$ lookupRef k m
+-- | strict
+forceStableName :: a -> IO (StableName a)
+forceStableName x = evaluate x >> makeStableName x
+
+lookup
+ :: k -- ^ strict in the key
+ -> RefCache k v
+ -> IO (Maybe v)
+lookup x m = do
+ k <- forceStableName x
+ let v = lookupRef k m
+ y <- readIORef `traverse` v
+ return y
 
 {- |
 
 hashes with 'hashStableName', disambiguate with 'eqStableName' (via 'Eq').
 
 -}
-lookupRef :: StableName k -> RefCache k v -> Maybe v
+lookupRef :: StableName k -> RefCache k v -> Maybe (IORef v)
 lookupRef k (RefCache m) = case (List.lookup (k) <=< IntMap.lookup (hashStableName k)) m of
  Nothing -> Nothing
- Just v -> Just (v)
+ Just v -> Just v
 
 {- |
 
@@ -99,20 +119,20 @@ related: Section 3 ("Benign Side Effects") in <http://community.haskell.org/~sim
 
 -}
 cacheByRef :: (a -> b) -> IO (a -> IO b)
-cacheByRef f = do
- cache <- newIORef empty
- return$ \(!x) -> do
-  k <- makeStableName x  -- the BangPattern has evaluated x to WHNF
-  lookupRef k <$> readIORef cache >>= \case
-   Just y  -> do
-    print "Hit"
-    return y
-   Nothing -> do
-    print "Miss"
-    let y = f x
-    atomicModifyIORef' cache ((,()) . insertRef k y)
-    return y
-{-# NOINLINE cacheByRef #-}
+cacheByRef f = cacheIOByRef (return.f)
+-- cacheByRef f = do
+--  c <- newCache
+--  return$ \x -> do
+--   readIORef c >>= lookup x >>= \case
+--    Just y  -> do
+--     return y
+--    Nothing -> do
+--     let y = f x
+--     k <- forceStableName x
+--     v <- newIORef y
+--     _ <- atomicModifyIORef' c ((,()) . insertRef k v)
+--     return y
+-- {-# NOINLINE cacheByRef #-}
 
 {- | like 'traverse', but preserves sharing.
 
@@ -142,6 +162,11 @@ recover sharing-observing graph with (\_ -> (Const <$> newUniqueReally)):
 >>>
 
 
+@traverseShared 'return'@ preserves sharing:
+
+>>>
+
+
 to keep the sharing "as you see it" in the source, call GHC with these options:
 
 *
@@ -154,40 +179,43 @@ to keep the sharing "as you see it" in the source, call GHC with these options:
 
 -}
 traverseShared
- :: forall t m a b. (Traversable t, Applicative m)
- => (a -> m b)
- ->        t a
- -> IO (m (t b))
+ :: forall t a b. (Traversable t)
+ => (a -> b)
+ ->     t a
+ -> IO (t b)
 traverseShared u t = do
  u' <- cacheByRef u
- getCompose $ traverse (Compose . u') t
-
-cacheIO :: (a -> IO b) -> IO (a -> IO b)
-cacheIO f = do
- cache <- newIORef empty
- return$ \(!x) -> do
-  k <- makeStableName x  -- the BangPattern has evaluated x to WHNF
-  lookupRef k <$> readIORef cache >>= \case
-   Just y  -> do
-    -- print "Hit"
-    return y
-   Nothing -> do
-    -- print "Miss"
-    y <- f x
-    atomicModifyIORef' cache ((,()) . insertRef k y)
-    return y
-{-# NOINLINE cacheIO #-}
-
-{- |
-
-@traverseSharedIO 'return'@ preserves sharing.
-
--}
-traverseSharedIO :: (Traversable t) => (a -> IO b) -> t a -> IO (t b)
-traverseSharedIO u t = do
- u' <- cacheIO u
  traverse u' t
 
--- traverseSharedIO :: (Traversable t) => (a -> IO b) -> t a -> IO (t b)
--- traverseSharedIO u = join . traverseShared u
+cacheIOByRef :: (a -> IO b) -> IO (a -> IO b)
+cacheIOByRef f = do
+ c <- newCache
+ return$ \x -> do
+  readIORef c >>= lookup x >>= \case
+   Just y  -> do
+    return y
+   Nothing -> do
+    print "Miss"
+    y <- f x
+    k <- forceStableName x
+    v <- newIORef y
+    _ <- atomicModifyIORef' c ((,()) . insertRef k v)
+    return y
+{-# NOINLINE cacheIOByRef #-}
+
+traverseSharedIO
+ :: forall t a b. (Traversable t)
+ => (a -> IO b)
+ ->     t a
+ -> IO (t b)
+
+traverseSharedIO u t = do
+ u' <- cacheIOByRef u
+ traverse u' t
+
+-- doesn't share
+-- traverseSharedIO u t = do
+--  u' <- cacheByRef u
+--  t' <- traverse u' t
+--  traverse id t'
 

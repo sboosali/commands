@@ -109,7 +109,6 @@ library
   Commands.Plugins.Example.Phrase
 
   Data.RefCache
-  Data.HRefCache
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits

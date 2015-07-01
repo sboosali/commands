@@ -11,8 +11,12 @@ import           Data.Reify
 import           System.Environment              (getArgs)
 -- import Data.Unique
 import           Control.Monad
+import           Control.Monad.ST
+import           Control.Monad.ST.Unsafe
 import           Data.Functor.Identity
 import           Data.IORef
+import           Data.STRef
+
 
 --
 -- $ sleep 2; curl -d '["replace this with that"]' 'http://localhost:8666/recognition/'
@@ -77,24 +81,37 @@ sharingMain = do
  -- print =<< reifyGraph [shared,shared,shared]
 
  print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Integer]  -- unshared
- -- [3,3,3]
-
- print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Int]  -- TODO shared by which optimization?
  -- [1,1,1]
 
+ -- print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [0,0,0::Int]  -- TODO shared by which optimization?
+ -- -- [3,3,3]
+
  print =<< (traverse readIORef <=< traverse (atomicModifyIORef_ (+1)) <=< RefCache.traverseSharedIO newIORef) [shared,shared,shared]  --
+ -- [3,3,3]
+
+ print $ runST $ do
+  rs <- unsafeIOToST $ RefCache.traverseSharedIO (unsafeSTToIO.newSTRef) [0,0,0::Integer]  -- unshared
+  _ <- traverse (\r -> modifySTRef r (+1)) rs
+  traverse readSTRef rs
+ -- [1,1,1]
+
+ -- unsafeIOToST is about as unsafe as unsafePerformIO
+ print $ runST $ do
+  rs <- unsafeIOToST $ RefCache.traverseSharedIO (unsafeSTToIO.newSTRef) [shared,shared,shared]  -- shared
+  _ <- traverse (\r -> modifySTRef r (+1)) rs
+  traverse readSTRef rs
  -- [3,3,3]
 
  -- print =<< (RefCache.traverseSharedIO (\_ -> hashUnique <$> newUnique)) [0,0,0]
  -- print =<< (RefCache.traverseSharedIO (\_ -> hashUnique <$> newUnique)) [shared,shared,shared]
 
- putStrLn ""
- print =<< reifyGraph [shared,shared,shared]
- print =<< reifyGraph =<< (RefCache.traverseSharedIO (return.Identity)) [shared,shared,shared]
- print =<< reifyGraph =<< ((return . fmap runIdentity) <=< RefCache.traverseSharedIO (return.Identity)) [shared,shared,shared]
- print =<< reifyGraph =<< ((return . fmap runLazy)     <=< RefCache.traverseSharedIO (return.Lazy))     [shared,shared,shared]
- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Identity shared, Identity shared, Identity shared]
- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Lazy     shared, Lazy     shared, Lazy     shared]
+ -- putStrLn ""
+ -- print =<< reifyGraph [shared,shared,shared]
+ -- print =<< reifyGraph =<< (RefCache.traverseSharedIO (return.Identity)) [shared,shared,shared]
+ -- print =<< reifyGraph =<< ((return . fmap runIdentity) <=< RefCache.traverseSharedIO (return.Identity)) [shared,shared,shared]
+ -- print =<< reifyGraph =<< ((return . fmap runLazy)     <=< RefCache.traverseSharedIO (return.Lazy))     [shared,shared,shared]
+ -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Identity shared, Identity shared, Identity shared]
+ -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Lazy     shared, Lazy     shared, Lazy     shared]
 
 data Lazy a = Lazy a deriving Show
 runLazy (Lazy a) = a

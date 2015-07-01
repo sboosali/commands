@@ -21,15 +21,19 @@ module Data.RefCache
  , traverseShared
  , cacheIOByRef
  , traverseSharedIO
+ , cacheSTByRef
+ , traverseSharedST
  ) where
 
-import           Control.Exception     (evaluate)
+import           Control.Exception       (evaluate)
 import           Control.Monad
-import           Data.IntMap           (IntMap)
-import qualified Data.IntMap           as IntMap
+import           Control.Monad.ST
+import           Control.Monad.ST.Unsafe
+import           Data.IntMap             (IntMap)
+import qualified Data.IntMap             as IntMap
 import           Data.IORef
-import qualified Data.List             as List
-import           Prelude               hiding (lookup)
+import qualified Data.List               as List
+import           Prelude                 hiding (lookup)
 import           System.Mem.StableName
 
 
@@ -178,11 +182,7 @@ to keep the sharing "as you see it" in the source, call GHC with these options:
 
 
 -}
-traverseShared
- :: forall t a b. (Traversable t)
- => (a -> b)
- ->     t a
- -> IO (t b)
+traverseShared :: (Traversable t) => (a -> b) -> t a -> IO (t b)
 traverseShared u t = do
  u' <- cacheByRef u
  traverse u' t
@@ -195,7 +195,7 @@ cacheIOByRef f = do
    Just y  -> do
     return y
    Nothing -> do
-    print "Miss"
+    -- print "Miss"
     y <- f x
     k <- forceStableName x
     v <- newIORef y
@@ -208,7 +208,6 @@ traverseSharedIO
  => (a -> IO b)
  ->     t a
  -> IO (t b)
-
 traverseSharedIO u t = do
  u' <- cacheIOByRef u
  traverse u' t
@@ -218,4 +217,13 @@ traverseSharedIO u t = do
 --  u' <- cacheByRef u
 --  t' <- traverse u' t
 --  traverse id t'
+
+
+cacheSTByRef :: (a -> ST s b) -> IO (a -> IO b)
+cacheSTByRef u = cacheIOByRef (unsafeSTToIO.u)
+
+traverseSharedST :: (Traversable t) => (a -> ST s b) -> t a -> IO (t b)
+traverseSharedST u t = do
+ u' <- cacheSTByRef u
+ traverse u' t
 

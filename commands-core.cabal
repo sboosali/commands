@@ -61,6 +61,8 @@ library
 
   Commands.Core
 
+  Commands.RHS.Types
+
   Commands.Symbol
   Commands.Symbol.Types
 --  Commands.Symbol.Proofs

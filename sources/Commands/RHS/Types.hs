@@ -1,15 +1,17 @@
-{-# LANGUAGE DeriveFunctor, FlexibleContexts, GADTs, LambdaCase #-}
-{-# LANGUAGE LiberalTypeSynonyms, PatternSynonyms, RankNTypes   #-}
-{-# LANGUAGE StandaloneDeriving, TypeOperators, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor, FlexibleContexts, FlexibleInstances, GADTs #-}
+{-# LANGUAGE LambdaCase, LiberalTypeSynonyms, OverloadedStrings        #-}
+{-# LANGUAGE PatternSynonyms, PostfixOperators, RankNTypes             #-}
+{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, TypeOperators    #-}
 module Commands.RHS.Types where
 
 -- import           Control.Lens
-import           Data.List.NonEmpty(NonEmpty (..))
-import qualified Data.List.NonEmpty    as NonEmpty
+import           Data.List.NonEmpty  (NonEmpty (..))
+import qualified Data.List.NonEmpty  as NonEmpty
 
 import           Control.Applicative
+import           Data.Foldable       (asum)
 import           Data.Monoid
-import           Data.Foldable                 (asum)
+import           GHC.Exts            (IsString (..))
 
 
 data RHS n t f a where
@@ -33,9 +35,8 @@ data RHS n t f a where
 
 pattern Empty = Alter []
 
--- TODO expects constraint: 
+-- TODO expects constraint:
 deriving instance (Functor (n t f)) => (Functor (RHS n t f))
-
 
 instance (Functor f, Functor (n t f)) => Monoid (RHS n t f a) where
  mempty = Empty
@@ -76,15 +77,6 @@ instance (Functor f, Functor (n t f)) => Alternative (RHS n t f) where
  some = fmap NonEmpty.toList . Some id
  {-# INLINE some #-}
 
--- | a reified 'optional'.
-optionalA :: RHS n t f a -> RHS n t f (Maybe a)
-optionalA = Opt id
-{-# INLINE optionalA #-}
-
-optionA :: a -> RHS n t f a -> RHS n t f a
-optionA x = Opt (maybe x id)
-{-# INLINE optionA #-}
-
 toRHSList :: RHS n t f a -> [RHS n t f a]
 toRHSList (Alter xs) = xs
 toRHSList x = [x]
@@ -119,4 +111,25 @@ runRHS fromNonTerminal fromTerminal u = \case
  where
  go :: forall x. RHS n t f x -> g x
  go = runRHS fromNonTerminal fromTerminal u
+
+(-?) :: RHS n t f a -> RHS n t f (Maybe a)
+(-?) = Opt id
+
+(-?-) :: RHS n t f a -> a -> RHS n t f a
+(-?-) r x = Opt (maybe x id) r
+
+(-*) :: RHS n t f a -> RHS n t f [a]
+(-*) = Many id
+
+(-+) :: RHS n t f a -> RHS n t f (NonEmpty a)
+(-+) = Some id
+
+(-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
+(-#-) k = traverse id . replicate k
+
+-- | both token and result must be a string
+-- (see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
+--
+-- @t@ can default to String.
+instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
 

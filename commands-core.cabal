@@ -109,8 +109,11 @@ library
 
   Commands.Plugins.Example
   Commands.Plugins.Example.Phrase
+  Commands.Plugins.Example.Emacs
 
   Data.RefCache
+  Data.HRefCache
+  Data.RefCache.Etc
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits

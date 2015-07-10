@@ -173,7 +173,7 @@ slot s = do
  sendText s
  sendKeyPress [] ReturnKey
 
-execute_extended_command = press C w -- non-standard: make this configurable? ImplicitParams?
+execute_extended_command = press C w --TODO non-standard: make this configurable? ImplicitParams?
 
 eval_expression = press M ':'
 

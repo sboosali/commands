@@ -25,7 +25,8 @@ module Data.RefCache
  , traverseSharedST
  ) where
 
-import           Control.Exception       (evaluate)
+import           Data.RefCache.Etc
+
 import           Control.Monad
 import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
@@ -72,10 +73,6 @@ insert x y m = do
 -}
 insertRef :: StableName k -> IORef v -> RefCache k v -> RefCache k v
 insertRef k v (RefCache m) = RefCache(IntMap.insertWith (++) (hashStableName k) [(k, v)] m)
-
--- | strict
-forceStableName :: a -> IO (StableName a)
-forceStableName x = evaluate x >> makeStableName x
 
 lookup
  :: k -- ^ strict in the key

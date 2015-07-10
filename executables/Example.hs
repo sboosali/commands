@@ -74,6 +74,9 @@ instance MuRef [Lazy Int] where
   [] -> pure EmptyRef
   (x:xs) -> ConsRef <$> f x <*> mapDeRef f xs
 
+data Lazy a = Lazy a deriving Show
+runLazy (Lazy a) = a
+
 sharingMain = do
  putStrLn ""
 
@@ -113,5 +116,3 @@ sharingMain = do
  -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Identity shared, Identity shared, Identity shared]
  -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Lazy     shared, Lazy     shared, Lazy     shared]
 
-data Lazy a = Lazy a deriving Show
-runLazy (Lazy a) = a

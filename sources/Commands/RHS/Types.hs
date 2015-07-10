@@ -94,23 +94,23 @@ runRHS
  -> (forall x. f x     -> g x)
  -> RHS n t f a
  -> g a
-runRHS fromNonTerminal fromTerminal u = \case
- Terminal    i t -> i <$> fromTerminal    t
- NonTerminal n   ->       fromNonTerminal n
+
+runRHS fromN fromT fromF = \case
+ Terminal    i t -> i <$> fromT t
+ NonTerminal n   ->       fromN n
 
  Opt  i x  -> i                       <$> optional (go x)
  Many i x  -> i                       <$> many     (go x)
  Some i x  -> (i . NonEmpty.fromList) <$> some     (go x)
 
  Pure a      -> pure a
- f `Apply` x -> go f <*> u x
+ f `Apply` x -> go f <*> fromF x
  f :<*>    g -> go f <*> go g
- -- RHS [] -> empty
- -- RHS [f,g]  -> go f <|> go g
  Alter fs  -> asum (go `map` fs)
+
  where
  go :: forall x. RHS n t f x -> g x
- go = runRHS fromNonTerminal fromTerminal u
+ go = runRHS fromN fromT fromF
 
 (-?) :: RHS n t f a -> RHS n t f (Maybe a)
 (-?) = Opt id
@@ -132,4 +132,23 @@ runRHS fromNonTerminal fromTerminal u = \case
 --
 -- @t@ can default to String.
 instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
+
+-- a Traversal?
+renameRHS
+ :: forall m n1 n2 t f a. (Applicative m)
+ => (forall x. RHS n1 t f x -> n1 t f x -> m (n2 t f x))
+ -> (RHS n1 t f a -> m (RHS n2 t f a))
+renameRHS u = \case
+ k@(NonTerminal x)  ->  NonTerminal <$> u k x -- like traverse, except this case
+ Terminal i t       ->  pure$ Terminal i t
+ Opt  i t           ->  Opt  i <$> go t
+ Many i t           ->  Many i <$> go t
+ Some i t           ->  Some i <$> go t
+ Pure a             ->  pure$ Pure a
+ t `Apply` x        ->  Apply  <$> go t <*> pure x -- preserved
+ t :<*> t'          ->  (:<*>) <$> go t <*> go t'
+ Alter ts           ->  Alter <$> go `traverse` ts
+ where
+ go :: forall x. RHS n1 t f x -> m (RHS n2 t f x)
+ go = renameRHS u
 

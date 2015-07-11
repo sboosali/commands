@@ -254,3 +254,6 @@ sccs2cycles :: [SCC n] -> [[n]]
 sccs2cycles = mapMaybe $ \case
  AcyclicSCC _ -> Nothing
  CyclicSCC ns -> Just ns
+
+snoc :: [a] -> a -> [a]
+snoc xs x = xs <> [x]

@@ -5,9 +5,12 @@
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies           #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 module Commands.Plugins.Example.Emacs where
+import           Commands.Etc
 import           Commands.RHS.Types
 import qualified Data.HRefCache.Internal as HRefCache
 -- import Commands.Plugins.Example.Phrase hiding  (phrase, casing, separator, joiner, brackets, keyword, char, dictation, word)
+import Commands.Plugins.Example.Phrase (Phrase_(..))
+import qualified Commands.Plugins.Example.Phrase as P
 
 import           Data.List.NonEmpty      (NonEmpty (..))
 import qualified Data.List.NonEmpty      as NonEmpty
@@ -22,6 +25,9 @@ import           Control.Monad.ST.Unsafe
 import           Data.Functor.Product
 import           Data.IORef
 import           Data.STRef
+import  Data.Foldable
+import Data.Function
+import Data.Ord
 
 
 type RHSEarleyDNS r = RHS (ConstName String) String (EarleyF r String String [])
@@ -192,11 +198,11 @@ brackets = "brackets"
   <|> bracket '\''     <$ "ticked"
   <|> bracket '|'      <$ "norm"
 
-keyword = "keyword"
-  <=> Keyword <$> liftEarley anyWord
-
 char = "char"
   <=> '`' <$ "grave"
+
+keyword = "keyword"
+  <=> Keyword <$> liftEarley anyWord
 
 dictation = "dictation"
   <=> Dictation <$> liftEarley (some anyWord)
@@ -206,8 +212,95 @@ word = "word"
 
 
 
+
+-- the specificity ("probability") of the phrase parts. Smaller is better.
+qPhrase :: [P.Phrase_] -> Int
+qPhrase = sum . fmap (\case
+ Escaped_ _ -> 1
+ Quoted_ _ -> 1
+ Pasted_  -> 1
+ Blank_  -> 1
+ Spelled_ _ -> 1
+ Capped_ _ -> 1
+ Separated_ _ -> 1
+ Cased_ _ -> 1
+ Joined_ _ -> 1
+ Surrounded_ _ -> 1
+ Dictated_ _ -> 0)
+
+phrase_ = "phrase"
+ <=> snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD)
+
+phraseA = "phraseA" <=> empty
+ <|> Escaped_    <$ "lit" <*> keyword_
+ <|> Quoted_     <$ "quote" <*> (dictation_ <* "unquote")
+ <|> Pasted_     <$ "paste"
+ <|> Blank_      <$ "blank"
+ <|> (Spelled_ . (:[])) <$> char
+ <|> Separated_  <$> separator_
+ <|> Cased_      <$> casing_
+ <|> Joined_     <$> joiner_
+ <|> Surrounded_ <$> brackets_
+
+phraseB = "phraseB" <=> empty
+ -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
+ -- <|> Spelled_  <$> "spell" <*> letters -- only, not chars
+ <|> Spelled_  <$ "spell" <*> (char-++)
+ <|> Capped_   <$ "caps" <*> (char-++)
+ -- <$> alphabetRHS
+
+phraseC = "phraseC" <=> Dictated_ <$ "say" <*> dictation_
+
+phraseW = "phraseD" <=> (Dictated_ . P.Dictation . (:[])) <$> word_
+
+phraseD = "phraseD" <=> Dictated_ <$> dictation_
+
+separator_ = "separator"
+  <=> P.Separator ""  <$ "break"
+  <|> P.Separator " " <$ "space"
+  <|> P.Separator "," <$ "comma"
+  <|> P.Separator "/" <$ "slash"
+  <|> P.Separator "." <$ "dot"
+
+casing_ = "casing"
+  <=> P.Upper  <$ "upper"
+  <|> P.Lower  <$ "lower"
+  <|> P.Capper <$ "capper"
+
+joiner_ = "joiner"
+  <=> (\c -> P.Joiner [c]) <$ "join" <*> char
+  <|> P.Joiner "_"  <$ "snake"
+  <|> P.Joiner "-"  <$ "dash"
+  <|> P.Joiner "/"  <$ "file"
+  <|> P.Joiner ""   <$ "squeeze"
+  <|> P.CamelJoiner <$ "camel"
+  <|> P.ClassJoiner <$ "class"
+
+brackets_ = "brackets"
+  <=> P.bracket          <$ "round" <*> char
+  <|> P.Brackets "(" ")" <$ "par"
+  <|> P.Brackets "[" "]" <$ "square"
+  <|> P.Brackets "{" "}" <$ "curl"
+  <|> P.Brackets "<" ">" <$ "angle"
+  <|> P.bracket '"'      <$ "string"
+  <|> P.bracket '\''     <$ "ticked"
+  <|> P.bracket '|'      <$ "norm"
+
+dictation_ = "dictation_"
+  <=> P.Dictation <$> liftEarley (some anyWord)
+
+word_ = "word_"
+ <=> id <$> liftEarley anyWord
+
+keyword_ = "keyword_"
+ <=> word_
+ -- <=> Keyword <$> word_
+
+
+
 renameRHSST
  :: (forall x. RHS n t f x -> n t f x -> ST s (n' t f x))
+ -- :: (forall x. RHS n t f x -> n t f x -> RHS n t f x -> ST s (n' t f x))
  -> ST s (RHS n t f a -> ST s (RHS n' t f a))
 -- renameRHSST = undefined
 -- renameRHSST u = do
@@ -223,12 +316,13 @@ renameRHSST
 --     return y
 renameRHSST u = unsafeIOToST$ do
  c <- HRefCache.newCache
- return$ renameRHS$ \t x -> unsafeIOToST$ do
-  k <- HRefCache.forceStableName t
+ -- return$ renameRHS$ \r1 n r2 -> unsafeIOToST$ do
+ return$ renameRHS$ \r1 n -> unsafeIOToST$ do
+  k <- HRefCache.forceStableName r1
   readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
    Just y  -> return y          -- cache hit
    Nothing -> do                -- cache miss
-    y <- unsafeSTToIO$ u t x
+    y <- unsafeSTToIO$ u r1 n
     v <- newIORef y
     _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
     return y
@@ -244,6 +338,7 @@ deriveEarley
  => ST s (        RHS (ConstName                 n) t f a
          -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
          )
+-- deriveEarley = renameRHSST $ \_ (ConstName n) _ -> do
 deriveEarley = renameRHSST $ \_ (ConstName n) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
@@ -289,6 +384,18 @@ parseString
 parseString r s = as
  where (as,_) = E.fullParses$ runEarley r (words s)
 
+parsePhrase :: String -> String
+parsePhrase
+ = (flip P.mungePhrase) P.defSpacing
+ . (flip P.splatPasted) "clipboard contents"
+ . P.pPhrase
+ . argmax qPhrase
+ . parseString phrase_
+
+-- argmax :: (a -> Int) -> (a -> a -> Ordering)
+-- argmax f = maximumBy (comparing `on` f)
+argmax f = maximumBy (\x y -> f x `compare` f y)
+
 mainEmacs = do
  print$ parseString edits "kill"
  print$ parseString edits "kill whole word"
@@ -300,6 +407,10 @@ mainEmacs = do
  -- ]                                          --
  print$ parseString edit "kill"            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
  print$ parseString edit "kill whole word" -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
+
+ print$ parsePhrase "par round grave camel lit async break break action"
+ -- wrong: List [Sexp (Surrounded (Brackets "(" ")")) [List [Atom (Right (PWord "round"))],Atom (Right (PAcronym "`")),Sexp (Joined CamelJoiner) [Atom (Right (PWord "async"))],Atom (Right (PWord ""))],Atom (Right (PWord "")),List [Atom (Right (PWord "action"))]]
+
  -- print$ parseString phrase "par round grave camel lit async break break action"
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
  -- _phrase <- unsafeSTToIO (deriveEarley >>= ($ phrase))

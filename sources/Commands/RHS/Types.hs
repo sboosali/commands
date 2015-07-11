@@ -147,10 +147,11 @@ instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal
 renameRHS
  :: forall m n1 n2 t f a. (Applicative m)
  => (forall x. RHS n1 t f x ->     n1 t f x -> m (    n2 t f x))
- -> (                          RHS n1 t f a -> m (RHS n2 t f a))
+ -- => (forall x. RHS n1 t f x ->     n1 t f x -> RHS n1 t f x -> m (    n2 t f x , RHS n2 t f x))
+ -> (                          RHS n1 t f a ->                 m (RHS n2 t f a))
 renameRHS u = \case
- -- k@(NonTerminal x)  ->  NonTerminal <$> u k x -- like traverse, except this case
- k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r
+ k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
+ -- k@(NonTerminal x r)  ->  (uncurry NonTerminal) <$> u k x r
  Terminal i r       ->  pure$ Terminal i r
  Opt  i r           ->  Opt  i <$> go r
  Many i r           ->  Many i <$> go r

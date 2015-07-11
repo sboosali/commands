@@ -204,8 +204,12 @@ test-suite tests
     commands-core
 
   , base       ==4.8.*
+  , Cabal >=1.22.3 && <1.23
+  , template-haskell  ==2.10.*
+
   , text       ==1.2.*
   , semigroups ==0.16.*
+  , lens
 
   , QuickCheck       ==2.8.*
   , doctest          ==0.9.*
@@ -227,9 +231,12 @@ executable example
   "-with-rtsopts=-N"
 
  build-depends:
+  commands-core,
+
+  data-reify ==0.6.*,
+  lens,
+
   base ==4.8.*
-  , commands-core
-  , data-reify ==0.6.*
 
 
 

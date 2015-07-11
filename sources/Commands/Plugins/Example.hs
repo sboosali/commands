@@ -821,18 +821,5 @@ realMain = do
  attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
  -- Earley is too slow without sharing, even with phraseW
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 main = do
  realMain

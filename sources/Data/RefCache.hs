@@ -22,5 +22,5 @@ module Data.RefCache
  , traverseSharedST
  ) where
 
-import           Data.RefCache.Internal
-import Prelude ()
+import Data.RefCache.Internal
+import Prelude                ()

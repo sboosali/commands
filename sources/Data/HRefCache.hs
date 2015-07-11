@@ -17,5 +17,5 @@ module Data.HRefCache
  , lookup
  ) where
 
-import           Data.HRefCache.Internal
-import Prelude ()
+import Data.HRefCache.Internal
+import Prelude                 ()

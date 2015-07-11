@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveFunctor, FlexibleContexts, FlexibleInstances, GADTs #-}
-{-# LANGUAGE LambdaCase, LiberalTypeSynonyms, OverloadedStrings        #-}
-{-# LANGUAGE PatternSynonyms, PostfixOperators, RankNTypes             #-}
-{-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, TypeOperators    #-}
+{-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
+{-# LANGUAGE TypeOperators                                             #-}
 module Commands.RHS.Types where
 
 -- import           Control.Lens
@@ -30,10 +31,12 @@ data RHS n t f a where
  Some        :: !(NonEmpty x -> a) -> RHS n t f x -> RHS n t f a
 
  -- (Coyoneda'd?) grammar-specific stuff
- Terminal    :: !(t -> a) -> !t -> RHS n t f a
- NonTerminal :: !(n t f a)      -> RHS n t f a
+ Terminal    :: !(t -> a)  -> !t          -> RHS n t f a
+ NonTerminal :: !(n t f a) -> RHS n t f a -> RHS n t f a
 
 pattern Empty = Alter []
+
+-- type RHSFunctorC n t f = (Functor f, Functor (n t f)) ConstraintKinds
 
 -- TODO expects constraint:
 deriving instance (Functor (n t f)) => (Functor (RHS n t f))
@@ -50,8 +53,8 @@ instance (Functor f, Functor (n t f)) => Applicative (RHS n t f) where
  -- Pure f <*> Pure x          = fmap f (Pure x) = Pure (f x)     -- Homomorphism
  txa     <*> Pure x            = fmap ($ x) txa                   -- Interchange
 
- Empty   <*> _                 = Empty                          -- left-Annihilation (?)
- _       <*> Empty             = Empty                          -- right-Annihilation
+ Empty   <*> _                 = Empty                            -- left-Annihilation (?)
+ _       <*> Empty             = Empty                            -- right-Annihilation
  txa     <*> Alter txs         = txa :<*> Alter txs               -- NO left-Distributivity
 
  txa     <*> (tyx `Apply` fy)  = ((.) <$> txa <*> tyx) `Apply` fy -- Composition
@@ -61,8 +64,9 @@ instance (Functor f, Functor (n t f)) => Applicative (RHS n t f) where
  txa     <*> (Many ysa ty)     = txa :<*> Many ysa ty
  txa     <*> (Some ysa ty)     = txa :<*> Some ysa ty
 
- txa     <*> (Terminal    i t) = txa :<*> Terminal    i t -- TODO correct?
- txa     <*> (NonTerminal na)  = txa :<*> NonTerminal na
+ txa     <*> (Terminal    i t)   = txa :<*> Terminal    i t -- TODO correct?
+ txa     <*> nx@NonTerminal{} = txa :<*> nx -- TODO to preserve sharing?
+-- https://hackage.haskell.org/package/Earley-0.8.3/docs/src/Text-Earley-Grammar.html#line-85
 
 instance (Functor f, Functor (n t f)) => Alternative (RHS n t f) where
  empty = Empty
@@ -87,17 +91,19 @@ liftRHS :: f a -> RHS n t f a
 liftRHS f = Pure id `Apply` f
 {-# INLINE liftRHS #-}
 
+-- TODO foldRHS foldRHS
+
 runRHS
  :: forall n t f g a. (Alternative g)
- => (forall x. n t f x -> g x)
- -> (forall x. t       -> g x)
- -> (forall x. f x     -> g x)
+ => (forall x. n t f x -> RHS n t f x -> g x)
+ -> (          t                      -> g t)
+ -> (forall x. f x                    -> g x)
  -> RHS n t f a
  -> g a
 
 runRHS fromN fromT fromF = \case
  Terminal    i t -> i <$> fromT t
- NonTerminal n   ->       fromN n
+ NonTerminal n r ->       fromN n r
 
  Opt  i x  -> i                       <$> optional (go x)
  Many i x  -> i                       <$> many     (go x)
@@ -124,6 +130,10 @@ runRHS fromN fromT fromF = \case
 (-+) :: RHS n t f a -> RHS n t f (NonEmpty a)
 (-+) = Some id
 
+-- | like '(-+)', but "downcasted" to a list.
+(-++) :: (Functor f, Functor (n t f)) => RHS n t f a -> RHS n t f [a]
+(-++) = some
+
 (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
 (-#-) k = traverse id . replicate k
 
@@ -136,19 +146,24 @@ instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal
 -- a Traversal?
 renameRHS
  :: forall m n1 n2 t f a. (Applicative m)
- => (forall x. RHS n1 t f x -> n1 t f x -> m (n2 t f x))
- -> (RHS n1 t f a -> m (RHS n2 t f a))
+ => (forall x. RHS n1 t f x ->     n1 t f x -> m (    n2 t f x))
+ -> (                          RHS n1 t f a -> m (RHS n2 t f a))
 renameRHS u = \case
- k@(NonTerminal x)  ->  NonTerminal <$> u k x -- like traverse, except this case
- Terminal i t       ->  pure$ Terminal i t
- Opt  i t           ->  Opt  i <$> go t
- Many i t           ->  Many i <$> go t
- Some i t           ->  Some i <$> go t
+ -- k@(NonTerminal x)  ->  NonTerminal <$> u k x -- like traverse, except this case
+ k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r
+ Terminal i r       ->  pure$ Terminal i r
+ Opt  i r           ->  Opt  i <$> go r
+ Many i r           ->  Many i <$> go r
+ Some i r           ->  Some i <$> go r
  Pure a             ->  pure$ Pure a
- t `Apply` x        ->  Apply  <$> go t <*> pure x -- preserved
- t :<*> t'          ->  (:<*>) <$> go t <*> go t'
- Alter ts           ->  Alter <$> go `traverse` ts
+ r `Apply` x        ->  Apply  <$> go r <*> pure x -- preserved
+ r :<*> r'          ->  (:<*>) <$> go r <*> go r'
+ Alter rs           ->  Alter <$> go `traverse` rs
  where
  go :: forall x. RHS n1 t f x -> m (RHS n2 t f x)
  go = renameRHS u
 
+-- | e.g. @('RHS' (ConstName n) t f a)@
+data ConstName n t (f :: * -> *) a = ConstName { unConstName :: !n } deriving (Functor)
+-- KindSignatures because: f being phantom, it's kind is inferred to be nullary (I think)
+-- TODO is PolyKinds better? (f :: k)

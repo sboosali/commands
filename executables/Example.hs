@@ -5,6 +5,7 @@ import qualified Commands.Plugins.Example        as Example
 import qualified Commands.Plugins.Example.Phrase as Example
 import qualified Commands.Servers.Servant        as Server
 -- import qualified Commands.Backends.OSX.Example as OSX
+import           Commands.Plugins.Example.Emacs
 import qualified Data.RefCache                   as RefCache
 
 import           Data.Reify
@@ -28,7 +29,8 @@ mainWith = \case
  ["serve"] -> do
   print "serveCommands 8666 root"
   Server.serveNatlink 8666 theModel
- _ -> sharingMain
+ _ -> mainEmacs
+ -- _ -> sharingMain
  -- _ -> Example.main
  -- OSX.main
 

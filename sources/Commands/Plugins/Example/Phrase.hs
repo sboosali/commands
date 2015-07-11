@@ -24,8 +24,8 @@ import           Prelude                     hiding (foldr1, mapM)
 
 -- |
 --
--- prop> length xs < 2 ==> length (stagger xs) == 0
--- prop> 2 <= length xs ==> length (stagger xs) + 1 == length xs
+-- TODO prop> length xs < 2 ==> length (stagger xs) == 0
+-- TODO prop> 2 <= length xs ==> length (stagger xs) + 1 == length xs
 stagger :: [a] -> [(a,a)]
 stagger []  = []
 stagger [_] = []
@@ -374,26 +374,6 @@ surroundWith (Brackets l r) as = do
 -- TODO generalize by renaming surround to transform: it shares the type with Interleave
 -- e.g. "par thread comma 123" -> (1,2,3)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- |
 --
 -- 'Phrase_' is the unassociated concrete syntax list
@@ -484,25 +464,6 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
  fromPAtom :: PAtom -> Phrase
  fromPAtom = Atom . Right
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 -- |
 --

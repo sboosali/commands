@@ -18,6 +18,29 @@ import Control.Monad.IO.Class         (liftIO)
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
+type Response = EitherT ServantErr IO
+
+{- | POST /recognition
+
+@
+$ export PORT=8666
+$ curl -d '["some","words"]' 'http://localhost:$PORT/recognition/'
+$ python -c 'import urllib2,json,sys; print json.loads(urllib2.urlopen("http://localhost:$PORT/recognition/", json.dumps(["some","words with spaces"])).readline())'
+@
+
+
+-}
+type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON] ()
+-- type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
+
+natlinkAPI :: Proxy NatlinkAPI
+natlinkAPI = Proxy
+
+natlinkHandlers :: (Show a) => (forall z. CmdModel z a) -> Server NatlinkAPI
+natlinkHandlers = postRecognition
+
+postRecognition :: (Show a) => (forall z. CmdModel z a) -> DGNRecognition -> Response ()
+postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
 {- | this handler:
 
@@ -49,30 +72,6 @@ handleInterpret cm s = do
 --       at sources/Commands/Servers/Servant/API.hs:33:41-72
 --     Expected type: C z ApplicationDesugarer Actions_ a
 --       Actual type: C z0 ApplicationDesugarer Actions_ a
-
-type Response = EitherT (Int, String) IO
-
-{- | POST /recognition
-
-@
-$ export PORT=8666
-$ curl -d '["some","words"]' 'http://localhost:$PORT/recognition/'
-$ python -c 'import urllib2,json,sys; print json.loads(urllib2.urlopen("http://localhost:$PORT/recognition/", json.dumps(["some","words with spaces"])).readline())'
-@
-
-
--}
-type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post ()
--- type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
-
-natlinkAPI :: Proxy NatlinkAPI
-natlinkAPI = Proxy
-
-natlinkHandlers :: (Show a) => (forall z. CmdModel z a) -> Server NatlinkAPI
-natlinkHandlers = postRecognition
-
-postRecognition :: (Show a) => (forall z. CmdModel z a) -> DGNRecognition -> Response ()
-postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
 natlinkApplication :: (Show a) => (forall z. CmdModel z a) -> Application
 natlinkApplication cm = serve natlinkAPI $ natlinkHandlers cm

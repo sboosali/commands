@@ -165,8 +165,8 @@ library
   , http-types ==0.8.6.*
 
   , aeson  ==0.8.*
-  , servant-server ==0.2.*
-  , servant ==0.2.*
+  , servant-server ==0.4.*
+  , servant ==0.4.*
   , bytestring  ==0.10.*
   , wai  ==3.0.*
   , warp  ==3.0.*

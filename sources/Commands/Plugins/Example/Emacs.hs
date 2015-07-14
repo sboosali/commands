@@ -30,7 +30,9 @@ import Data.Function (on)
 import Data.Ord (compare)
 
 
-type RHSEarleyDNS r = RHS (ConstName String) String (EarleyF r String String [])
+type RHSEarleyDNS r = RHS (ConstName String) String (EarleyF r String String DNSF)
+
+type DNSF = Const String
 
 type EarleyF r n t f = (Product (E.Prod r n t) f)
 -- type EarleyF a n t f = (forall r. (Product (E.Prod r n t) f))
@@ -40,7 +42,8 @@ type EarleyF r n t f = (Product (E.Prod r n t) f)
 (<=>) n r = NonTerminal (ConstName n) r
 infix 2 <=>
 
-liftEarley p = liftRHS (Pair p [])
+liftEarley p = liftRHS (Pair p(Const "") )
+liftPair p r = liftRHS (Pair p  r)
 
 anyWord = E.Terminal (const True) (pure id)
 

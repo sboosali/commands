@@ -26,8 +26,8 @@ import           Data.Functor.Product
 import           Data.IORef
 import           Data.STRef
 import  Data.Foldable
-import Data.Function
-import Data.Ord
+import Data.Function (on)
+import Data.Ord (compare)
 
 
 type RHSEarleyDNS r = RHS (ConstName String) String (EarleyF r String String [])
@@ -155,7 +155,7 @@ phrase = "phrase"
   <|> Join       <$>              joiner <*>                              phrase
   <|> Surround   <$>            brackets <*>                              phrase
   <|> Separated  <$>           separator <*>                              phrase
-  <|> Spelled    <$ "spell"              <*> (char-++) <*>                 phrase
+  <|> Spelled    <$ "spell"              <*> (char-++) <*>                phrase
   <|> Letter     <$>                char <*>                              phrase
   <|> Cap        <$ "cap"                <*>     char <*>                 phrase
   <|> Pasted     <$ "paste"              <*>                              phrase
@@ -212,22 +212,6 @@ word = "word"
 
 
 
-
--- the specificity ("probability") of the phrase parts. Smaller is better.
-qPhrase :: [P.Phrase_] -> Int
-qPhrase = sum . fmap (\case
- Escaped_ _ -> 1
- Quoted_ _ -> 1
- Pasted_  -> 1
- Blank_  -> 1
- Spelled_ _ -> 1
- Capped_ _ -> 1
- Separated_ _ -> 1
- Cased_ _ -> 1
- Joined_ _ -> 1
- Surrounded_ _ -> 1
- Dictated_ _ -> 0)
-
 phrase_ = "phrase"
  <=> snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD)
 
@@ -236,7 +220,8 @@ phraseA = "phraseA" <=> empty
  <|> Quoted_     <$ "quote" <*> (dictation_ <* "unquote")
  <|> Pasted_     <$ "paste"
  <|> Blank_      <$ "blank"
- <|> (Spelled_ . (:[])) <$> char
+ -- <|> (Spelled_ . (:[])) <$> char
+ <|> Spelled_    <$ "spell" <*> (char-++)
  <|> Separated_  <$> separator_
  <|> Cased_      <$> casing_
  <|> Joined_     <$> joiner_
@@ -377,6 +362,8 @@ parse
  -> ([a], E.Report n [t])
 parse r xs = E.fullParses$ runEarley r xs
 
+
+
 parseString
  :: (forall r. RHS (ConstName n) String (Product (E.Prod r n String) f) a)
  -> String
@@ -394,7 +381,23 @@ parsePhrase
 
 -- argmax :: (a -> Int) -> (a -> a -> Ordering)
 -- argmax f = maximumBy (comparing `on` f)
-argmax f = maximumBy (\x y -> f x `compare` f y)
+-- argmax f = maximumBy (\x y -> f x `compare` f y)
+argmax f = maximumBy (compare `on` f)
+
+-- the specificity ("probability") of the phrase parts. bigger is better.
+qPhrase :: [P.Phrase_] -> Int
+qPhrase = sum . fmap (\case
+ Escaped_ _ -> 1
+ Quoted_ _ -> 1
+ Pasted_  -> 1
+ Blank_  -> 1
+ Spelled_ _ -> 1
+ Capped_ _ -> 1
+ Separated_ _ -> 1
+ Cased_ _ -> 1
+ Joined_ _ -> 1
+ Surrounded_ _ -> 1
+ Dictated_ _ -> 0)
 
 mainEmacs = do
  print$ parseString edits "kill"
@@ -408,10 +411,11 @@ mainEmacs = do
  print$ parseString edit "kill"            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
  print$ parseString edit "kill whole word" -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
 
- print$ parsePhrase "par round grave camel lit async break break action"
- -- wrong: List [Sexp (Surrounded (Brackets "(" ")")) [List [Atom (Right (PWord "round"))],Atom (Right (PAcronym "`")),Sexp (Joined CamelJoiner) [Atom (Right (PWord "async"))],Atom (Right (PWord ""))],Atom (Right (PWord "")),List [Atom (Right (PWord "action"))]]
+ print$ parsePhrase "par round grave camel lit with async do break break action"
+ -- "(`async`action)"
+ print$ length $ parseString phrase_ "par round grave camel lit async break break action"
 
- -- print$ parseString phrase "par round grave camel lit async break break action"
+ -- loop print$ parseString phrase "par round grave camel lit async break break action"
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
  -- _phrase <- unsafeSTToIO (deriveEarley >>= ($ phrase))
  putStrLn ""

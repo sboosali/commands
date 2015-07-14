@@ -20,6 +20,8 @@ import Control.Monad.IO.Class         (liftIO)
 
 type Response = EitherT ServantErr IO
 
+type CmdModelZ a = forall z. CmdModel z a
+
 {- | POST /recognition
 
 @
@@ -36,10 +38,10 @@ type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON
 natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
-natlinkHandlers :: (Show a) => (forall z. CmdModel z a) -> Server NatlinkAPI
+natlinkHandlers :: (Show a) => CmdModelZ a -> Server NatlinkAPI
 natlinkHandlers = postRecognition
 
-postRecognition :: (Show a) => (forall z. CmdModel z a) -> DGNRecognition -> Response ()
+postRecognition :: (Show a) => CmdModelZ a -> DGNRecognition -> Response ()
 postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
 {- | this handler:
@@ -50,7 +52,7 @@ postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
 
 -}
-handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
+handleInterpret :: (Show a) => CmdModelZ a -> String -> Response ()
 handleInterpret cm s = do
  liftIO $ putStrLn s
  let v = either (const $ (_modDefault cm) s) id $ ((_modCommand cm)^.comRule) `parses` s
@@ -60,7 +62,7 @@ handleInterpret cm s = do
  liftIO $ runActions as
  return ()
 
--- handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
+-- handleInterpret :: (Show a) => CmdModelZ a -> String -> Response ()
 -- handleInterpret (CmdModel command def context) text = do
 --
 -- can't bind the rank2 field to command:
@@ -73,15 +75,15 @@ handleInterpret cm s = do
 --     Expected type: C z ApplicationDesugarer Actions_ a
 --       Actual type: C z0 ApplicationDesugarer Actions_ a
 
-natlinkApplication :: (Show a) => (forall z. CmdModel z a) -> Application
+natlinkApplication :: (Show a) => CmdModelZ a -> Application
 natlinkApplication cm = serve natlinkAPI $ natlinkHandlers cm
 
-serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
+serveNatlink :: (Show a) => Port -> CmdModelZ a -> IO ()
 serveNatlink port cm = run port $ natlinkApplication cm
 -- I think is relevant that ($) is specially typed
 -- point-free doesn't work:
 --
--- serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
+-- serveNatlink :: (Show a) => Port -> CmdModelZ a -> IO ()
 -- serveNatlink port = run port . natlinkApplication
     -- Cannot instantiate unification variable ‘a0’
     -- with a type involving foralls:

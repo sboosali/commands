@@ -1,49 +1,63 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor     #-}
-{-# LANGUAGE ExtendedDefaultRules, KindSignatures, LambdaCase          #-}
+{-# LANGUAGE ExistentialQuantification, ExtendedDefaultRules           #-}
+{-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase              #-}
 {-# LANGUAGE OverloadedStrings, PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, ScopedTypeVariables         #-}
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances                                      #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 module Commands.Plugins.Example.Emacs where
 import           Commands.Etc
 import           Commands.RHS.Types
-import qualified Data.HRefCache.Internal as HRefCache
+import qualified Data.HRefCache.Internal         as HRefCache
 -- import Commands.Plugins.Example.Phrase hiding  (phrase, casing, separator, joiner, brackets, keyword, char, dictation, word)
-import Commands.Plugins.Example.Phrase (Phrase_(..))
+import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
 
-import           Data.List.NonEmpty      (NonEmpty (..))
-import qualified Data.List.NonEmpty      as NonEmpty
-import qualified Text.Earley             as E
-import qualified Text.Earley.Grammar     as E
-import qualified Text.Earley.Internal    as E
+import           Data.List.NonEmpty              (NonEmpty (..))
+import qualified Data.List.NonEmpty              as NonEmpty
+import qualified Text.Earley                     as E
+import qualified Text.Earley.Grammar             as E
+import qualified Text.Earley.Internal            as E
 
 import           Control.Applicative
-import           Control.Arrow           ((>>>))
+import           Control.Arrow                   ((>>>))
 import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
+import           Data.Foldable
+import           Data.Function                   (on)
 import           Data.Functor.Product
 import           Data.IORef
+import           Data.Ord                        (compare)
 import           Data.STRef
-import  Data.Foldable
-import Data.Function (on)
-import Data.Ord (compare)
 
 
-type RHSEarleyDNS r = RHS (ConstName String) String (EarleyF r String String DNSF)
+type RHSEarleyDNS2 z = RHS (ConstName String) String (EarleyF z String String DNSF)
+type EarleyF z n t f = (Product (E.Prod z n t) f)
 
 type DNSF = Const String
 
-type EarleyF r n t f = (Product (E.Prod r n t) f)
+-- type EarleyF r n t f = (Product (E.Prod r n t) f)
 -- type EarleyF a n t f = (forall r. (Product (E.Prod r n t) f))
 
-(<=>) :: String -> RHSEarleyDNS r a -> RHSEarleyDNS r a
--- type signature for type inference: "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
+type RHSEarleyDNS z = RHS (ConstName String) String (RHSEarleyDNSF z (ConstName String) String)
+data RHSEarleyDNSF z n t a
+ =           LeafRHS (E.Prod z String t a) String --  (DNSRHS String t)
+ | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
+-- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
+deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t)
+-- needs UndecidableInstances:
+--  Variables ‘n, t’ occur more often than in the instance head in the constraint
+
+(<=>) :: String -> RHSEarleyDNS2 z a -> RHSEarleyDNS2 z a
+-- (<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
+-- type signature for type inference, disambiguates:
+--  "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
 (<=>) n r = NonTerminal (ConstName n) r
 infix 2 <=>
 
-liftEarley p = liftRHS (Pair p(Const "") )
-liftPair p r = liftRHS (Pair p  r)
+liftEarley p r = liftRHS (LeafRHS p r)
+liftEarley2 p r = liftRHS (Pair p $ Const r)
 
 anyWord = E.Terminal (const True) (pure id)
 
@@ -205,13 +219,13 @@ char = "char"
   <=> '`' <$ "grave"
 
 keyword = "keyword"
-  <=> Keyword <$> liftEarley anyWord
+  <=> Keyword <$> liftEarley2 anyWord "keyword"
 
 dictation = "dictation"
-  <=> Dictation <$> liftEarley (some anyWord)
+  <=> Dictation <$> liftEarley2 (some anyWord) "dictation"
 
 word = "word"
-  <=> (Dictation . (:[])) <$> liftEarley anyWord
+  <=> (Dictation . (:[])) <$> liftEarley2 anyWord "word"
 
 
 
@@ -275,16 +289,52 @@ brackets_ = "brackets"
   <|> P.bracket '|'      <$ "norm"
 
 dictation_ = "dictation_"
-  <=> P.Dictation <$> liftEarley (some anyWord)
+  <=> P.Dictation <$> liftEarley2 (some anyWord) "dictation_"
 
 word_ = "word_"
- <=> id <$> liftEarley anyWord
+ <=> liftEarley2 anyWord "word_"
 
 keyword_ = "keyword_"
- <=> word_
+ <=> id <$> liftEarley2 anyWord "keyword_"
  -- <=> Keyword <$> word_
 
+renameRHSEarleyDNSF
+ :: forall z m n1 n2 t f1 f2 a. ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+ => (Applicative m)
+ => (forall x. RHS n1 t f1 x -> n1 t f1 x -> m (    n2 t f2 x))
+ -> (                       RHS n1 t f1 a -> m (RHS n2 t f2 a))
+renameRHSEarleyDNSF u = \case
+ k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
+ Terminal i r       ->  pure$ Terminal i r
+ Opt  i r           ->  Opt  i <$> go r
+ Many i r           ->  Many i <$> go r
+ Some i r           ->  Some i <$> go r
+ Pure a             ->  pure$ Pure a
+ r `Apply` x        ->  Apply <$> go r <*> (case x of
+  TreeRHS pRHS rRHS ->  TreeRHS <$> go pRHS <*> go rRHS
+  LeafRHS p s       ->  pure$ LeafRHS p s)
+ r :<*> r'          ->  (:<*>) <$> go r <*> go r'
+ Alter rs           ->  Alter <$> go `traverse` rs
+ where
+ go :: forall x. RHS n1 t f1 x -> m (RHS n2 t f2 x)
+ go = renameRHSEarleyDNSF u
 
+renameRHSEarleyDNSST
+ :: forall z s n1 n2 t f1 f2 a. ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+ => (forall x. RHS n1 t f1 x -> n1 t f1 x -> ST s (    n2 t f2 x))
+ -> ST s                   (RHS n1 t f1 a -> ST s (RHS n2 t f2 a))
+renameRHSEarleyDNSST u = unsafeIOToST$ do
+ c <- HRefCache.newCache
+ -- return$ renameRHS$ \r1 n r2 -> unsafeIOToST$ do
+ return$ renameRHSEarleyDNSF$ \r1 n -> unsafeIOToST$ do
+  k <- HRefCache.forceStableName r1
+  readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
+   Just y  -> return y          -- cache hit
+   Nothing -> do                -- cache miss
+    y <- unsafeSTToIO$ u r1 n
+    v <- newIORef y
+    _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
+    return y
 
 renameRHSST
  :: (forall x. RHS n t f x -> n t f x -> ST s (n' t f x))

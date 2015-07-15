@@ -32,14 +32,6 @@ import           Data.Ord                        (compare)
 import           Data.STRef
 
 
-type RHSEarleyDNS2 z = RHS (ConstName String) String (EarleyF z String String DNSF)
-type EarleyF z n t f = (Product (E.Prod z n t) f)
-
-type DNSF = Const String
-
--- type EarleyF r n t f = (Product (E.Prod r n t) f)
--- type EarleyF a n t f = (forall r. (Product (E.Prod r n t) f))
-
 type RHSEarleyDNS z = RHS (ConstName String) String (RHSEarleyDNSF z (ConstName String) String)
 data RHSEarleyDNSF z n t a
  =           LeafRHS (E.Prod z String t a) String --  (DNSRHS String t)
@@ -49,15 +41,14 @@ deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNS
 -- needs UndecidableInstances:
 --  Variables ‘n, t’ occur more often than in the instance head in the constraint
 
-(<=>) :: String -> RHSEarleyDNS2 z a -> RHSEarleyDNS2 z a
--- (<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
+(<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
 -- type signature for type inference, disambiguates:
 --  "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
 (<=>) n r = NonTerminal (ConstName n) r
 infix 2 <=>
 
-liftEarley p r = liftRHS (LeafRHS p r)
-liftEarley2 p r = liftRHS (Pair p $ Const r)
+liftLeaf p r = liftRHS (LeafRHS p r)
+liftTree p r = liftRHS (TreeRHS p r)
 
 anyWord = E.Terminal (const True) (pure id)
 
@@ -219,18 +210,22 @@ char = "char"
   <=> '`' <$ "grave"
 
 keyword = "keyword"
-  <=> Keyword <$> liftEarley2 anyWord "keyword"
+  <=> Keyword <$> liftLeaf anyWord "keyword"
 
 dictation = "dictation"
-  <=> Dictation <$> liftEarley2 (some anyWord) "dictation"
+  <=> Dictation <$> liftLeaf (some anyWord) "dictation"
 
 word = "word"
-  <=> (Dictation . (:[])) <$> liftEarley2 anyWord "word"
+  <=> (Dictation . (:[])) <$> liftLeaf anyWord "word"
 
 
 
-phrase_ = "phrase"
- <=> snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD)
+-- phrase_ = "phrase"
+--  <=> snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD)
+
+phrase_ = "phrase" <=> liftTree
+ (snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (snoc <$> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
 
 phraseA = "phraseA" <=> empty
  <|> Escaped_    <$ "lit" <*> keyword_
@@ -253,7 +248,7 @@ phraseB = "phraseB" <=> empty
 
 phraseC = "phraseC" <=> Dictated_ <$ "say" <*> dictation_
 
-phraseW = "phraseD" <=> (Dictated_ . P.Dictation . (:[])) <$> word_
+phraseW = "phraseW" <=> (Dictated_ . P.Dictation . (:[])) <$> word_
 
 phraseD = "phraseD" <=> Dictated_ <$> dictation_
 
@@ -289,13 +284,13 @@ brackets_ = "brackets"
   <|> P.bracket '|'      <$ "norm"
 
 dictation_ = "dictation_"
-  <=> P.Dictation <$> liftEarley2 (some anyWord) "dictation_"
+  <=> P.Dictation <$> liftLeaf (some anyWord) "dictation_"
 
 word_ = "word_"
- <=> liftEarley2 anyWord "word_"
+ <=> liftLeaf anyWord "word_"
 
 keyword_ = "keyword_"
- <=> id <$> liftEarley2 anyWord "keyword_"
+ <=> id <$> liftLeaf anyWord "keyword_"
  -- <=> Keyword <$> word_
 
 renameRHSEarleyDNSF
@@ -371,25 +366,31 @@ data EarleyName z n t (f :: * -> *) a = EarleyName
  }
 -- not a Functor
 
-deriveEarley
- :: forall s r n t f a. ()
- => ST s (        RHS (ConstName                 n) t f a
-         -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
-         )
+-- deriveEarley
+--  :: forall s r n t f a. ()
+--  => ST s (        RHS (ConstName                 n) t f a
+--          -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
+--          )
 -- deriveEarley = renameRHSST $ \_ (ConstName n) _ -> do
-deriveEarley = renameRHSST $ \_ (ConstName n) -> do
+deriveEarley = renameRHSEarleyDNSST $ \_ (ConstName n) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
  return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
 
 induceEarley
- :: forall s r n t f a. (Eq t)
- => RHS (EarleyName (E.Rule s r) n) t (Product (E.Prod (E.Rule s r) n t) f) a
- -> E.Prod (E.Rule s r) n t a
+ :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))
+ => (Eq t)
+ => RHS (EarleyName z n)
+        t
+        (RHSEarleyDNSF z (EarleyName z n) t)
+        a
+ -> E.Prod z n t a
 induceEarley = runRHS
  (\n r -> (unEarleyName n) (induceEarley r))
  E.symbol
- (\(Pair p _) -> p)
+ (\case
+  LeafRHS p    _ -> p
+  TreeRHS pRHS _ -> induceEarley pRHS)
 
 buildEarley
  :: E.Prod (E.Rule s a) n t a
@@ -400,8 +401,9 @@ buildEarley p xs = do
   E.parse [s] [] [] (return ()) [] 0 xs
 
 runEarley
- :: (Eq t)
- => (forall r. RHS (ConstName n) t (Product (E.Prod (E.Rule s r) n t) f) a)
+ :: ((n ~ String))
+ => (Eq t)
+ => (forall r. RHS (ConstName n) t (RHSEarleyDNSF (E.Rule s r) (ConstName n) t) a)
  -> [t]
  -> ST s (E.Result s n [t] a)
 runEarley r1 xs = do
@@ -409,8 +411,9 @@ runEarley r1 xs = do
  buildEarley (induceEarley r2) xs
 
 parse
- :: (Eq t)
- => (forall r. RHS (ConstName n) t (Product (E.Prod r n t) f) a)
+ :: ((n ~ String))
+ =>  (Eq t)
+ => (forall r. RHS (ConstName n) t (RHSEarleyDNSF r (ConstName String) t) a)
  -> [t]
  -> ([a], E.Report n [t])
 parse r xs = E.fullParses$ runEarley r xs
@@ -418,7 +421,8 @@ parse r xs = E.fullParses$ runEarley r xs
 
 
 parseString
- :: (forall r. RHS (ConstName n) String (Product (E.Prod r n String) f) a)
+ ::((n ~ String))
+ => (forall r. RHS (ConstName n) String (RHSEarleyDNSF r (ConstName String) String) a)
  -> String
  -> [a]
 parseString r s = as

@@ -105,9 +105,9 @@ runRHS fromN fromT fromF = \case
  Terminal    i t -> i <$> fromT t
  NonTerminal n r ->       fromN n r
 
- Opt  i x  -> i                       <$> optional (go x)
- Many i x  -> i                       <$> many     (go x)
- Some i x  -> (i . NonEmpty.fromList) <$> some     (go x)
+ Opt  i x  -> i  <$> optional (go x)
+ Many i x  -> i  <$> many     (go x)
+ Some i x  -> i' <$> some     (go x) where i' = i . NonEmpty.fromList
 
  Pure a      -> pure a
  f `Apply` x -> go f <*> fromF x
@@ -118,21 +118,63 @@ runRHS fromN fromT fromF = \case
  go :: forall x. RHS n t f x -> g x
  go = runRHS fromN fromT fromF
 
-(-?) :: RHS n t f a -> RHS n t f (Maybe a)
-(-?) = Opt id
+-- | An "unlifted" 'runRHS'. ignores value (in Pure) and transformations in (Terminal/Opt/Many/Some).
+--
+-- The arguments: @foldRHS fromN fromT fromF unit mul add opt_ many_ some_@
+foldRHS
+ :: forall n t f a b. ()
+ => (forall x. n t f x -> b -> b)
+ -> (          t                      -> b)
+ -> (forall x. f x                    -> b)
+ -> b
+ -> (b -> b -> b)
+ -> ([b] -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> RHS n t f a
+ -> b
+foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
+ Terminal    _ t -> fromT t
+ NonTerminal n r -> fromN n (go r)
+ Opt  _ x  -> opt_  (go x)
+ Many _ x  -> many_ (go x)
+ Some _ x  -> some_ (go x)
+ Pure _      -> unit
+ f `Apply` x -> go f `mul` fromF x
+ f :<*>    g -> go f `mul` go g
+ Alter fs  -> add (go `map` fs)
+ where
+ go :: forall x. RHS n t f x -> b
+ go = foldRHS fromN fromT fromF unit mul add opt_ many_ some_
 
+-- | @(-?) = 'optionalRHS'@
+(-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
+(-?) = optionalRHS
+optionalRHS = Opt id
+
+-- | @(-?-) = 'flip' 'optionRHS'@
 (-?-) :: RHS n t f a -> a -> RHS n t f a
-(-?-) r x = Opt (maybe x id) r
+(-?-) = flip optionRHS
+optionRHS :: a -> RHS n t f a -> RHS n t f a
+optionRHS x = Opt (maybe x id)
 
-(-*) :: RHS n t f a -> RHS n t f [a]
-(-*) = Many id
+-- | @(-*) = 'manyRHS'@
+(-*), manyRHS :: RHS n t f a -> RHS n t f [a]
+(-*) = manyRHS
+manyRHS = Many id
 
-(-+) :: RHS n t f a -> RHS n t f (NonEmpty a)
-(-+) = Some id
+-- | @(-+) = 'someRHS'@
+(-+), someRHS :: RHS n t f a -> RHS n t f (NonEmpty a)
+(-+) = someRHS
+someRHS = Some id
 
--- | like '(-+)', but "downcasted" to a list.
-(-++) :: (Functor f, Functor (n t f)) => RHS n t f a -> RHS n t f [a]
-(-++) = some
+-- | @(-++) = 'many1RHS'@
+--
+-- like 'someRHS', but "downcasted" to a list.
+(-++), many1RHS :: RHS n t f a -> RHS n t f [a]
+(-++) = many1RHS
+many1RHS = Some NonEmpty.toList
 
 (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
 (-#-) k = traverse id . replicate k

@@ -37,9 +37,8 @@ data RHSEarleyDNSF z n t a
  =           LeafRHS (E.Prod z String t a) String --  (DNSRHS String t)
  | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
-deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t)
--- needs UndecidableInstances:
---  Variables ‘n, t’ occur more often than in the instance head in the constraint
+deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t) -- TODO UndecidableInstances
+-- Variables ‘n, t’ occur more often than in the instance head in the constraint
 
 (<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
 -- type signature for type inference, disambiguates:

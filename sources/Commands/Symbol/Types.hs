@@ -2,6 +2,7 @@
 {-# LANGUAGE LiberalTypeSynonyms, PatternSynonyms, RankNTypes   #-}
 {-# LANGUAGE StandaloneDeriving, TemplateHaskell, TypeOperators #-}
 module Commands.Symbol.Types where
+-- import Commands.RHS.Types
 
 import           Control.Lens
 import           Data.Functor.Coyoneda

@@ -153,7 +153,7 @@ library
 
   , text                      ==1.2.*
   , wl-pprint-text            ==1.1.*
-  , language-python           ==0.4.*
+  , language-python           ==0.5.*
   , reducers                  ==3.10.*
   , formatting                ==6.2.*
   , interpolatedstring-perl6  ==0.9.*

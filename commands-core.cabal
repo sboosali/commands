@@ -136,6 +136,7 @@ library
 -- https://downloads.haskell.org/~ghc/7.10.1/docs/html/users_guide/release-7-10-1.html
   , transformers              ==0.4.2.*
   , ghc-prim  ==0.4.0.0
+  , base-prelude ==0.1.*
 
   , vinyl  ==0.5.*
   , exceptions                ==0.6.*

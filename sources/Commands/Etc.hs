@@ -170,7 +170,7 @@ hashAlphanumeric = flip showHex "" . abs . hash
 -- >>> case Any [] of Any xs -> length xs
 -- 0
 --
-data Any f = forall x. Any (f x)
+data Any f = Any {unAny :: forall x. (f x)}
 
 
 nonemptyHead :: Lens' (NonEmpty a) a
@@ -257,3 +257,4 @@ sccs2cycles = mapMaybe $ \case
 
 snoc :: [a] -> a -> [a]
 snoc xs x = xs <> [x]
+

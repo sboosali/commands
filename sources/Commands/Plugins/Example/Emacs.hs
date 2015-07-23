@@ -13,13 +13,16 @@ import qualified Data.HRefCache.Internal         as HRefCache
 -- import Commands.Plugins.Example.Phrase hiding  (phrase, casing, separator, joiner, brackets, keyword, char, dictation, word)
 import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
+import Commands.Frontends.Dragon13.Types
 
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
+import BasePrelude hiding (bracket, Product (..), Any (..))
 
+import Prelude ()
 import           Control.Applicative
 import           Control.Arrow                   ((>>>))
 import           Control.Monad.ST
@@ -30,20 +33,31 @@ import           Data.Functor.Product
 import           Data.IORef
 import           Data.Ord                        (compare)
 import           Data.STRef
+import           Data.Unique
+import Data.Functor.Classes
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Monad.Trans.State
 
 
-type RHSEarleyDNS z = RHS (ConstName String) String (RHSEarleyDNSF z (ConstName String) String)
+type RHSEarleyDNS z = RHS
+ (ConstName (DNSInfo, String))
+ String
+ (RHSEarleyDNSF z (ConstName (DNSInfo, String)) String)
+
 data RHSEarleyDNSF z n t a
- =           LeafRHS (E.Prod z String t a) String --  (DNSRHS String t)
+ =           LeafRHS (E.Prod z String t a) (DNSRHS String t)
  | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
 deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t) -- TODO UndecidableInstances
 -- Variables ‘n, t’ occur more often than in the instance head in the constraint
 
+data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t)
+
 (<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
 -- type signature for type inference, disambiguates:
 --  "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
-(<=>) n r = NonTerminal (ConstName n) r
+(<=>) n r = NonTerminal (ConstName (defaultDNSInfo, n)) r
 infix 2 <=>
 
 liftLeaf p r = liftRHS (LeafRHS p r)
@@ -125,97 +139,97 @@ region = "region"
  <|> Reference  <$ "ref"
  <|> Structure  <$ "struct"
 
-data Phrase
- -- continuation necessary
- = Case             Casing                       Phrase
- | Join             Joiner                       Phrase
- | Surround         Brackets                     Phrase
- | Separated        Separator                    Phrase
- | Spelled          [Char]                       Phrase
- | Letter           Char                         Phrase
- | Cap              Char                         Phrase
- | Pasted                                        Phrase
- | Blank                                         Phrase
- -- continuation optional
- | Escaped     Keyword                    (Maybe Phrase)
- | Quoted      Dictation                  (Maybe Phrase)
- | Dictated    Dictation                  (Maybe Phrase)
- -- continuation prohibited
- | Dictation_ Dictation
- deriving (Show,Eq,Ord)
+-- data Phrase
+--  -- continuation necessary
+--  = Case             Casing                       Phrase
+--  | Join             Joiner                       Phrase
+--  | Surround         Brackets                     Phrase
+--  | Separated        Separator                    Phrase
+--  | Spelled          [Char]                       Phrase
+--  | Letter           Char                         Phrase
+--  | Cap              Char                         Phrase
+--  | Pasted                                        Phrase
+--  | Blank                                         Phrase
+--  -- continuation optional
+--  | Escaped     Keyword                    (Maybe Phrase)
+--  | Quoted      Dictation                  (Maybe Phrase)
+--  | Dictated    Dictation                  (Maybe Phrase)
+--  -- continuation prohibited
+--  | Dictation_ Dictation
+--  deriving (Show,Eq,Ord)
 
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum)
-data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
-data Brackets = Brackets String String deriving (Show,Eq,Ord)
-newtype Separator = Separator String  deriving (Show,Eq,Ord)
-newtype Keyword = Keyword String deriving (Show,Eq,Ord)
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+-- data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum)
+-- data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
+-- data Brackets = Brackets String String deriving (Show,Eq,Ord)
+-- newtype Separator = Separator String  deriving (Show,Eq,Ord)
+-- newtype Keyword = Keyword String deriving (Show,Eq,Ord)
+-- newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 
-bracket :: Char -> Brackets
-bracket c = Brackets [c] [c]
+-- bracket :: Char -> Brackets
+-- bracket c = Brackets [c] [c]
 
 
 
-phrase = "phrase"
-  -- continuation necessary
-  <=> Case       <$>              casing <*>                              phrase
-  <|> Join       <$>              joiner <*>                              phrase
-  <|> Surround   <$>            brackets <*>                              phrase
-  <|> Separated  <$>           separator <*>                              phrase
-  <|> Spelled    <$ "spell"              <*> (char-++) <*>                phrase
-  <|> Letter     <$>                char <*>                              phrase
-  <|> Cap        <$ "cap"                <*>     char <*>                 phrase
-  <|> Pasted     <$ "paste"              <*>                              phrase
-  <|> Blank      <$ "blank"              <*>                              phrase
-  -- continuation optional
-  <|> Escaped    <$ "lit"                <*>   keyword <*>               ( phrase-?)
-  <|> Quoted     <$ "quote"              <*>   word    <*> ("unquote" *> ( phrase-?))
-  <|> Dictated   <$>                word <*>                             ( phrase-?)
-  -- continuation prohibited
-  <|> Dictation_ <$> word
+-- phrase = "phrase"
+--   -- continuation necessary
+--   <=> Case       <$>              casing <*>                              phrase
+--   <|> Join       <$>              joiner <*>                              phrase
+--   <|> Surround   <$>            brackets <*>                              phrase
+--   <|> Separated  <$>           separator <*>                              phrase
+--   <|> Spelled    <$ "spell"              <*> (char-++) <*>                phrase
+--   <|> Letter     <$>                char <*>                              phrase
+--   <|> Cap        <$ "cap"                <*>     char <*>                 phrase
+--   <|> Pasted     <$ "paste"              <*>                              phrase
+--   <|> Blank      <$ "blank"              <*>                              phrase
+--   -- continuation optional
+--   <|> Escaped    <$ "lit"                <*>   keyword <*>               ( phrase-?)
+--   <|> Quoted     <$ "quote"              <*>   word    <*> ("unquote" *> ( phrase-?))
+--   <|> Dictated   <$>                word <*>                             ( phrase-?)
+--   -- continuation prohibited
+--   <|> Dictation_ <$> word
 
-separator = "separator"
-  <=> Separator ""  <$ "break"
-  <|> Separator " " <$ "space"
-  <|> Separator "," <$ "comma"
-  <|> Separator "/" <$ "slash"
-  <|> Separator "." <$ "dot"
+-- separator = "separator"
+--   <=> Separator ""  <$ "break"
+--   <|> Separator " " <$ "space"
+--   <|> Separator "," <$ "comma"
+--   <|> Separator "/" <$ "slash"
+--   <|> Separator "." <$ "dot"
 
-casing = "casing"
-  <=> Upper  <$ "upper"
-  <|> Lower  <$ "lower"
-  <|> Capper <$ "capper"
+-- casing = "casing"
+--   <=> Upper  <$ "upper"
+--   <|> Lower  <$ "lower"
+--   <|> Capper <$ "capper"
 
-joiner = "joiner"
-  <=> (\c -> Joiner [c]) <$ "join" <*> char
-  <|> Joiner "_"  <$ "snake"
-  <|> Joiner "-"  <$ "dash"
-  <|> Joiner "/"  <$ "file"
-  <|> Joiner ""   <$ "squeeze"
-  <|> CamelJoiner <$ "camel"
-  <|> ClassJoiner <$ "class"
+-- joiner = "joiner"
+--   <=> (\c -> Joiner [c]) <$ "join" <*> char
+--   <|> Joiner "_"  <$ "snake"
+--   <|> Joiner "-"  <$ "dash"
+--   <|> Joiner "/"  <$ "file"
+--   <|> Joiner ""   <$ "squeeze"
+--   <|> CamelJoiner <$ "camel"
+--   <|> ClassJoiner <$ "class"
 
-brackets = "brackets"
-  <=> bracket          <$ "round" <*> char
-  <|> Brackets "(" ")" <$ "par"
-  <|> Brackets "[" "]" <$ "square"
-  <|> Brackets "{" "}" <$ "curl"
-  <|> Brackets "<" ">" <$ "angle"
-  <|> bracket '"'      <$ "string"
-  <|> bracket '\''     <$ "ticked"
-  <|> bracket '|'      <$ "norm"
+-- brackets = "brackets"
+--   <=> bracket          <$ "round" <*> char
+--   <|> Brackets "(" ")" <$ "par"
+--   <|> Brackets "[" "]" <$ "square"
+--   <|> Brackets "{" "}" <$ "curl"
+--   <|> Brackets "<" ">" <$ "angle"
+--   <|> bracket '"'      <$ "string"
+--   <|> bracket '\''     <$ "ticked"
+--   <|> bracket '|'      <$ "norm"
 
 char = "char"
   <=> '`' <$ "grave"
 
-keyword = "keyword"
-  <=> Keyword <$> liftLeaf anyWord "keyword"
+-- keyword = "keyword"
+--   <=> Keyword <$> liftLeaf anyWord "keyword"
 
-dictation = "dictation"
-  <=> Dictation <$> liftLeaf (some anyWord) "dictation"
+-- dictation = "dictation"
+--   <=> Dictation <$> liftLeaf (some anyWord) "dictation"
 
-word = "word"
-  <=> (Dictation . (:[])) <$> liftLeaf anyWord "word"
+-- word = "word"
+--   <=> (Dictation . (:[])) <$> liftLeaf anyWord "word"
 
 
 
@@ -283,13 +297,13 @@ brackets_ = "brackets"
   <|> P.bracket '|'      <$ "norm"
 
 dictation_ = "dictation_"
-  <=> P.Dictation <$> liftLeaf (some anyWord) "dictation_"
+  <=> P.Dictation <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
 
 word_ = "word_"
- <=> liftLeaf anyWord "word_"
+ <=> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
 
 keyword_ = "keyword_"
- <=> id <$> liftLeaf anyWord "keyword_"
+ <=> id <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
  -- <=> Keyword <$> word_
 
 renameRHSEarleyDNSF
@@ -319,13 +333,29 @@ renameRHSEarleyDNSST
  -> ST s                   (RHS n1 t f1 a -> ST s (RHS n2 t f2 a))
 renameRHSEarleyDNSST u = unsafeIOToST$ do
  c <- HRefCache.newCache
- -- return$ renameRHS$ \r1 n r2 -> unsafeIOToST$ do
+ -- return$ renameRHS'$ \r1 n r2 -> unsafeIOToST$ do
  return$ renameRHSEarleyDNSF$ \r1 n -> unsafeIOToST$ do
   k <- HRefCache.forceStableName r1
   readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
    Just y  -> return y          -- cache hit
    Nothing -> do                -- cache miss
     y <- unsafeSTToIO$ u r1 n
+    v <- newIORef y
+    _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
+    return y
+
+renameRHSEarleyDNSIO
+ :: ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+ => (forall x. RHS n1 t f1 x -> n1 t f1 x -> IO (    n2 t f2 x))
+ -> IO                   (RHS n1 t f1 a -> IO (RHS n2 t f2 a))
+renameRHSEarleyDNSIO u = do
+ c <- HRefCache.newCache
+ return$ renameRHSEarleyDNSF$ \r1 n -> do
+  k <- HRefCache.forceStableName r1
+  readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
+   Just y  -> return y          -- cache hit
+   Nothing -> do                -- cache miss
+    y <- u r1 n
     v <- newIORef y
     _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
     return y
@@ -349,7 +379,7 @@ renameRHSST
 renameRHSST u = unsafeIOToST$ do
  c <- HRefCache.newCache
  -- return$ renameRHS$ \r1 n r2 -> unsafeIOToST$ do
- return$ renameRHS$ \r1 n -> unsafeIOToST$ do
+ return$ renameRHS'$ \r1 n -> unsafeIOToST$ do
   k <- HRefCache.forceStableName r1
   readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
    Just y  -> return y          -- cache hit
@@ -359,6 +389,8 @@ renameRHSST u = unsafeIOToST$ do
     _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
     return y
 -- renaming recursive RHS doesn't terminate because: in renaming/traversing the non-terminal, the name is decoupled from the body. the natural transformation should return a pair, and the name and the rhs are both cached. makes sense, as we are caching on the non-terminal (isomorphic to a pair) pointer.
+
+
 
 data EarleyName z n t (f :: * -> *) a = EarleyName
  { unEarleyName :: E.Prod z n t a -> E.Prod z n t a
@@ -371,13 +403,13 @@ data EarleyName z n t (f :: * -> *) a = EarleyName
 --          -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
 --          )
 -- deriveEarley = renameRHSST $ \_ (ConstName n) _ -> do
-deriveEarley = renameRHSEarleyDNSST $ \_ (ConstName n) -> do
+deriveEarley = renameRHSEarleyDNSST $ \_ (ConstName (_, n)) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
  return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
 
 induceEarley
- :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))
+ :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))  -- type equality only for documentation
  => (Eq t)
  => RHS (EarleyName z n)
         t
@@ -400,28 +432,23 @@ buildEarley p xs = do
   E.parse [s] [] [] (return ()) [] 0 xs
 
 runEarley
- :: ((n ~ String))
- => (Eq t)
- => (forall r. RHS (ConstName n) t (RHSEarleyDNSF (E.Rule s r) (ConstName n) t) a)
+ :: (Eq t)
+ => (forall r. RHS (ConstName (_,String)) t (RHSEarleyDNSF (E.Rule s r) (ConstName (_,String)) t) a)
  -> [t]
- -> ST s (E.Result s n [t] a)
+ -> ST s (E.Result s String [t] a)
 runEarley r1 xs = do
  r2 <- deriveEarley >>= ($ r1)
  buildEarley (induceEarley r2) xs
 
 parse
- :: ((n ~ String))
- =>  (Eq t)
- => (forall r. RHS (ConstName n) t (RHSEarleyDNSF r (ConstName String) t) a)
+ :: (Eq t)
+ => (forall r. RHS (ConstName (_,String)) t (RHSEarleyDNSF r (ConstName (_,String)) t) a)
  -> [t]
- -> ([a], E.Report n [t])
+ -> ([a], E.Report String [t])
 parse r xs = E.fullParses$ runEarley r xs
 
-
-
 parseString
- ::((n ~ String))
- => (forall r. RHS (ConstName n) String (RHSEarleyDNSF r (ConstName String) String) a)
+ :: (forall r. RHSEarleyDNS r a)
  -> String
  -> [a]
 parseString r s = as
@@ -454,6 +481,79 @@ qPhrase = sum . fmap (\case
  Joined_ _ -> 1
  Surrounded_ _ -> 1
  Dictated_ _ -> 0)
+
+
+
+data DNSName n t (f :: * -> *) a = DNSName DNSInfo n Int
+
+instance (Eq n) => (Eq  (DNSName n t f a)) where (==) = eqDNSName
+instance (Eq n) => (Eq1 (DNSName n t f))   where eq1  = eqDNSName
+instance (Eq n) => (HEq (DNSName n t f))   where hEq  = eqDNSName
+
+class HEq f where
+ hEq :: f a -> f b -> Bool
+ -- default hEq :: f a -> f b -> Bool
+
+eqDNSName :: (Eq n) => DNSName n t f a -> DNSName n t' f' a' -> Bool
+eqDNSName (DNSName i n k) (DNSName i' n' k')
+  = i == i'
+ && n == n'
+ && k == k'
+
+-- deriveDNS ::
+deriveDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
+ k <- hashUnique <$> newUnique
+ return$ DNSName i n k
+
+-- also collect names to build DNSProductions
+-- induceDNS
+--  :: RHS (DNSName n) t (RHSEarleyDNSF z (DNSName n) t) a
+--  -> DNSRHS (DNSProduction DNSInfo n t) t
+-- induceDNS = foldRHS
+--  (\(DNSName i n k) r -> SomeDNSNonTerminal$ DNSFixName$ DNSProduction i (DNSRule $ n <> show k) r)
+--  DNSTerminal
+--  (\case
+--   LeafRHS _ g  -> g
+--   TreeRHS _ gRHS -> induceDNS gRHS)
+--  UnitDNSRHS
+--  (\r1 r2 -> DNSSequence (r1 :| [r2]))
+--  (maybe ZeroDNSRHS DNSAlternatives . NonEmpty.nonEmpty)
+--  (DNSOptional)
+--  (DNSOptional . DNSMultiple)
+--  (DNSMultiple)
+
+-- reifyDNS :: DNSRHS (DNSProduction i n t) t -> Map n (DNSRHS n t)
+-- reifyDNS r = undefined r
+
+-- reifyRHS :: RHS n t f x -> Map (Any (n t f)) (SomeRHS n t f)
+-- reifyRHS :: (?eqName :: forall a b. (n t f a) -> (n t f b) -> Bool) => 
+-- reifyRHS :: (?hEqI :: HEqI (n t f)) =>
+-- (Eq n)  -- (HEq (DNSName n t f))  -- (Eq1 (n t f))  -- (forall x. Eq (n t f x))
+-- reifyRHS :: (Eq1 (n t f)) => RHS n t f x -> [Any (Product (n t f) (RHS n t f))]
+reifyRHS :: (forall a b. (n t f a) -> (n t f b) -> Bool) -> RHS n t f x -> OList (n t f) (RHS n t f)
+reifyRHS eqName r = undefined execState eqName r
+
+type HEqI f = forall x y. f x -> f y -> Bool
+type Exists = Any
+unExists (Any x) = x
+leftProduct (Pair f _) = f
+rightProduct (Pair _ g) = g
+-- | list with higher-order items
+type OList f g = [Exists (Product f g)]
+-- insertOList :: f a -> g a -> OList f g -> OList f g
+-- insertOList f g fgs = Any (Pair f g) : fgs
+insertOList :: (forall x. (f x, g x)) -> OList f g -> OList f g
+insertOList fg fgs = Any (Pair (fst fg) (snd fg)) : fgs
+-- insertOList (f,g) fgs = Any (Pair f g) : fgs  -- type variable ‘x’ would escape its scope
+lookupOList :: (HEqI f) -> OList f g -> f a -> Maybe (g a)
+-- lookupOList hEq fgs f1 =  case (\(Any (Pair f2 _)) -> (hEq f1 f2)) fgs of (Any (Pair _ g)) -> g
+lookupOList hEq fgs f = foldr go Nothing fgs
+ where
+ go fg = \case
+  Nothing -> if (hEq f . leftProduct . unExists) fg then Just$ (rightProduct . unExists) fg else Nothing
+  Just r -> Just r
+
+
 
 mainEmacs = do
  print$ parseString edits "kill"

@@ -186,14 +186,32 @@ many1RHS = Some NonEmpty.toList
 instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
 
 -- a Traversal?
-renameRHS
+renameRHS'
  :: forall m n1 n2 t f a. (Applicative m)
  => (forall x. RHS n1 t f x ->     n1 t f x -> m (    n2 t f x))
  -- => (forall x. RHS n1 t f x ->     n1 t f x -> RHS n1 t f x -> m (    n2 t f x , RHS n2 t f x))
  -> (                          RHS n1 t f a ->                 m (RHS n2 t f a))
-renameRHS u = \case
+renameRHS' u = \case
  k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
  -- k@(NonTerminal x r)  ->  (uncurry NonTerminal) <$> u k x r
+ Terminal i r       ->  pure$ Terminal i r
+ Opt  i r           ->  Opt  i <$> go r
+ Many i r           ->  Many i <$> go r
+ Some i r           ->  Some i <$> go r
+ Pure a             ->  pure$ Pure a
+ r `Apply` x        ->  Apply  <$> go r <*> pure x -- preserved
+ r :<*> r'          ->  (:<*>) <$> go r <*> go r'
+ Alter rs           ->  Alter <$> go `traverse` rs
+ where
+ go :: forall x. RHS n1 t f x -> m (RHS n2 t f x)
+ go = renameRHS' u
+
+renameRHS
+ :: forall m n1 n2 t f a. (Applicative m)
+ => (forall x. RHS n1 t f x ->     n1 t f x -> RHS n1 t f x -> m (    n2 t f x , RHS n2 t f x))
+ -> (                          RHS n1 t f a ->                 m (RHS n2 t f a))
+renameRHS u = \case
+ k@(NonTerminal x r)  ->  uncurry(NonTerminal) <$> u k x r
  Terminal i r       ->  pure$ Terminal i r
  Opt  i r           ->  Opt  i <$> go r
  Many i r           ->  Many i <$> go r
@@ -210,3 +228,5 @@ renameRHS u = \case
 data ConstName n t (f :: * -> *) a = ConstName { unConstName :: !n } deriving (Functor)
 -- KindSignatures because: f being phantom, it's kind is inferred to be nullary (I think)
 -- TODO is PolyKinds better? (f :: k)
+
+data SomeRHS n t f = SomeRHS { unSomeRHS :: forall x. RHS n t f x }

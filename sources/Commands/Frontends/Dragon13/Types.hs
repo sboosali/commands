@@ -266,6 +266,10 @@ asDNSSequence = \case
  DNSSequence rs -> rs
  r -> r :| []
 
+pattern SomeDNSNonTerminal l = DNSNonTerminal (SomeDNSLHS l)
+
+-- TODO nonemptyDNS: if DNS unit represents the empty list, why not simplify types and use normal lists? Avoids needing to optimize away (DNSSequence DNSUnit). Delays empty case analysis until pretty printing.
+
 
 -- ================================================================ --
 

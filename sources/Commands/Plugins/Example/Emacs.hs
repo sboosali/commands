@@ -46,7 +46,7 @@ type RHSEarleyDNS z = RHS
  (RHSEarleyDNSF z (ConstName (DNSInfo, String)) String)
 
 data RHSEarleyDNSF z n t a
- =           LeafRHS (E.Prod z String t a) (DNSRHS String t)
+ =           LeafRHS (E.Prod z String t a) (DNSRHS t String)
  | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
 deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t) -- TODO UndecidableInstances
@@ -508,7 +508,7 @@ deriveDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
 -- also collect names to build DNSProductions
 -- induceDNS
 --  :: RHS (DNSName n) t (RHSEarleyDNSF z (DNSName n) t) a
---  -> DNSRHS (DNSProduction DNSInfo n t) t
+--  -> DNSRHS t (DNSProduction DNSInfo n t)
 -- induceDNS = foldRHS
 --  (\(DNSName i n k) r -> SomeDNSNonTerminal$ DNSFixName$ DNSProduction i (DNSRule $ n <> show k) r)
 --  DNSTerminal
@@ -522,7 +522,7 @@ deriveDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
 --  (DNSOptional . DNSMultiple)
 --  (DNSMultiple)
 
--- reifyDNS :: DNSRHS (DNSProduction i n t) t -> Map n (DNSRHS n t)
+-- reifyDNS :: DNSRHS t (DNSProduction i n t) -> Map n (DNSRHS n t)
 -- reifyDNS r = undefined r
 
 -- reifyRHS :: RHS n t f x -> Map (Any (n t f)) (SomeRHS n t f)

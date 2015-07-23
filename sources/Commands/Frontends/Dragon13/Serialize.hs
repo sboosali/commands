@@ -113,7 +113,7 @@ as you can see, horizontally delimited 'Doc'uments are vertically aligned iff th
 
 
 -}
-serializeGrammar :: DNSGrammar i DNSName DNSText -> SerializedGrammar
+serializeGrammar :: DNSGrammar i DNSText DNSName -> SerializedGrammar
 serializeGrammar grammar = SerializedGrammar{..}
  where
  serializedLists  = serializeVocabularies (grammar^.dnsVocabularies)
@@ -154,7 +154,7 @@ not (as the 'DNSRule's are) defined as a @gramSpec@ String.
 
 -}
 serializeVocabularies
- :: [DNSVocabulary i DNSName DNSText] -> Doc
+ :: [DNSVocabulary i DNSText DNSName] -> Doc
 serializeVocabularies
  = enclosePythonic "{" "}" ","
  . mapMaybe serializeVocabulary
@@ -165,7 +165,7 @@ serializeVocabularies
 "list": ["one","two"]
 
 -}
-serializeVocabulary :: DNSVocabulary i DNSName DNSText -> Possibly Doc
+serializeVocabulary :: DNSVocabulary i DNSText DNSName -> Possibly Doc
 serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
  (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
 
@@ -174,7 +174,7 @@ serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
 --
 --
 --
-serializeProductions :: NonEmpty (DNSProduction i DNSName DNSText) -> Doc
+serializeProductions :: NonEmpty (DNSProduction i DNSText DNSName) -> Doc
 serializeProductions (export :| productions)
  = cat
  . punctuate "\n"
@@ -186,7 +186,7 @@ serializeProductions (export :| productions)
 -- >>> serializeExport $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
 -- <rule> exported  = "token";
 --
-serializeExport :: DNSProduction i DNSName DNSText -> Doc
+serializeExport :: DNSProduction i DNSText DNSName -> Doc
 serializeExport (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
@@ -195,7 +195,7 @@ serializeExport (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
 -- >>> serializeProduction $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
 -- <rule>  = "token";
 --
-serializeProduction :: DNSProduction i DNSName DNSText -> Doc
+serializeProduction :: DNSProduction i DNSText DNSName -> Doc
 serializeProduction (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
@@ -213,7 +213,7 @@ serializeRHS $ DNSAlternatives
 ("hello" "world" | [(<word>)+])
 
 -}
-serializeRHS :: DNSRHS DNSName DNSText -> Doc
+serializeRHS :: DNSRHS DNSText DNSName -> Doc
 serializeRHS (DNSTerminal t)                  = serializeToken t
 serializeRHS (DNSNonTerminal (SomeDNSLHS l))  = serializeLHS l
 serializeRHS (DNSOptional r)                  = "[" <> serializeRHS r <> "]"
@@ -299,8 +299,8 @@ enclosePythonic left right sep ds
 --
 -- a Kleisli arrow where @(m ~ Either [SomeException])@
 --
-escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSName DNSText)
-escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
+escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSText DNSName)
+escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSText) (eitherToValidations . escapeDNSName)
 
 
 data Address = Address Host Port

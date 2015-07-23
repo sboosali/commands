@@ -23,11 +23,11 @@ makeLenses ''DNSExpandedName
 makeLenses ''DNSInfo
 
 -- | equality projected 'on' the left-hand sides of productions.
-equalDNSProduction :: (Eq n) => DNSProduction i n t -> DNSProduction i n t -> Bool
+equalDNSProduction :: (Eq n) => DNSProduction i t n -> DNSProduction i t n -> Bool
 equalDNSProduction = (==) `on` view dnsProductionLHS
 
 -- |
-getNonTerminals :: DNSProduction i n t -> [SomeDNSLHS n]
+getNonTerminals :: DNSProduction i t n -> [SomeDNSLHS n]
 getNonTerminals
  = mapMaybe (\case
     DNSNonTerminal l -> Just l
@@ -44,10 +44,10 @@ dnsLHSName f = \case
  DNSList n   -> DNSList <$> f n
  l           -> pure l
 
-dnsExport :: Lens' (DNSGrammar i n t) (DNSProduction i n t)
+dnsExport :: Lens' (DNSGrammar i t n) (DNSProduction i t n)
 dnsExport = dnsProductions . nonemptyHead
 
-dnsNonExports :: Lens' (DNSGrammar i n t) [DNSProduction i n t]
+dnsNonExports :: Lens' (DNSGrammar i t n) [DNSProduction i t n]
 dnsNonExports = dnsProductions . nonemptyTail
 
 ruleExpand :: Lens' (Rule p DNSReifying l i a) Natural

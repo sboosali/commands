@@ -23,48 +23,51 @@ import Numeric.Natural
 
 -- ================================================================ --
 
--- | a Dragon NaturallySpeaking (\"DNS") grammar has
--- one or more 'DNSProduction's, exactly one of which is an export.
--- (the "exactly one" constraint should really be "at least one", but
--- this restriction shouldn't matter).
---
--- in the type @DNSGrammar i n t@, you can read:
---
--- * @i@ as @info@
--- * @n@ as @name@ or @nonTerminal@
--- * @t@ as @text@ or @terminal@
---
--- a 'Bitraversable', for easy validation
--- (e.g. "Commands.Frontends.Dragon13.escapeDNSGrammar")
--- not a 'Traversable', because the terminals and the non-terminals
--- are distinct lexemes, with different criteria for being valid.
---
---
--- in relation to NatLink's concrete syntax:
---
--- * @"\<rule> = ...;"@ and @"\<rule> exported = ...;"@ both declare a @'DNSProduction' ...@
--- * @"self.setList('list', [...])"@ declares a 'DNSVocabulary'
--- * @"\<rule> imported;"@ is a 'DNSImport'
---
---
--- a 'DNSVocabulary' can be named only by 'LHSList's, as
--- a 'DNSProduction' can be named only by 'LHSRule's.
---
--- an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
---
--- (technically, this is an abstract syntax tree for a general SAPI grammar.
--- which could work with either DNS or WSR (Windows speech recognition), for example.)
---
-data DNSGrammar i n t = DNSGrammar
- { _dnsProductions  :: NonEmpty (DNSProduction i n t)
- , _dnsVocabularies :: [DNSVocabulary i n t]
+{- | a Dragon NaturallySpeaking (\"DNS") grammar has
+one or more 'DNSProduction's, exactly one of which is an export.
+(the "exactly one" constraint should really be "at least one", but
+this restriction shouldn't matter).
+
+in the type @DNSGrammar i t n@, you can read:
+
+* @i@ as @info@
+* @t@ as @text@ or @terminal@
+* @n@ as @name@ or @nonTerminal@
+
+the type parameter order permits direct/cyclic reference, e.g.:
+
+@type DNSGrammarFix i t = 'Data.Functor.Foldable.Fix' (DNSGrammar i t)@
+
+a 'Bitraversable', for easy validation
+(e.g. "Commands.Frontends.Dragon13.escapeDNSGrammar")
+not a 'Traversable', because the terminals and the non-terminals
+are distinct lexemes, with different criteria for being valid.
+
+in relation to NatLink's concrete syntax:
+
+* @"\<rule> = ...;"@ and @"\<rule> exported = ...;"@ both declare a @'DNSProduction' ...@
+* @"self.setList('list', [...])"@ declares a 'DNSVocabulary'
+* @"\<rule> imported;"@ is a 'DNSImport'
+
+a 'DNSVocabulary' can be named only by 'LHSList's, as
+a 'DNSProduction' can be named only by 'LHSRule's.
+
+an 'LHSRule' \'s 'DNSRHS' must be 'NonEmpty', but an 'LHSList' \'s 'DNSToken's may be empty.
+
+(technically, this is an abstract syntax tree for a general SAPI grammar.
+which could work with either DNS or WSR (Windows speech recognition), for example.)
+
+-}
+data DNSGrammar i t n = DNSGrammar
+ { _dnsProductions  :: NonEmpty (DNSProduction i t n)
+ , _dnsVocabularies :: [DNSVocabulary i t n]
  , _dnsImports      :: [DNSImport n] -- TODO  a Set, or remove duplicates later. a Set has no duplicates by construction, though does constrain the non-terminal type
- -- TODO _dnsExports  :: NonEmpty (DNSProduction i n t)
- -- TODO _dnsP? :: (DNSProduction i n t)
+ -- TODO _dnsExports  :: NonEmpty (DNSProduction i t n)
+ -- TODO _dnsP? :: (DNSProduction i t n)
  -- TODO dnsProductions = dnsExports <> _dnsP?
  } deriving (Show, Eq)
 
-instance Semigroup (DNSGrammar i n t) where
+instance Semigroup (DNSGrammar i t n) where
  DNSGrammar ps vs is <> DNSGrammar ps' vs' is' = DNSGrammar (ps <> ps') (vs <> vs') (is <> is')
 
 instance Bifunctor     (DNSGrammar i) where  bimap     = bimapDefault
@@ -73,7 +76,7 @@ instance Bitraversable (DNSGrammar i) where -- valid Bitraversable?
  bitraverse f g (DNSGrammar productions vocabularies imports) = DNSGrammar
   <$> traverse (bitraverse f g) productions
   <*> traverse (bitraverse f g) vocabularies
-  <*> traverse (traverse f) imports
+  <*> traverse (traverse g) imports
 
 
 -- ================================================================ --
@@ -107,17 +110,17 @@ dnsHeader = (DNSImport . DNSBuiltinRule) <$> constructors
 -- |
 --
 --
-data DNSProduction i n t = DNSProduction
+data DNSProduction i t n = DNSProduction
  { _dnsProductionInfo :: i
  , _dnsProductionLHS  :: (DNSLHS LHSRule LHSDefined n)
- , _dnsProductionRHS  :: (DNSRHS n t)
+ , _dnsProductionRHS  :: (DNSRHS t n)
  }
  deriving (Show,Eq,Ord)
 
 instance Bifunctor     (DNSProduction i) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction i) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSProduction i) where
- bitraverse f g (DNSProduction i l rs) = DNSProduction i <$> traverse f l <*> bitraverse f g rs
+ bitraverse f g (DNSProduction i l r) = DNSProduction i <$> traverse g l <*> bitraverse f g r
 
 
 -- ================================================================ --
@@ -126,7 +129,7 @@ instance Bitraversable (DNSProduction i) where
 --
 --
 --
-data DNSVocabulary i n t = DNSVocabulary
+data DNSVocabulary i t n = DNSVocabulary
  { _dnsVocabularyInfo   :: i
  , _dnsVocabularyLHS    :: (DNSLHS LHSList LHSDefined n)
  , _dnsVocabularyTokens :: [DNSToken t]
@@ -136,7 +139,7 @@ data DNSVocabulary i n t = DNSVocabulary
 instance Bifunctor     (DNSVocabulary i) where bimap     = bimapDefault
 instance Bifoldable    (DNSVocabulary i) where bifoldMap = bifoldMapDefault
 instance Bitraversable (DNSVocabulary i) where
- bitraverse f g (DNSVocabulary i l ts) = DNSVocabulary i <$> traverse f l <*> traverse (traverse g) ts
+ bitraverse f g (DNSVocabulary i l ts) = DNSVocabulary i <$> traverse g l <*> traverse (traverse f) ts
 
 
 -- ================================================================ --
@@ -146,26 +149,26 @@ instance Bitraversable (DNSVocabulary i) where
 -- grammar specification.
 --
 -- 'Eq' instance is manual because a constructor ('DNSNonTerminal') is existentially-quantified.
-data DNSRHS n t
+data DNSRHS t n
  = DNSTerminal    (DNSToken t) -- ^ e.g. @"terminal"@
  | DNSNonTerminal (SomeDNSLHS n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
- | DNSOptional (DNSRHS n t) -- ^ e.g. @[optional]@
- | DNSMultiple (DNSRHS n t) -- ^ e.g. @(multiple)+@
- | DNSSequence     (NonEmpty (DNSRHS n t)) -- ^ e.g. @first second ...@
- | DNSAlternatives (NonEmpty (DNSRHS n t)) -- ^ e.g. @(alternative | ...)@
+ | DNSOptional (DNSRHS t n) -- ^ e.g. @[optional]@
+ | DNSMultiple (DNSRHS t n) -- ^ e.g. @(multiple)+@
+ | DNSSequence     (NonEmpty (DNSRHS t n)) -- ^ e.g. @first second ...@
+ | DNSAlternatives (NonEmpty (DNSRHS t n)) -- ^ e.g. @(alternative | ...)@
  deriving (Show,Eq,Ord)
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault
 instance Bitraversable DNSRHS where -- valid Bitraversable?
- bitraverse _ g (DNSTerminal t)      = DNSTerminal     <$> traverse g t
- bitraverse f _ (DNSNonTerminal n)   = DNSNonTerminal  <$> traverse f n
+ bitraverse f _ (DNSTerminal t)      = DNSTerminal     <$> traverse f t
+ bitraverse _ g (DNSNonTerminal n)   = DNSNonTerminal  <$> traverse g n
  bitraverse f g (DNSSequence rs)     = DNSSequence     <$> traverse (bitraverse f g) rs
  bitraverse f g (DNSAlternatives rs) = DNSAlternatives <$> traverse (bitraverse f g) rs
  bitraverse f g (DNSOptional r)      = DNSOptional     <$> bitraverse f g r
  bitraverse f g (DNSMultiple r)      = DNSMultiple     <$> bitraverse f g r
 
-instance Plated (DNSRHS n t) where
+instance Plated (DNSRHS t n) where
  plate f (DNSOptional r)      = DNSOptional     <$> f r
  plate f (DNSMultiple r)      = DNSMultiple     <$> f r
  plate f (DNSSequence rs)     = DNSSequence     <$> traverse f rs -- TODO is the instance correct? Are these "immediate" children? they are non-transitive, and seem necessary for the use I want
@@ -173,11 +176,11 @@ instance Plated (DNSRHS n t) where
  plate _ r = pure r
 
 -- | for readable @doctest@s
-instance (IsString t) => (IsString (DNSRHS n t)) where
+instance (IsString t) => (IsString (DNSRHS t n)) where
  fromString = DNSTerminal . DNSToken . fromString
 
 -- sequencing or alternation?
-instance Monoid (DNSRHS n t) where
+instance Monoid (DNSRHS t n) where
  mempty = UnitDNSRHS
 
  UnitDNSRHS `mappend` y = y
@@ -199,12 +202,12 @@ pattern ZeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 -- these properties are used at different stages of building the
 -- grammar (e.g. "Commands.Frontends.Dragon13.Render" and
 -- "Commands.Frontends.Dragon13.Optimize"). these stages use different
--- name types (i.e. the @n@ in @DNSRHS n t@): not the same one, and
+-- name types (i.e. the @n@ in @DNSRHS t n@): not the same one, and
 -- not just Strings. Thus, we need a parametrically polymorphic
 -- 'ZeroDNSRHS':
 --
 -- @
--- DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS n t
+-- DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS t n
 -- @
 --
 -- rather than the simple but non-@n@-polymorphic:
@@ -216,7 +219,7 @@ pattern ZeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 --
 --
 
-asDNSAlternatives :: DNSRHS n t -> NonEmpty (DNSRHS n t)
+asDNSAlternatives :: DNSRHS t n -> NonEmpty (DNSRHS t n)
 asDNSAlternatives = \case
  DNSAlternatives rs -> rs
  r -> r :| []
@@ -261,7 +264,7 @@ asDNSAlternatives = \case
 --
 pattern UnitDNSRHS = DNSOptional ZeroDNSRHS
 
-asDNSSequence :: DNSRHS n t -> NonEmpty (DNSRHS n t)
+asDNSSequence :: DNSRHS t n -> NonEmpty (DNSRHS t n)
 asDNSSequence = \case
  DNSSequence rs -> rs
  r -> r :| []
@@ -440,12 +443,12 @@ newtype DNSReifying l i = DNSReifying { _dnsReifyingDescendents :: (Tree (DNSRei
 defaultDNSReifying :: l -> DNSReifyingRHS l i -> DNSReifying l i
 defaultDNSReifying l r = DNSReifying $ Node (defaultDNSProduction l r) []
 
-type DNSReifyingProduction l i = DNSProduction DNSInfo (DNSExpandedName l) i
+type DNSReifyingProduction l i = DNSProduction DNSInfo i (DNSExpandedName l)
 
 defaultDNSProduction :: l -> DNSReifyingRHS l i -> DNSReifyingProduction l i
 defaultDNSProduction l r = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) r
 
-type DNSReifyingRHS l i = DNSRHS (DNSExpandedName l) i
+type DNSReifyingRHS l i = DNSRHS i (DNSExpandedName l)
 
 type DNSReifyingName = DNSExpandedName LHS
 

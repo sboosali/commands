@@ -164,13 +164,13 @@ hashAlphanumeric = flip showHex "" . abs . hash
 
 -- | existentially-quantify any unary type-constructor
 --
--- >>> :t Any Nothing
--- Any Nothing :: Any Maybe
+-- >>> :t Exists Nothing
+-- Exists Nothing :: Exists Maybe
 --
--- >>> case Any [] of Any xs -> length xs
+-- >>> case Exists [] of Exists xs -> length xs
 -- 0
 --
-data Any f = Any {unAny :: forall x. (f x)}
+data Exists f = Exists {unExists :: forall x. (f x)}
 
 
 nonemptyHead :: Lens' (NonEmpty a) a

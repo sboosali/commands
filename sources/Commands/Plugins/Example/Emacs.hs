@@ -20,7 +20,7 @@ import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
-import BasePrelude hiding (bracket, Product (..), Any (..))
+import BasePrelude hiding (bracket, Product (..))
 
 import Prelude ()
 import           Control.Applicative
@@ -38,7 +38,10 @@ import Data.Functor.Classes
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.Trans.State
+import Data.Functor.Foldable (Fix(..))
 
+
+type DNSProductionFix i t = Fix (DNSProduction i t)
 
 type RHSEarleyDNS z = RHS
  (ConstName (DNSInfo, String))
@@ -525,29 +528,27 @@ deriveDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
 -- reifyDNS :: DNSRHS t (DNSProduction i n t) -> Map n (DNSRHS n t)
 -- reifyDNS r = undefined r
 
--- reifyRHS :: RHS n t f x -> Map (Any (n t f)) (SomeRHS n t f)
+-- reifyRHS :: RHS n t f x -> Map (Exists (n t f)) (SomeRHS n t f)
 -- reifyRHS :: (?eqName :: forall a b. (n t f a) -> (n t f b) -> Bool) => 
 -- reifyRHS :: (?hEqI :: HEqI (n t f)) =>
 -- (Eq n)  -- (HEq (DNSName n t f))  -- (Eq1 (n t f))  -- (forall x. Eq (n t f x))
--- reifyRHS :: (Eq1 (n t f)) => RHS n t f x -> [Any (Product (n t f) (RHS n t f))]
-reifyRHS :: (forall a b. (n t f a) -> (n t f b) -> Bool) -> RHS n t f x -> OList (n t f) (RHS n t f)
+-- reifyRHS :: (Eq1 (n t f)) => RHS n t f x -> [Exists (Product (n t f) (RHS n t f))]
+reifyRHS :: (forall a b. (n t f a) -> (n t f b) -> Bool) -> RHS n t f x -> OMap (n t f) (RHS n t f)
 reifyRHS eqName r = undefined execState eqName r
 
 type HEqI f = forall x y. f x -> f y -> Bool
-type Exists = Any
-unExists (Any x) = x
 leftProduct (Pair f _) = f
 rightProduct (Pair _ g) = g
 -- | list with higher-order items
-type OList f g = [Exists (Product f g)]
--- insertOList :: f a -> g a -> OList f g -> OList f g
--- insertOList f g fgs = Any (Pair f g) : fgs
-insertOList :: (forall x. (f x, g x)) -> OList f g -> OList f g
-insertOList fg fgs = Any (Pair (fst fg) (snd fg)) : fgs
--- insertOList (f,g) fgs = Any (Pair f g) : fgs  -- type variable ‘x’ would escape its scope
-lookupOList :: (HEqI f) -> OList f g -> f a -> Maybe (g a)
--- lookupOList hEq fgs f1 =  case (\(Any (Pair f2 _)) -> (hEq f1 f2)) fgs of (Any (Pair _ g)) -> g
-lookupOList hEq fgs f = foldr go Nothing fgs
+type OMap f g = [Exists (Product f g)]
+-- insertOMap :: f a -> g a -> OMap f g -> OMap f g
+-- insertOMap f g fgs = Exists (Pair f g) : fgs
+insertOMap :: (forall x. (f x, g x)) -> OMap f g -> OMap f g
+insertOMap fg fgs = Exists (Pair (fst fg) (snd fg)) : fgs
+-- insertOMap (f,g) fgs = Exists (Pair f g) : fgs  -- type variable ‘x’ would escape its scope
+lookupOMap :: (HEqI f) -> OMap f g -> f a -> Maybe (g a)
+-- lookupOMap hEq fgs f1 =  case (\(Exists (Pair f2 _)) -> (hEq f1 f2)) fgs of (Exists (Pair _ g)) -> g
+lookupOMap hEq fgs f = foldr go Nothing fgs
  where
  go fg = \case
   Nothing -> if (hEq f . leftProduct . unExists) fg then Just$ (rightProduct . unExists) fg else Nothing

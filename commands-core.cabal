@@ -146,6 +146,7 @@ library
   , action-permutations       ==0.0.*
   , split                     ==0.2.2.*
   , kan-extensions            ==4.2.*
+  , recursion-schemes  ==4.1.*
 
   , Earley                    >=0.8.3 && <0.9.0
   , parsec                    ==3.1.*

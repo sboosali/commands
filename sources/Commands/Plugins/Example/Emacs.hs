@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings, PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, ScopedTypeVariables         #-}
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances                                      #-}
+{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo                                      #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 module Commands.Plugins.Example.Emacs where
 import           Commands.Etc
@@ -13,16 +13,18 @@ import qualified Data.HRefCache.Internal         as HRefCache
 -- import Commands.Plugins.Example.Phrase hiding  (phrase, casing, separator, joiner, brackets, keyword, char, dictation, word)
 import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
-import Commands.Frontends.Dragon13.Types
+import Commands.Frontends.Dragon13
 
+import Data.Void
+import Data.Bifunctor
+import Data.Bitraversable
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
-import BasePrelude hiding (bracket, Product (..))
 
-import Prelude ()
+import Data.Monoid              ((<>))
 import           Control.Applicative
 import           Control.Arrow                   ((>>>))
 import           Control.Monad.ST
@@ -38,10 +40,11 @@ import Data.Functor.Classes
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.Trans.State
+-- import Control.Monad.Trans.Maybe
 import Data.Functor.Foldable (Fix(..))
+import Control.Comonad.Cofree
+import qualified Data.List as List
 
-
-type DNSProductionFix i t = Fix (DNSProduction i t)
 
 type RHSEarleyDNS z = RHS
  (ConstName (DNSInfo, String))
@@ -49,7 +52,7 @@ type RHSEarleyDNS z = RHS
  (RHSEarleyDNSF z (ConstName (DNSInfo, String)) String)
 
 data RHSEarleyDNSF z n t a
- =           LeafRHS (E.Prod z String t a) (DNSRHS t String)
+ =           LeafRHS (E.Prod z String t a) (DNSRHS t Void)
  | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
 deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t) -- TODO UndecidableInstances
@@ -486,74 +489,73 @@ qPhrase = sum . fmap (\case
  Dictated_ _ -> 0)
 
 
+-- | a directly-recursive right-hand side, with a left-hand side annotation; like a production.
+type DNSRHSRec i t n = Cofree (DNSRHS t) (i, n)
+-- DNSRHS t (Cofree (DNSRHS t) (i, n))
 
-data DNSName n t (f :: * -> *) a = DNSName DNSInfo n Int
+data DNSUniqueName n t (f :: * -> *) a = DNSUniqueName DNSInfo n Int
 
-instance (Eq n) => (Eq  (DNSName n t f a)) where (==) = eqDNSName
-instance (Eq n) => (Eq1 (DNSName n t f))   where eq1  = eqDNSName
-instance (Eq n) => (HEq (DNSName n t f))   where hEq  = eqDNSName
 
-class HEq f where
- hEq :: f a -> f b -> Bool
- -- default hEq :: f a -> f b -> Bool
-
-eqDNSName :: (Eq n) => DNSName n t f a -> DNSName n t' f' a' -> Bool
-eqDNSName (DNSName i n k) (DNSName i' n' k')
-  = i == i'
- && n == n'
- && k == k'
-
--- deriveDNS ::
-deriveDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
+renameRHSToDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
  k <- hashUnique <$> newUnique
- return$ DNSName i n k
+ return$ DNSUniqueName i n k
 
--- also collect names to build DNSProductions
--- induceDNS
---  :: RHS (DNSName n) t (RHSEarleyDNSF z (DNSName n) t) a
---  -> DNSRHS t (DNSProduction DNSInfo n t)
--- induceDNS = foldRHS
---  (\(DNSName i n k) r -> SomeDNSNonTerminal$ DNSFixName$ DNSProduction i (DNSRule $ n <> show k) r)
---  DNSTerminal
---  (\case
---   LeafRHS _ g  -> g
---   TreeRHS _ gRHS -> induceDNS gRHS)
---  UnitDNSRHS
---  (\r1 r2 -> DNSSequence (r1 :| [r2]))
---  (maybe ZeroDNSRHS DNSAlternatives . NonEmpty.nonEmpty)
---  (DNSOptional)
---  (DNSOptional . DNSMultiple)
---  (DNSMultiple)
+induceDNS
+ :: RHS (DNSUniqueName String) t (RHSEarleyDNSF z (DNSUniqueName String) t) a
+ -> Cofree (DNSRHS t) (DNSInfo, String)
+induceDNS = induceDNS' >>> \case
+ SomeDNSNonTerminal (DNSRule ((i,n) :< r)) -> (i,n)         :< r
+ r                                         -> defaultDNSLHS :< r
 
--- reifyDNS :: DNSRHS t (DNSProduction i n t) -> Map n (DNSRHS n t)
--- reifyDNS r = undefined r
+defaultDNSLHS :: (DNSInfo,String)
+defaultDNSLHS = (defaultDNSInfo,"defaultDNSLHS") -- TODO should be unique; quote it?
 
--- reifyRHS :: RHS n t f x -> Map (Exists (n t f)) (SomeRHS n t f)
--- reifyRHS :: (?eqName :: forall a b. (n t f a) -> (n t f b) -> Bool) => 
--- reifyRHS :: (?hEqI :: HEqI (n t f)) =>
--- (Eq n)  -- (HEq (DNSName n t f))  -- (Eq1 (n t f))  -- (forall x. Eq (n t f x))
--- reifyRHS :: (Eq1 (n t f)) => RHS n t f x -> [Exists (Product (n t f) (RHS n t f))]
-reifyRHS :: (forall a b. (n t f a) -> (n t f b) -> Bool) -> RHS n t f x -> OMap (n t f) (RHS n t f)
-reifyRHS eqName r = undefined execState eqName r
+induceDNS' -- TODO doesn't terminate on cyclic data
+ -- :: RHS (DNSUniqueName n) t (RHSEarleyDNSF z (DNSUniqueName n) t) a
+ :: RHS (DNSUniqueName String) t (RHSEarleyDNSF z (DNSUniqueName String) t) a
+ -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
+ -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
+induceDNS' = foldRHS
+  (\(DNSUniqueName i n k) r -> SomeDNSNonTerminal$ DNSRule$ (i, n <> "_" <> show k) :< r)
+  (DNSTerminal . DNSToken)
+  (\case
+   LeafRHS _ g -> unVoidDNSRHS g
+   TreeRHS _ gRHS -> induceDNS' gRHS) -- auxiliary recursion, not a cata
+  (UnitDNSRHS)
+  (\r1 r2 -> DNSSequence (r1 :| [r2]))
+  (maybe ZeroDNSRHS DNSAlternatives . NonEmpty.nonEmpty)
+  (DNSOptional)
+  (DNSOptional . DNSMultiple)
+  (DNSMultiple)
 
-type HEqI f = forall x y. f x -> f y -> Bool
-leftProduct (Pair f _) = f
-rightProduct (Pair _ g) = g
--- | list with higher-order items
-type OMap f g = [Exists (Product f g)]
--- insertOMap :: f a -> g a -> OMap f g -> OMap f g
--- insertOMap f g fgs = Exists (Pair f g) : fgs
-insertOMap :: (forall x. (f x, g x)) -> OMap f g -> OMap f g
-insertOMap fg fgs = Exists (Pair (fst fg) (snd fg)) : fgs
--- insertOMap (f,g) fgs = Exists (Pair f g) : fgs  -- type variable ‘x’ would escape its scope
-lookupOMap :: (HEqI f) -> OMap f g -> f a -> Maybe (g a)
--- lookupOMap hEq fgs f1 =  case (\(Exists (Pair f2 _)) -> (hEq f1 f2)) fgs of (Exists (Pair _ g)) -> g
-lookupOMap hEq fgs f = foldr go Nothing fgs
+unVoidDNSRHS :: DNSRHS t Void -> DNSRHS t n
+unVoidDNSRHS = second (\case)
+
+-- 1. collect Cofree's by name
+-- 2. for each, project Cofree's to name
+reifyDNSRHS ::forall i n t. (Ord n) => Cofree (DNSRHS t) (i,n) -> [DNSProduction i t n]
+--  Map n (DNSProduction i t n) is more efficient but unordered
+reifyDNSRHS
+ = fmap (snd >>> toIndirectDNSRHS >>> toDNSProduction)
+ . (flip execState) []
+ . go -- runMaybeT
  where
- go fg = \case
-  Nothing -> if (hEq f . leftProduct . unExists) fg then Just$ (rightProduct . unExists) fg else Nothing
-  Just r -> Just r
+ toIndirectDNSRHS :: Cofree (DNSRHS t) (i,n) -> (i, n, DNSRHS t n)
+ toIndirectDNSRHS ((i,n) :< r) = (i,n, bimap id (\((_,n) :< _) -> n) r)
+ toDNSProduction :: (i, n, DNSRHS t n) -> DNSProduction i t n
+ toDNSProduction (i,n,r) = DNSProduction i (DNSRule n) r
+ go :: Cofree (DNSRHS t) (i,n) -> (State [(n, Cofree (DNSRHS t) (i,n))]) ()
+ go c@((_,n) :< r) = do
+  gets (List.lookup n) >>= \case
+   Nothing -> do
+    _ <- modify$ List.insertBy (compare `on` fst) (n, c)
+    _ <- bitraverse return go r
+    return()
+   Just {} -> return()
 
+format r = do
+ renamer <- renameRHSToDNS
+ renamer r >>= (induceDNS >>> reifyDNSRHS >>> return)
 
 
 mainEmacs = do
@@ -576,3 +578,4 @@ mainEmacs = do
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
  -- _phrase <- unsafeSTToIO (deriveEarley >>= ($ phrase))
  putStrLn ""
+ print =<< format phrase_

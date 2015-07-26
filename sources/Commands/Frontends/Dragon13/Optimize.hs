@@ -315,11 +315,54 @@ simplifyGrammar = over (dnsProductions.each.dnsProductionRHS) simplifyRHS
 -- | all simplifications are "inductive" (I think that's the word), i.e. they structurally reduce the input. Thus, we know 'rewrite' terminates.
 simplifyRHS :: (Eq t, Eq n) => DNSRHS t n -> DNSRHS t n
 simplifyRHS = rewrite $ \case
+ -- singleton
  DNSSequence     (r :| [])   -> Just r
  DNSAlternatives (r :| [])   -> Just r
- DNSMultiple (DNSMultiple r) -> Just $ DNSMultiple r -- TODO  valid?
- DNSOptional (DNSOptional r) -> Just $ DNSOptional r -- TODO  valid?
- -- terminates:
- DNSAlternatives (NonEmpty.partition (==ZeroDNSRHS) -> ((_:_), rs)) ->
-   Just $ maybe ZeroDNSRHS DNSAlternatives (NonEmpty.nonEmpty rs)
+ -- idempotent
+ DNSMultiple (DNSMultiple r) -> Just$ DNSMultiple r -- TODO  valid?
+ DNSOptional (DNSOptional r) -> Just$ DNSOptional r -- TODO  valid?
+ -- additive identity. terminates.
+ DNSAlternatives (filterAway (==ZeroDNSRHS) -> Just [])     -> Just$ ZeroDNSRHS
+ DNSAlternatives (filterAway (==ZeroDNSRHS) -> Just (r:rs)) -> Just$ DNSAlternatives (r :| rs)
+ -- multiplicative identity. terminates.
+ DNSSequence     (filterAway (==UnitDNSRHS) -> Just [])     -> Just$ UnitDNSRHS
+ DNSSequence     (filterAway (==UnitDNSRHS) -> Just (r:rs)) -> Just$ DNSSequence     (r :| rs)
+ --
  _ -> Nothing
+
+{- |
+
+@
+filter (not p) <$> filterAway p xs = filterAway p xs
+filterAway p xs = Nothing | Just (filter (not p) xs)
+
+(<) (length <$> filterAway p xs) (Just (length xs))
+-- Nothing | Just True
+
+fromJust (filterAway p xs) < (length xs)
+True
+
+"inductive"
+case filterAway p xs of
+ Nothing -> True
+ Just ys  -> length ys < length xs
+
+case filterAway (==x) xs of
+ Nothing -> not (x elem xs)
+ Just ys  -> not (x elem ys)
+
+@
+
+@
+case filterAway p xs of
+ Nothing -> -- nothing was filtered away ("input preserved")
+ Just [] -> -- everything was filtered away
+ Just (x:xs) -> -- some items were filtered away
+@
+
+-}
+filterAway :: (a -> Bool) -> NonEmpty a -> Maybe [a]
+filterAway p xs = case NonEmpty.partition p xs of -- partition odd [1,2,3,4] == ([1,3], [2,4])
+ ([],_) -> Nothing
+ (_,xs) -> Just xs
+

@@ -179,11 +179,18 @@ many1RHS = Some NonEmpty.toList
 (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
 (-#-) k = traverse id . replicate k
 
--- | both token and result must be a string
--- (see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
---
--- @t@ can default to String.
-instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
+{- | both token and result must be a string
+(see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
+
+@t@ can default to String.
+
+-}
+instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString s = Terminal id t where t = fromString s
+-- instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString = Terminal id . fromString
+-- instance (IsString t, Show t, a ~ String) => IsString (RHS n t f a) where fromString = Terminal show . fromString
+-- instance (IsString t, Show t) => IsString (RHS n t f String) where fromString = Terminal show . fromString
+-- instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
+-- instance (IsString t, Show t) => IsString (RHS n t f t) where fromString = Terminal id . fromString
 
 -- a Traversal?
 renameRHS'
@@ -230,3 +237,12 @@ data ConstName n t (f :: * -> *) a = ConstName { unConstName :: !n } deriving (F
 -- TODO is PolyKinds better? (f :: k)
 
 data SomeRHS n t f = SomeRHS { unSomeRHS :: forall x. RHS n t f x }
+
+-- -- | the children
+-- selfRHS :: Traversal (RHS n t f a) (RHS n' t' f' a')
+-- selfRHS = traverse
+
+-- invmapTerminal :: (t1 -> t2) -> (t2 -> t1) -> RHS n t1 f a -> RHS n t2 f a
+-- invmapTerminal fromT intoT = \case
+--  Terminal i t -> Terminal (i.intoT) (fromT t)
+--  r ->

@@ -682,9 +682,9 @@ attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerialize
 
 printSerializedGrammar SerializedGrammar{..} = do
  replicateM_ 3 $ putStrLn ""
- T.putStrLn $ display serializedRules
+ T.putStrLn $ displayDoc serializedRules
  putStrLn ""
- T.putStrLn $ display serializedLists
+ T.putStrLn $ displayDoc serializedLists
 
 -- failingParse grammar s = do
 --  putStrLn ""

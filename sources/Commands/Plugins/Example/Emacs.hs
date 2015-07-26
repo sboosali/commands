@@ -23,7 +23,11 @@ import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as T
+import Data.Text.Lazy (Text)
 
+import Control.Exception (Exception,SomeException (..))
 import Data.Monoid              ((<>))
 import           Control.Applicative
 import           Control.Arrow                   ((>>>))
@@ -44,12 +48,15 @@ import Control.Monad.Trans.State
 import Data.Functor.Foldable (Fix(..))
 import Control.Comonad.Cofree
 import qualified Data.List as List
+import GHC.Exts (IsString(..))
+
+default (Text)
 
 
 type RHSEarleyDNS z = RHS
  (ConstName (DNSInfo, String))
- String
- (RHSEarleyDNSF z (ConstName (DNSInfo, String)) String)
+ Text
+ (RHSEarleyDNSF z (ConstName (DNSInfo, String)) Text)
 
 data RHSEarleyDNSF z n t a
  =           LeafRHS (E.Prod z String t a) (DNSRHS t Void)
@@ -69,7 +76,11 @@ infix 2 <=>
 liftLeaf p r = liftRHS (LeafRHS p r)
 liftTree p r = liftRHS (TreeRHS p r)
 
+anyWord :: E.Prod z String Text Text
 anyWord = E.Terminal (const True) (pure id)
+
+
+-- ================================================================ --
 
 -- edits :: RHSEarleyDNS r (NonEmpty Edit)
 -- edits :: RHS (ConstName String) String (forall r. (EarleyF r (NonEmpty Edit) String String [])) (NonEmpty Edit)
@@ -303,14 +314,20 @@ brackets_ = "brackets"
   <|> P.bracket '|'      <$ "norm"
 
 dictation_ = "dictation_"
-  <=> P.Dictation <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
+  <=> P.Dictation <$> fmap T.unpack <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
+  -- <=> P.Dictation <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
 
 word_ = "word_"
- <=> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
+ <=> T.unpack <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
+ -- <=> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
 
 keyword_ = "keyword_"
- <=> id <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
+ <=> T.unpack <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
+ -- <=> id <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
  -- <=> Keyword <$> word_
+
+
+-- ================================================================ --
 
 renameRHSEarleyDNSF
  :: forall z m n1 n2 t f1 f2 a. ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
@@ -455,12 +472,12 @@ parse r xs = E.fullParses$ runEarley r xs
 
 parseString
  :: (forall r. RHSEarleyDNS r a)
- -> String
+ -> Text
  -> [a]
 parseString r s = as
- where (as,_) = E.fullParses$ runEarley r (words s)
+ where (as,_) = E.fullParses$ runEarley r (T.words s)
 
-parsePhrase :: String -> String
+parsePhrase :: Text -> String
 parsePhrase
  = (flip P.mungePhrase) P.defSpacing
  . (flip P.splatPasted) "clipboard contents"
@@ -489,12 +506,14 @@ qPhrase = sum . fmap (\case
  Dictated_ _ -> 0)
 
 
+
+-- ================================================================ --
+
 -- | a directly-recursive right-hand side, with a left-hand side annotation; like a production.
 type DNSRHSRec i t n = Cofree (DNSRHS t) (i, n)
 -- DNSRHS t (Cofree (DNSRHS t) (i, n))
 
 data DNSUniqueName n t (f :: * -> *) a = DNSUniqueName DNSInfo n Int
-
 
 renameRHSToDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
  k <- hashUnique <$> newUnique
@@ -516,7 +535,7 @@ induceDNS' -- TODO doesn't terminate on cyclic data
  -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
  -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
 induceDNS' = foldRHS
-  (\(DNSUniqueName i n k) r -> SomeDNSNonTerminal$ DNSRule$ (i, n <> "_" <> show k) :< r)
+  (\(DNSUniqueName i n k) r -> SomeDNSNonTerminal$ DNSRule$ (i, n <> "_" <> (show k)) :< r)
   (DNSTerminal . DNSToken)
   (\case
    LeafRHS _ g -> unVoidDNSRHS g
@@ -533,10 +552,11 @@ unVoidDNSRHS = second (\case)
 
 -- 1. collect Cofree's by name
 -- 2. for each, project Cofree's to name
-reifyDNSRHS ::forall i n t. (Ord n) => Cofree (DNSRHS t) (i,n) -> [DNSProduction i t n]
+reifyDNSRHS :: forall i n t. (Ord n) => Cofree (DNSRHS t) (i,n) -> NonEmpty (DNSProduction i t n)
 --  Map n (DNSProduction i t n) is more efficient but unordered
 reifyDNSRHS
- = fmap (snd >>> toIndirectDNSRHS >>> toDNSProduction)
+ = NonEmpty.fromList            --   TODO
+ . fmap (snd >>> toIndirectDNSRHS >>> toDNSProduction)
  . (flip execState) []
  . go -- runMaybeT
  where
@@ -553,9 +573,21 @@ reifyDNSRHS
     return()
    Just {} -> return()
 
+serializeDNSGrammar' :: DNSGrammar i Text Text -> Either [SomeException] SerializedGrammar
+serializeDNSGrammar' uG = do
+ let oG = optimizeAnyGrammar uG
+ eG <- escapeDNSGrammar oG
+ let sG = serializeGrammar eG
+ return$ sG
+
 format r = do
  renamer <- renameRHSToDNS
- renamer r >>= (induceDNS >>> reifyDNSRHS >>> return)
+ let serializeRHS = (induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar')
+ renamer r >>= (serializeRHS >>> return)
+
+showRHS r = do
+ eG <- format r
+ return$ either (T.pack . show) displaySerializedGrammar eG
 
 
 mainEmacs = do
@@ -578,4 +610,5 @@ mainEmacs = do
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
  -- _phrase <- unsafeSTToIO (deriveEarley >>= ($ phrase))
  putStrLn ""
- print =<< format phrase_
+ T.putStrLn =<< showRHS phrase_
+

@@ -12,7 +12,6 @@ import           Commands.Frontends.Dragon13.Shim
 import           Commands.Frontends.Dragon13.Lens
 
 import           Control.Monad.Catch               (SomeException (..))
-import           Data.Bifoldable
 import           Data.Bitraversable
 import           Data.Either.Validation            (validationToEither)
 import           Data.Foldable                     (toList)
@@ -30,6 +29,11 @@ data SerializedGrammar = SerializedGrammar
  , serializedLists  :: Doc
  , serializedExport :: Doc
  }
+
+-- | (for debugging)
+displaySerializedGrammar :: SerializedGrammar -> Text
+displaySerializedGrammar SerializedGrammar{..} =
+ displayDoc $ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
 
 {- $setup
 
@@ -74,7 +78,7 @@ a Kleisli arrow (when partially applied).
 
 -}
 shimmySerialization :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> Possibly PythonFile
-shimmySerialization diff = newPythonFile . display . getShim . from_SerializedGrammar_to_ShimR diff
+shimmySerialization diff = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR diff
 
 {- | serializes an (escaped) grammar into a Python Docstring and a
 Python Dict.
@@ -318,31 +322,3 @@ from_SerializedGrammar_to_ShimR
  SerializedGrammar{..}
  = ShimR serializedRules serializedLists serializedExport serverHost serverPort clientHost clientPort -- TODO 
 
-
-{- | get all the names in the left-hand sides of the grammar, without duplicates. 
-Works on different levels of the grammar.
-
-e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
-
->>> map unDNSName $ getNames grammar
-["root","command","subcommand","flag"]
-
-@getNames = 'getLefts'@
-
--}
-getNames :: (Eq n, Bifoldable p) => p n t -> [n]
-getNames = getLefts
-
-{- | get all the words in the terminals of the grammar, without duplicates. 
-Works on different levels of the grammar.
-
-e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
-
->>> map unDNSText $ getWords grammar
-["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
-
-@getWords = 'getRights'@
-
--}
-getWords :: (Eq t, Bifoldable p) => p n t -> [t]
-getWords = getRights

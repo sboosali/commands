@@ -41,7 +41,7 @@ type DNSExpanded n = [SomeDNSLHS (DNSExpandedName n)]
 type DNSInlined t n = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS t (DNSExpandedName n))
 
 -- | see 'vocabularizeGrammar'
-type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList LHSDefined (DNSExpandedName n))
+type DNSVocabularized n = Map n (DNSLHS LHSList LHSDefined n)
 
 
 -- ================================================================ --
@@ -56,13 +56,18 @@ type DNSVocabularized n = Map (DNSExpandedName n) (DNSLHS LHSList LHSDefined (DN
 --
 -- TODO prop> introduces no naming collisions
 --
-optimizeGrammar :: (Eq t) => DNSGrammar DNSInfo t (DNSExpandedName LHS) -> DNSGrammar DNSInfo t Text
-optimizeGrammar
+optimizeGrammar' :: (Eq t) => DNSGrammar DNSInfo t (DNSExpandedName LHS) -> DNSGrammar DNSInfo t Text
+optimizeGrammar'
  = second renderDNSExpandedName
  . tidyupGrammar
  . expandGrammar
  . vocabularizeGrammar
  . inlineGrammar
+ . simplifyGrammar
+
+optimizeAnyGrammar :: (Eq t, Ord n) => DNSGrammar i t n -> DNSGrammar i t n
+optimizeAnyGrammar
+ = vocabularizeGrammar
  . simplifyGrammar
 
 
@@ -228,7 +233,7 @@ partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
 
 -- |
 -- TODO prop>
-vocabularizeGrammar :: (Ord n, Eq t) => DNSGrammarOptimizeable t n -> DNSGrammarOptimizeable t n
+vocabularizeGrammar :: (Ord n, Eq t) => DNSGrammar i t n -> DNSGrammar i t n
 vocabularizeGrammar (DNSGrammar _ps _vs _is) = DNSGrammar ps vs _is
  where
  ps = rules2lists vocabularized <$> productions
@@ -238,14 +243,14 @@ vocabularizeGrammar (DNSGrammar _ps _vs _is) = DNSGrammar ps vs _is
 
 -- |
 partitionVocabularizables
- :: NonEmpty (DNSProductionOptimizeable t n)
- -> (NonEmpty (DNSProductionOptimizeable t n), [DNSVocabularyOptimizeable t n])
+ :: NonEmpty (DNSProduction i t n)
+ -> (NonEmpty (DNSProduction i t n), [DNSVocabulary i t n])
 partitionVocabularizables (e:|_ps) = (e:|ps, vs)
  where
  (ps, vs) = partitionEithers . fmap canVocabularize $ _ps
 
 -- |
-canVocabularize :: DNSProductionOptimizeable t n -> Either (DNSProductionOptimizeable t n) (DNSVocabularyOptimizeable t n)
+canVocabularize :: DNSProduction i t n -> Either (DNSProduction i t n) (DNSVocabulary i t n)
 canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getApp . onlyTokens) r of
  Nothing -> Left p
  Just ts -> Right $ DNSVocabulary i (DNSList n) ts  -- make sure this doesn't introduce a naming conflict with existing DNSList. might be best to just treat rules and lists as if they shared the same namespace.
@@ -281,7 +286,7 @@ onlyTokens = \case
  _                  -> Ap Nothing
 
 -- |
-rules2lists :: (Ord n) => DNSVocabularized n -> DNSProductionOptimizeable t n -> DNSProductionOptimizeable t n
+rules2lists :: (Ord n) => DNSVocabularized n -> DNSProduction i t n -> DNSProduction i t n
 rules2lists ls = transformOn dnsProductionRHS $ \case
  DNSNonTerminal (SomeDNSLHS (DNSRule ((flip Map.lookup) ls -> Just l))) -> DNSNonTerminal (SomeDNSLHS l)
  r -> r

@@ -78,6 +78,9 @@ instance Bitraversable (DNSGrammar i) where -- valid Bitraversable?
   <*> traverse (bitraverse f g) vocabularies
   <*> traverse (traverse g) imports
 
+defaultDNSGrammar :: NonEmpty (DNSProduction i t n) -> DNSGrammar i t n
+defaultDNSGrammar ps = DNSGrammar ps [] dnsHeader
+
 
 -- ================================================================ --
 
@@ -409,6 +412,37 @@ data DNSToken t
 -- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
  fromString = DNSToken . fromString
+
+
+-- ================================================================ --
+
+{- | get all the names in the left-hand sides of the grammar, without duplicates.
+Works on different levels of the grammar.
+
+e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
+
+>>> map unDNSName $ getNames grammar
+["root","command","subcommand","flag"]
+
+@getNames = 'getLefts'@
+
+-}
+getNames :: (Eq n, Bifoldable p) => p n t -> [n]
+getNames = getLefts
+
+{- | get all the words in the terminals of the grammar, without duplicates.
+Works on different levels of the grammar.
+
+e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
+
+>>> map unDNSText $ getWords grammar
+["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
+
+@getWords = 'getRights'@
+
+-}
+getWords :: (Eq t, Bifoldable p) => p n t -> [t]
+getWords = getRights
 
 
 -- ================================================================ --

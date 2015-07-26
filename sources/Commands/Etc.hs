@@ -129,8 +129,8 @@ newtype Identifier = Identifier String deriving (Show, Eq, Ord, Generic); instan
 data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord, Generic)
 instance Hashable GUI
 
-display :: Doc -> Text
-display = displayT . renderPretty 1.0 80
+displayDoc :: Doc -> Text
+displayDoc = displayT . renderPretty 1.0 80
 
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
 (-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)

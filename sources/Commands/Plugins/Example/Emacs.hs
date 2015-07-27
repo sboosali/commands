@@ -26,6 +26,7 @@ import qualified Text.Earley.Internal            as E
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.IO as T
 import Data.Text.Lazy (Text)
+import Control.Lens hiding (snoc)
 
 import Control.Exception (Exception,SomeException (..))
 import Data.Monoid              ((<>))
@@ -50,7 +51,7 @@ import Control.Comonad.Cofree
 import qualified Data.List as List
 import GHC.Exts (IsString(..))
 
-default (Text)
+default (Text) -- TODO Necessary? Sufficient?
 
 
 type RHSEarleyDNS z = RHS
@@ -78,6 +79,9 @@ liftTree p r = liftRHS (TreeRHS p r)
 
 anyWord :: E.Prod z String Text Text
 anyWord = E.Terminal (const True) (pure id)
+
+_RHSInfo :: Traversal' (RHS (ConstName (DNSInfo, String)) t f a) DNSInfo
+_RHSInfo = _NonTerminal._1.unConstName._1
 
 
 -- ================================================================ --
@@ -313,15 +317,19 @@ brackets_ = "brackets"
   <|> P.bracket '\''     <$ "ticked"
   <|> P.bracket '|'      <$ "norm"
 
-dictation_ = "dictation_"
-  <=> P.Dictation <$> fmap T.unpack <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
-  -- <=> P.Dictation <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
 
-word_ = "word_"
+inlineRHS = set (_RHSInfo.dnsInline) True
+
+dictation_ = inlineRHS $ "dictation_"
+  <=> (P.Dictation . fmap T.unpack) <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
+  -- <=> P.Dictation <$> liftLeaf (some anyWord) (SomeDNSNonTerminal$ DNSBuiltinRule DGNDictation)
+{-# NOINLINE dictation_ #-} --TODO doesn't help with the unshared <dictation__4>/<dictation__14>/<dictation__16>
+
+word_ = inlineRHS $ "word_"
  <=> T.unpack <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
  -- <=> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
 
-keyword_ = "keyword_"
+keyword_ = inlineRHS $ "keyword_"
  <=> T.unpack <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
  -- <=> id <$> liftLeaf anyWord (SomeDNSNonTerminal$ DNSBuiltinRule DGNWords)
  -- <=> Keyword <$> word_
@@ -414,6 +422,7 @@ renameRHSST u = unsafeIOToST$ do
 -- renaming recursive RHS doesn't terminate because: in renaming/traversing the non-terminal, the name is decoupled from the body. the natural transformation should return a pair, and the name and the rhs are both cached. makes sense, as we are caching on the non-terminal (isomorphic to a pair) pointer.
 
 
+-- ================================================================ --
 
 data EarleyName z n t (f :: * -> *) a = EarleyName
  { unEarleyName :: E.Prod z n t a -> E.Prod z n t a
@@ -552,41 +561,48 @@ unVoidDNSRHS = second (\case)
 
 -- 1. collect Cofree's by name
 -- 2. for each, project Cofree's to name
-reifyDNSRHS :: forall i n t. (Ord n) => Cofree (DNSRHS t) (i,n) -> NonEmpty (DNSProduction i t n)
+reifyDNSRHS :: forall i n t. (Eq n) => Cofree (DNSRHS t) (i,n) -> NonEmpty (DNSProduction i t n)
 --  Map n (DNSProduction i t n) is more efficient but unordered
-reifyDNSRHS
- = NonEmpty.fromList            --   TODO
+reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
  . fmap (snd >>> toIndirectDNSRHS >>> toDNSProduction)
  . (flip execState) []
  . go -- runMaybeT
  where
+
  toIndirectDNSRHS :: Cofree (DNSRHS t) (i,n) -> (i, n, DNSRHS t n)
  toIndirectDNSRHS ((i,n) :< r) = (i,n, bimap id (\((_,n) :< _) -> n) r)
+
  toDNSProduction :: (i, n, DNSRHS t n) -> DNSProduction i t n
  toDNSProduction (i,n,r) = DNSProduction i (DNSRule n) r
+
+ list'insertBy :: (a -> a -> Bool) -> a -> [a] -> [a]
+ list'insertBy eq x xs = case List.find (eq x) xs of
+  Nothing -> snoc xs x          -- could reverse later; or like fuse it with a fold; or difference list; performance here doesn't matter
+  Just{}  ->    xs
+
  go :: Cofree (DNSRHS t) (i,n) -> (State [(n, Cofree (DNSRHS t) (i,n))]) ()
  go c@((_,n) :< r) = do
   gets (List.lookup n) >>= \case
    Nothing -> do
-    _ <- modify$ List.insertBy (compare `on` fst) (n, c)
+    _ <- modify$ list'insertBy ((==) `on` fst) (n, c)
     _ <- bitraverse return go r
     return()
    Just {} -> return()
 
-serializeDNSGrammar' :: DNSGrammar i Text Text -> Either [SomeException] SerializedGrammar
+serializeDNSGrammar' :: DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
 serializeDNSGrammar' uG = do
- let oG = optimizeAnyGrammar uG
+ let oG = optimizeDNSInfoGrammar uG
  eG <- escapeDNSGrammar oG
  let sG = serializeGrammar eG
  return$ sG
 
-format r = do
+formatRHS r = do
  renamer <- renameRHSToDNS
  let serializeRHS = (induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar')
  renamer r >>= (serializeRHS >>> return)
 
 showRHS r = do
- eG <- format r
+ eG <- formatRHS r
  return$ either (T.pack . show) displaySerializedGrammar eG
 
 

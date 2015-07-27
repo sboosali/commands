@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
-{-# LANGUAGE TypeOperators                                             #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators                            #-}
 module Commands.RHS.Types where
 
 -- import           Control.Lens
@@ -10,6 +10,7 @@ import           Data.List.NonEmpty  (NonEmpty (..))
 import qualified Data.List.NonEmpty  as NonEmpty
 
 import           Control.Applicative
+import           Control.Lens
 import           Data.Foldable       (asum)
 import           Data.Monoid
 import           GHC.Exts            (IsString (..))
@@ -232,11 +233,11 @@ renameRHS u = \case
  go = renameRHS u
 
 -- | e.g. @('RHS' (ConstName n) t f a)@
-data ConstName n t (f :: * -> *) a = ConstName { unConstName :: !n } deriving (Functor)
+data ConstName n t (f :: * -> *) a = ConstName { _unConstName :: !n } deriving (Functor)
 -- KindSignatures because: f being phantom, it's kind is inferred to be nullary (I think)
 -- TODO is PolyKinds better? (f :: k)
 
-data SomeRHS n t f = SomeRHS { unSomeRHS :: forall x. RHS n t f x }
+data SomeRHS n t f = SomeRHS { _unSomeRHS :: forall x. RHS n t f x }
 
 -- -- | the children
 -- selfRHS :: Traversal (RHS n t f a) (RHS n' t' f' a')
@@ -246,3 +247,12 @@ data SomeRHS n t f = SomeRHS { unSomeRHS :: forall x. RHS n t f x }
 -- invmapTerminal fromT intoT = \case
 --  Terminal i t -> Terminal (i.intoT) (fromT t)
 --  r ->
+
+_NonTerminal :: Prism' (RHS n t f a) (n t f a, RHS n t f a)
+_NonTerminal = prism (uncurry NonTerminal) $ \case
+ NonTerminal l r -> Right (l, r)
+ r -> Left r
+-- makePrisms ''RHS
+makeLenses ''ConstName
+makeLenses ''SomeRHS
+

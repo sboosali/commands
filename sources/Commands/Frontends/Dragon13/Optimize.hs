@@ -38,7 +38,7 @@ type DNSAdjacency t n = Adjacency (SomeDNSLHS (DNSExpandedName n)) (DNSProductio
 type DNSExpanded n = [SomeDNSLHS (DNSExpandedName n)]
 
 -- | see 'inlineGrammar'. quick access to the right-hand side of a production to be inlined.
-type DNSInlined t n = Map (SomeDNSLHS (DNSExpandedName n)) (DNSRHS t (DNSExpandedName n))
+type DNSInlined t n = Map (SomeDNSLHS n) (DNSRHS t n)
 
 -- | see 'vocabularizeGrammar'
 type DNSVocabularized n = Map n (DNSLHS LHSList LHSDefined n)
@@ -65,8 +65,14 @@ optimizeGrammar'
  . inlineGrammar
  . simplifyGrammar
 
-optimizeAnyGrammar :: (Eq t, Ord n) => DNSGrammar i t n -> DNSGrammar i t n
-optimizeAnyGrammar
+optimizeDNSInfoGrammar :: (Eq t, Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
+optimizeDNSInfoGrammar
+ = vocabularizeGrammar
+ . inlineGrammar
+ . simplifyGrammar
+
+optimizeAnyDNSGrammar :: (Eq t, Ord n) => DNSGrammar i t n -> DNSGrammar i t n
+optimizeAnyDNSGrammar
  = vocabularizeGrammar
  . simplifyGrammar
 
@@ -198,7 +204,7 @@ expandProductionMaxDepth
 -- the 'dnsExport' is never inlined away.
 --
 --
-inlineGrammar :: (Ord n) => DNSGrammarOptimizeable t n -> DNSGrammarOptimizeable t n
+inlineGrammar :: (Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
 inlineGrammar (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
  where
  e = inlineProduction theInlined $ _e
@@ -207,21 +213,21 @@ inlineGrammar (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
  (yesInlined, notInlined) = partitionInlined _ps
 
 -- | assumes the 'DNSInlined' are acyclic wrt each other: otherwise, doesn't terminate.
-inlineAway :: (Ord n) => DNSInlined t n -> [DNSProductionOptimizeable t n] -> [DNSProductionOptimizeable t n]
+inlineAway :: (Ord n) => DNSInlined t n -> [DNSProduction DNSInfo t n] -> [DNSProduction DNSInfo t n]
 inlineAway = undefined -- TODO  rewriteOn?
 
-inlineProduction :: (Ord n) => DNSInlined t n -> DNSProductionOptimizeable t n -> DNSProductionOptimizeable t n
+inlineProduction :: (Ord n) => DNSInlined t n -> DNSProduction DNSInfo t n -> DNSProduction DNSInfo t n
 inlineProduction lrs = rewriteOn dnsProductionRHS $ \case
  DNSNonTerminal l -> shouldInline lrs l
  _ -> Nothing
 
-shouldInline :: (Ord n) => DNSInlined t n -> SomeDNSLHS (DNSExpandedName n) -> Maybe (DNSRHS t (DNSExpandedName n))
+shouldInline :: (Ord n) => DNSInlined t n -> SomeDNSLHS n -> Maybe (DNSRHS t n)
 shouldInline lrs l = Map.lookup l lrs
 
 partitionInlined
  :: (Ord n)
- => [DNSProductionOptimizeable t n]
- -> ( DNSInlined t n , [DNSProductionOptimizeable t n] )
+ => [DNSProduction DNSInfo t n]
+ -> ( DNSInlined t n , [DNSProduction DNSInfo t n] )
 partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
  where
  yesInlined = Map.fromList . fmap (\(DNSProduction _ l r) -> (SomeDNSLHS l, r)) $ _yesInlined

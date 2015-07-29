@@ -16,7 +16,6 @@ import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
 import           Commands.Symbol.Types
-import qualified Data.RefCache                   as RefCache
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async

@@ -117,6 +117,8 @@ library
   Data.HRefCache.Internal
   Data.RefCache.Etc
 
+  Data.Sexp
+
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
  includes:         cbits/objc_actor.h
@@ -229,8 +231,8 @@ executable example
   -Wall
   -fno-warn-name-shadowing
   -threaded
-  -O2
   "-with-rtsopts=-N"
+  -- -O2
 
  build-depends:
   commands-core,

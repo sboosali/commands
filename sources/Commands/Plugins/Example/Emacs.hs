@@ -4,8 +4,9 @@
 {-# LANGUAGE OverloadedStrings, PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, ScopedTypeVariables         #-}
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo                                      #-}
+{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo, OverloadedLists , OverloadedStrings                                      #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
+{-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Emacs where
 import           Commands.Etc
 import           Commands.RHS.Types
@@ -14,6 +15,7 @@ import qualified Data.HRefCache.Internal         as HRefCache
 import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
 import Commands.Frontends.Dragon13
+import Data.Sexp
 
 import Data.Void
 import Data.Bifunctor
@@ -54,21 +56,23 @@ import GHC.Exts (IsString(..))
 default (Text) -- TODO Necessary? Sufficient?
 
 
-type RHSEarleyDNS z = RHS
- (ConstName (DNSInfo, String))
- Text
- (RHSEarleyDNSF z (ConstName (DNSInfo, String)) Text)
+type DNSEarleyName n = ConstName (DNSInfo, n)
 
-data RHSEarleyDNSF z n t a
+type DNSEarleyRHS z = RHS
+ (DNSEarleyName String)
+ Text
+ (DNSEarleyFunc z (DNSEarleyName String) Text)
+
+data DNSEarleyFunc z n t a
  =           LeafRHS (E.Prod z String t a) (DNSRHS t Void)
- | forall x. TreeRHS (RHS n t (RHSEarleyDNSF z n t) a) (RHS n t (RHSEarleyDNSF z n t) x)
+ | forall x. TreeRHS (RHS n t (DNSEarleyFunc z n t) a) (RHS n t (DNSEarleyFunc z n t) x)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
-deriving instance (Functor (n t (RHSEarleyDNSF z n t))) => Functor (RHSEarleyDNSF z n t) -- TODO UndecidableInstances
+deriving instance (Functor (n t (DNSEarleyFunc z n t))) => Functor (DNSEarleyFunc z n t) -- TODO UndecidableInstances
 -- Variables ‘n, t’ occur more often than in the instance head in the constraint
 
 data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t)
 
-(<=>) :: String -> RHSEarleyDNS z a -> RHSEarleyDNS z a
+(<=>) :: String -> DNSEarleyRHS z a -> DNSEarleyRHS z a
 -- type signature for type inference, disambiguates:
 --  "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
 (<=>) n r = NonTerminal (ConstName (defaultDNSInfo, n)) r
@@ -80,13 +84,13 @@ liftTree p r = liftRHS (TreeRHS p r)
 anyWord :: E.Prod z String Text Text
 anyWord = E.Terminal (const True) (pure id)
 
-_RHSInfo :: Traversal' (RHS (ConstName (DNSInfo, String)) t f a) DNSInfo
+_RHSInfo :: Traversal' (RHS (DNSEarleyName String) t f a) DNSInfo
 _RHSInfo = _NonTerminal._1.unConstName._1
 
 
 -- ================================================================ --
 
--- edits :: RHSEarleyDNS r (NonEmpty Edit)
+-- edits :: DNSEarleyRHS r (NonEmpty Edit)
 -- edits :: RHS (ConstName String) String (forall r. (EarleyF r (NonEmpty Edit) String String [])) (NonEmpty Edit)
 -- edits :: RHS (ConstName String) String (EarleyF r a String String f) (NonEmpty Edit)
 -- edits :: RHS (ConstName String) String [] (NonEmpty Edit)
@@ -95,7 +99,7 @@ _RHSInfo = _NonTerminal._1.unConstName._1
 edits = "edits" <=> (edit-+)
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
--- edit :: RHSEarleyDNS r Edit
+-- edit :: DNSEarleyRHS r Edit
 edit = "edit" <=> empty
  <|> Edit Cut Forwards Line <$ "kill"
  <|> Edit <$> action            <*> (slice-?-Whole) <*> (region-?-That)
@@ -109,7 +113,7 @@ data Action
  | Transpose                    -- read/write.
  | Google                       -- read-only.
  deriving (Show,Eq,Ord)
--- action :: RHSEarleyDNS r Action
+-- action :: DNSEarleyRHS r Action
 action = "action" <=> empty
  <|> Select      <$ "sell"
  <|> Copy        <$ "cop"
@@ -119,7 +123,7 @@ action = "action" <=> empty
  <|> Google      <$ "google"
 
 data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum)
--- slice :: RHSEarleyDNS r Slice
+-- slice :: DNSEarleyRHS r Slice
 slice = "slice"
  <=> Whole     <$ "whole"
  <|> Backwards <$ "back"
@@ -142,7 +146,7 @@ data Region
  | Reference
  | Structure
  deriving (Show,Eq,Ord,Enum)
--- region :: RHSEarleyDNS r Region
+-- region :: DNSEarleyRHS r Region
 region = "region"
  <=> That       <$ "that"
  <|> Character  <$ "char"
@@ -337,12 +341,12 @@ keyword_ = inlineRHS $ "keyword_"
 
 -- ================================================================ --
 
-renameRHSEarleyDNSF
- :: forall z m n1 n2 t f1 f2 a. ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+renameDNSEarleyFunc
+ :: forall z m n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
  => (Applicative m)
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> m (    n2 t f2 x))
  -> (                       RHS n1 t f1 a -> m (RHS n2 t f2 a))
-renameRHSEarleyDNSF u = \case
+renameDNSEarleyFunc u = \case
  k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
  Terminal i r       ->  pure$ Terminal i r
  Opt  i r           ->  Opt  i <$> go r
@@ -356,16 +360,16 @@ renameRHSEarleyDNSF u = \case
  Alter rs           ->  Alter <$> go `traverse` rs
  where
  go :: forall x. RHS n1 t f1 x -> m (RHS n2 t f2 x)
- go = renameRHSEarleyDNSF u
+ go = renameDNSEarleyFunc u
 
-renameRHSEarleyDNSST
- :: forall z s n1 n2 t f1 f2 a. ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+renameDNSEarleyRHSST
+ :: forall z s n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> ST s (    n2 t f2 x))
  -> ST s                   (RHS n1 t f1 a -> ST s (RHS n2 t f2 a))
-renameRHSEarleyDNSST u = unsafeIOToST$ do
+renameDNSEarleyRHSST u = unsafeIOToST$ do
  c <- HRefCache.newCache
  -- return$ renameRHS'$ \r1 n r2 -> unsafeIOToST$ do
- return$ renameRHSEarleyDNSF$ \r1 n -> unsafeIOToST$ do
+ return$ renameDNSEarleyFunc$ \r1 n -> unsafeIOToST$ do
   k <- HRefCache.forceStableName r1
   readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
    Just y  -> return y          -- cache hit
@@ -375,13 +379,13 @@ renameRHSEarleyDNSST u = unsafeIOToST$ do
     _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
     return y
 
-renameRHSEarleyDNSIO
- :: ((f1 ~ RHSEarleyDNSF z n1 t), (f2 ~ RHSEarleyDNSF z n2 t))
+renameDNSEarleyRHSIO
+ :: ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> IO (    n2 t f2 x))
  -> IO                   (RHS n1 t f1 a -> IO (RHS n2 t f2 a))
-renameRHSEarleyDNSIO u = do
+renameDNSEarleyRHSIO u = do
  c <- HRefCache.newCache
- return$ renameRHSEarleyDNSF$ \r1 n -> do
+ return$ renameDNSEarleyFunc$ \r1 n -> do
   k <- HRefCache.forceStableName r1
   readIORef c >>= (HRefCache.lookupRef k >>> traverse readIORef) >>= \case
    Just y  -> return y          -- cache hit
@@ -429,13 +433,14 @@ data EarleyName z n t (f :: * -> *) a = EarleyName
  }
 -- not a Functor
 
--- deriveEarley
+-- renameRHSToEarley
 --  :: forall s r n t f a. ()
 --  => ST s (        RHS (ConstName                 n) t f a
 --          -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
 --          )
--- deriveEarley = renameRHSST $ \_ (ConstName n) _ -> do
-deriveEarley = renameRHSEarleyDNSST $ \_ (ConstName (_, n)) -> do
+-- renameRHSToEarley = renameRHSST $ \_ (ConstName n) _ -> do
+renameRHSToEarley :: ST s (RHS (ConstName (_, n)) t (DNSEarleyFunc z (ConstName (_, n)) t) a -> ST s (RHS (EarleyName (E.Rule s r) n) t (DNSEarleyFunc z (EarleyName (E.Rule s r) n) t) a))
+renameRHSToEarley = renameDNSEarleyRHSST $ \_ (ConstName (_, n)) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
  return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
@@ -445,11 +450,11 @@ induceEarley
  => (Eq t)
  => RHS (EarleyName z n)
         t
-        (RHSEarleyDNSF z (EarleyName z n) t)
+        (DNSEarleyFunc z (EarleyName z n) t)
         a
  -> E.Prod z n t a
 induceEarley = runRHS
- (\n r -> (unEarleyName n) (induceEarley r))
+ (\n r -> (unEarleyName n) (induceEarley r))  -- accessor (not pattern match) for polymorphic z (Rank2 elsewhere)
  E.symbol
  (\case
   LeafRHS p    _ -> p
@@ -465,22 +470,22 @@ buildEarley p xs = do
 
 runEarley
  :: (Eq t)
- => (forall r. RHS (ConstName (_,String)) t (RHSEarleyDNSF (E.Rule s r) (ConstName (_,String)) t) a)
+ => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) t) a)
  -> [t]
  -> ST s (E.Result s String [t] a)
 runEarley r1 xs = do
- r2 <- deriveEarley >>= ($ r1)
+ r2 <- renameRHSToEarley >>= ($ r1)
  buildEarley (induceEarley r2) xs
 
 parse
  :: (Eq t)
- => (forall r. RHS (ConstName (_,String)) t (RHSEarleyDNSF r (ConstName (_,String)) t) a)
+ => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc r (ConstName (_,String)) t) a)
  -> [t]
  -> ([a], E.Report String [t])
 parse r xs = E.fullParses$ runEarley r xs
 
 parseString
- :: (forall r. RHSEarleyDNS r a)
+ :: (forall r. DNSEarleyRHS r a)
  -> Text
  -> [a]
 parseString r s = as
@@ -524,12 +529,13 @@ type DNSRHSRec i t n = Cofree (DNSRHS t) (i, n)
 
 data DNSUniqueName n t (f :: * -> *) a = DNSUniqueName DNSInfo n Int
 
-renameRHSToDNS = renameRHSEarleyDNSIO $ \_ (ConstName (i, n)) -> do
+renameRHSToDNS :: IO (RHS (DNSEarleyName n) t (DNSEarleyFunc z (DNSEarleyName n) t) a -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a))
+renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
  k <- hashUnique <$> newUnique
  return$ DNSUniqueName i n k
 
 induceDNS
- :: RHS (DNSUniqueName String) t (RHSEarleyDNSF z (DNSUniqueName String) t) a
+ :: RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -> Cofree (DNSRHS t) (DNSInfo, String)
 induceDNS = induceDNS' >>> \case
  SomeDNSNonTerminal (DNSRule ((i,n) :< r)) -> (i,n)         :< r
@@ -539,8 +545,8 @@ defaultDNSLHS :: (DNSInfo,String)
 defaultDNSLHS = (defaultDNSInfo,"defaultDNSLHS") -- TODO should be unique; quote it?
 
 induceDNS' -- TODO doesn't terminate on cyclic data
- -- :: RHS (DNSUniqueName n) t (RHSEarleyDNSF z (DNSUniqueName n) t) a
- :: RHS (DNSUniqueName String) t (RHSEarleyDNSF z (DNSUniqueName String) t) a
+ -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a
+ :: RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
  -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
 induceDNS' = foldRHS
@@ -591,16 +597,18 @@ reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
 
 serializeDNSGrammar' :: DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
 serializeDNSGrammar' uG = do
- let oG = optimizeDNSInfoGrammar uG
+ let oG = uG                    -- optimizeDNSInfoGrammar
  eG <- escapeDNSGrammar oG
  let sG = serializeGrammar eG
  return$ sG
 
+formatRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO (Either [SomeException] SerializedGrammar)
 formatRHS r = do
  renamer <- renameRHSToDNS
  let serializeRHS = (induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar')
  renamer r >>= (serializeRHS >>> return)
 
+showRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO Text
 showRHS r = do
  eG <- formatRHS r
  return$ either (T.pack . show) displaySerializedGrammar eG
@@ -624,7 +632,9 @@ mainEmacs = do
 
  -- loop print$ parseString phrase "par round grave camel lit async break break action"
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
- -- _phrase <- unsafeSTToIO (deriveEarley >>= ($ phrase))
+ -- _phrase <- unsafeSTToIO (renameRHSToEarley >>= ($ phrase))
  putStrLn ""
  T.putStrLn =<< showRHS phrase_
+
+ print $ exampleSexpBlock
 

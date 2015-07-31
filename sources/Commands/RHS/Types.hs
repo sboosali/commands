@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
-{-# LANGUAGE TemplateHaskell, TypeOperators                            #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators, TypeFamilies                           #-}
 module Commands.RHS.Types where
 
 -- import           Control.Lens
@@ -13,7 +13,7 @@ import           Control.Applicative
 import           Control.Lens
 import           Data.Foldable       (asum)
 import           Data.Monoid
-import           GHC.Exts            (IsString (..))
+import           GHC.Exts            (IsString (..), IsList (..))
 
 
 data RHS n t f a where
@@ -92,7 +92,57 @@ liftRHS :: f a -> RHS n t f a
 liftRHS f = Pure id `Apply` f
 {-# INLINE liftRHS #-}
 
--- TODO foldRHS foldRHS
+{- | both token and result must be an (instance of) 'IsString'.
+
+(see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
+
+@t@ can default to String.
+
+-}
+instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString s = Terminal id t where t = fromString s
+-- instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString = Terminal id . fromString
+-- instance (IsString t, Show t, a ~ String) => IsString (RHS n t f a) where fromString = Terminal show . fromString
+-- instance (IsString t, Show t) => IsString (RHS n t f String) where fromString = Terminal show . fromString
+-- instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
+-- instance (IsString t, Show t) => IsString (RHS n t f t) where fromString = Terminal id . fromString
+
+-- | @([r1,r2,r3] :: RHS n t f a)@ is @('mconcat' [r1,r2,r3])@ is @('asum' [r1,r2,r3])@ is @(r1 '<|>' r2 '<|>' r3)@
+instance IsList (RHS n t f a) where
+ type Item (RHS n t f a) = RHS n t f a
+ fromList = Alter             -- the constructor (rather than a method like "asum") avoids the (Functor f) constraint
+ toList = toRHSList
+
+-- | @(-?) = 'optionalRHS'@
+(-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
+(-?) = optionalRHS
+optionalRHS = Opt id
+
+-- | @(-?-) = 'flip' 'optionRHS'@
+(-?-) :: RHS n t f a -> a -> RHS n t f a
+(-?-) = flip optionRHS
+optionRHS :: a -> RHS n t f a -> RHS n t f a
+optionRHS x = Opt (maybe x id)
+
+-- | @(-*) = 'manyRHS'@
+(-*), manyRHS :: RHS n t f a -> RHS n t f [a]
+(-*) = manyRHS
+manyRHS = Many id
+
+-- | @(-+) = 'someRHS'@
+(-+), someRHS :: RHS n t f a -> RHS n t f (NonEmpty a)
+(-+) = someRHS
+someRHS = Some id
+
+-- | @(-++) = 'many1RHS'@
+--
+-- like 'someRHS', but "downcasted" to a list.
+(-++), many1RHS :: RHS n t f a -> RHS n t f [a]
+(-++) = many1RHS
+many1RHS = Some NonEmpty.toList
+
+(-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
+(-#-) k = traverse id . replicate k
+
 
 runRHS
  :: forall n t f g a. (Alternative g)
@@ -148,50 +198,6 @@ foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
  where
  go :: forall x. RHS n t f x -> b
  go = foldRHS fromN fromT fromF unit mul add opt_ many_ some_
-
--- | @(-?) = 'optionalRHS'@
-(-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
-(-?) = optionalRHS
-optionalRHS = Opt id
-
--- | @(-?-) = 'flip' 'optionRHS'@
-(-?-) :: RHS n t f a -> a -> RHS n t f a
-(-?-) = flip optionRHS
-optionRHS :: a -> RHS n t f a -> RHS n t f a
-optionRHS x = Opt (maybe x id)
-
--- | @(-*) = 'manyRHS'@
-(-*), manyRHS :: RHS n t f a -> RHS n t f [a]
-(-*) = manyRHS
-manyRHS = Many id
-
--- | @(-+) = 'someRHS'@
-(-+), someRHS :: RHS n t f a -> RHS n t f (NonEmpty a)
-(-+) = someRHS
-someRHS = Some id
-
--- | @(-++) = 'many1RHS'@
---
--- like 'someRHS', but "downcasted" to a list.
-(-++), many1RHS :: RHS n t f a -> RHS n t f [a]
-(-++) = many1RHS
-many1RHS = Some NonEmpty.toList
-
-(-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
-(-#-) k = traverse id . replicate k
-
-{- | both token and result must be a string
-(see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
-
-@t@ can default to String.
-
--}
-instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString s = Terminal id t where t = fromString s
--- instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString = Terminal id . fromString
--- instance (IsString t, Show t, a ~ String) => IsString (RHS n t f a) where fromString = Terminal show . fromString
--- instance (IsString t, Show t) => IsString (RHS n t f String) where fromString = Terminal show . fromString
--- instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
--- instance (IsString t, Show t) => IsString (RHS n t f t) where fromString = Terminal id . fromString
 
 -- a Traversal?
 renameRHS'

@@ -1,10 +1,12 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor     #-}
 {-# LANGUAGE ExistentialQuantification, ExtendedDefaultRules           #-}
 {-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase              #-}
-{-# LANGUAGE OverloadedStrings, PartialTypeSignatures, PatternSynonyms #-}
+{-# LANGUAGE PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, ScopedTypeVariables         #-}
-{-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo, OverloadedLists , OverloadedStrings                                      #-}
+{-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, KindSignatures, ConstraintKinds  #-}
+-- {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Emacs where
@@ -58,21 +60,23 @@ default (Text) -- TODO Necessary? Sufficient?
 
 -- ================================================================ --
 
+t = T.pack
+
 mainEmacs = do
- print$ parseString edits "kill"
- print$ parseString edits "kill whole word"
+ print$ parseString edits (t"kill")
+ print$ parseString edits (t"kill whole word")
  -- [Edit Cut Forwards Line :| [Edit Select Whole Word_]  "kill" and "_ whole word"
  -- ,Edit Cut Whole That :| [Edit Select Whole Word_]  "kill _ _" and "_ whole word"
  -- ,Edit Cut Whole That :| [Edit Select Whole Word_]  ?
  -- ,Edit Cut Whole Word_ :| []
  -- ,Edit Cut Whole Word_ :| []
  -- ]                                          --
- print$ parseString edit "kill"            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
- print$ parseString edit "kill whole word" -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
+ print$ parseString edit (t"kill")            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
+ print$ parseString edit (t"kill whole word") -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
 
- print$ parsePhrase "par round grave camel lit with async do break break action"
+ print$ parsePhrase (t"par round grave camel lit with async do break break action")
  -- "(`async`action)"
- print$ length $ parseString phrase_ "par round grave camel lit async break break action"
+ print$ length $ parseString phrase_ (t"par round grave camel lit async break break action")
 
  -- loop print$ parseString phrase "par round grave camel lit async break break action"
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
@@ -100,6 +104,9 @@ deriving instance (Functor (n t (DNSEarleyFunc z n t))) => Functor (DNSEarleyFun
 -- Variables ‘n, t’ occur more often than in the instance head in the constraint
 
 data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t)
+
+-- | @ConstraintKinds@
+type Functor'RHS n t f = (Functor (n t f), Functor f)
 
 (<=>) :: String -> DNSEarleyRHS z a -> DNSEarleyRHS z a
 -- type signature for type inference, disambiguates:
@@ -130,9 +137,9 @@ edits = "edits" <=> (edit-+)
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 -- edit :: DNSEarleyRHS r Edit
 edit = "edit" <=> empty
- <|> Edit Cut Forwards Line <$ "kill"
- <|> Edit <$> action            <*> (slice-?-Whole) <*> (region-?-That)
- <|> Edit <$> (action-?-Select) <*> (slice-?-Whole) <*> region
+ <|> Edit Cut Forwards Line <#> "kill"
+ <|> Edit <#> action            # (slice-?-Whole) # (region-?-That)
+ <|> Edit <#> (action-?-Select) # (slice-?-Whole) # region
 
 data Action
  = Select                       -- read-only.
@@ -144,19 +151,19 @@ data Action
  deriving (Show,Eq,Ord)
 -- action :: DNSEarleyRHS r Action
 action = "action" <=> empty
- <|> Select      <$ "sell"
- <|> Copy        <$ "cop"
- <|> Cut         <$ "kill"
- <|> Delete      <$ "del"
- <|> Transpose   <$ "trans"
- <|> Google      <$ "google"
+ <|> Select      <#> "sell"
+ <|> Copy        <#> "cop"
+ <|> Cut         <#> "kill"
+ <|> Delete      <#> "del"
+ <|> Transpose   <#> "trans"
+ <|> Google      <#> "google"
 
 data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum)
 -- slice :: DNSEarleyRHS r Slice
 slice = "slice"
- <=> Whole     <$ "whole"
- <|> Backwards <$ "back"
- <|> Forwards  <$ "for"
+ <=> Whole     <#> "whole"
+ <|> Backwards <#> "back"
+ <|> Forwards  <#> "for"
 
 data Region
  = That
@@ -177,21 +184,21 @@ data Region
  deriving (Show,Eq,Ord,Enum)
 -- region :: DNSEarleyRHS r Region
 region = "region"
- <=> That       <$ "that"
- <|> Character  <$ "char"
- <|> Word_      <$ "word"
- <|> Token      <$ "toke"
- <|> Group      <$ "group"
- <|> Line       <$ "line"
- <|> Rectangle  <$ "wreck"
- <|> Block      <$ "block"
- <|> Page       <$ "page"
- <|> Screen     <$ "screen"
- <|> Everything <$ "all"
- <|> Definition <$ "def"
- <|> Function_  <$ "fun"
- <|> Reference  <$ "ref"
- <|> Structure  <$ "struct"
+ <=> That       <#> "that"
+ <|> Character  <#> "char"
+ <|> Word_      <#> "word"
+ <|> Token      <#> "toke"
+ <|> Group      <#> "group"
+ <|> Line       <#> "line"
+ <|> Rectangle  <#> "wreck"
+ <|> Block      <#> "block"
+ <|> Page       <#> "page"
+ <|> Screen     <#> "screen"
+ <|> Everything <#> "all"
+ <|> Definition <#> "def"
+ <|> Function_  <#> "fun"
+ <|> Reference  <#> "ref"
+ <|> Structure  <#> "struct"
 
 -- data Phrase
 --  -- continuation necessary
@@ -274,7 +281,7 @@ region = "region"
 --   <|> bracket '|'      <$ "norm"
 
 char = "char"
-  <=> '`' <$ "grave"
+  <=> '`' <#> "grave"
 
 -- keyword = "keyword"
 --   <=> Keyword <$> liftLeaf anyWord "keyword"
@@ -295,60 +302,60 @@ phrase_ = "phrase" <=> liftTree
  (snoc <$> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
 
 phraseA = "phraseA" <=> empty
- <|> Escaped_    <$ "lit" <*> keyword_
- <|> Quoted_     <$ "quote" <*> (dictation_ <* "unquote")
- <|> Pasted_     <$ "paste"
- <|> Blank_      <$ "blank"
+ <|> Escaped_    <#> "lit" # keyword_
+ <|> Quoted_     <#> "quote" # dictation_ # "unquote"
+ <|> Pasted_     <#> "paste"
+ <|> Blank_      <#> "blank"
  -- <|> (Spelled_ . (:[])) <$> char
- <|> Spelled_    <$ "spell" <*> (char-++)
- <|> Separated_  <$> separator_
- <|> Cased_      <$> casing_
- <|> Joined_     <$> joiner_
- <|> Surrounded_ <$> brackets_
+ <|> Spelled_    <#> "spell" # (char-++)
+ <|> Separated_  <#> separator_
+ <|> Cased_      <#> casing_
+ <|> Joined_     <#> joiner_
+ <|> Surrounded_ <#> brackets_
 
 phraseB = "phraseB" <=> empty
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
- -- <|> Spelled_  <$> "spell" <*> letters -- only, not chars
- <|> Spelled_  <$ "spell" <*> (char-++)
- <|> Capped_   <$ "caps" <*> (char-++)
+ -- <|> Spelled_  <$> "spell" # letters -- only, not chars
+ <|> Spelled_  <#> "spell" # (char-++)
+ <|> Capped_   <#> "caps" # (char-++)
  -- <$> alphabetRHS
 
-phraseC = "phraseC" <=> Dictated_ <$ "say" <*> dictation_
+phraseC = "phraseC" <=> Dictated_ <#> "say" # dictation_
 
-phraseW = "phraseW" <=> (Dictated_ . P.Dictation . (:[])) <$> word_
+phraseW = "phraseW" <=> (Dictated_ . P.Dictation . (:[])) <#> word_
 
-phraseD = "phraseD" <=> Dictated_ <$> dictation_
+phraseD = "phraseD" <=> Dictated_ <#> dictation_
 
 separator_ = "separator"
-  <=> P.Separator ""  <$ "break"
-  <|> P.Separator " " <$ "space"
-  <|> P.Separator "," <$ "comma"
-  <|> P.Separator "/" <$ "slash"
-  <|> P.Separator "." <$ "dot"
+  <=> P.Separator ""  <#> "break"
+  <|> P.Separator " " <#> "space"
+  <|> P.Separator "," <#> "comma"
+  <|> P.Separator "/" <#> "slash"
+  <|> P.Separator "." <#> "dot"
 
 casing_ = "casing"
-  <=> P.Upper  <$ "upper"
-  <|> P.Lower  <$ "lower"
-  <|> P.Capper <$ "capper"
+  <=> P.Upper  <#> "upper"
+  <|> P.Lower  <#> "lower"
+  <|> P.Capper <#> "capper"
 
 joiner_ = "joiner"
-  <=> (\c -> P.Joiner [c]) <$ "join" <*> char
-  <|> P.Joiner "_"  <$ "snake"
-  <|> P.Joiner "-"  <$ "dash"
-  <|> P.Joiner "/"  <$ "file"
-  <|> P.Joiner ""   <$ "squeeze"
-  <|> P.CamelJoiner <$ "camel"
-  <|> P.ClassJoiner <$ "class"
+  <=> (\c -> P.Joiner [c]) <#> "join" # char
+  <|> P.Joiner "_"  <#> "snake"
+  <|> P.Joiner "-"  <#> "dash"
+  <|> P.Joiner "/"  <#> "file"
+  <|> P.Joiner ""   <#> "squeeze"
+  <|> P.CamelJoiner <#> "camel"
+  <|> P.ClassJoiner <#> "class"
 
 brackets_ = "brackets"
-  <=> P.bracket          <$ "round" <*> char
-  <|> P.Brackets "(" ")" <$ "par"
-  <|> P.Brackets "[" "]" <$ "square"
-  <|> P.Brackets "{" "}" <$ "curl"
-  <|> P.Brackets "<" ">" <$ "angle"
-  <|> P.bracket '"'      <$ "string"
-  <|> P.bracket '\''     <$ "ticked"
-  <|> P.bracket '|'      <$ "norm"
+  <=> P.bracket          <#> "round" # char
+  <|> P.Brackets "(" ")" <#> "par"
+  <|> P.Brackets "[" "]" <#> "square"
+  <|> P.Brackets "{" "}" <#> "curl"
+  <|> P.Brackets "<" ">" <#> "angle"
+  <|> P.bracket '"'      <#> "string"
+  <|> P.bracket '\''     <#> "ticked"
+  <|> P.bracket '|'      <#> "norm"
 
 
 inlineRHS = set (_RHSInfo.dnsInline) True
@@ -514,7 +521,7 @@ parse
 parse r xs = E.fullParses$ runEarley r xs
 
 parseString
- :: (forall r. DNSEarleyRHS r a)
+ :: (forall r. DNSEarleyRHS r a) -- Couldn't match type ‘z1’ with ‘r’ because type variable ‘r’ would escape its scope
  -> Text
  -> [a]
 parseString r s = as
@@ -645,69 +652,88 @@ showRHS r = do
 
 -- ================================================================ --
 
--- -- TODO compare relative associativity
--- infixl 4 <#> -- TODO   `(#) = review` or something in lens
--- infixl 4 # -- TODO   `(&) = flip ($)` in base in 7.10
+-- TODO compare relative associativity
+infixl 4 <#>
+infixl 4 #
 
 
--- -- | like '<$' or '<$>', given the type (see the 'AppRHS' instances in this module).
--- --
--- -- e.g. inference for @True <#> "true"@ (__without__ @OverloadedStrings@):
--- --
--- -- @
--- -- (<#>) :: (AppRHS p r l i a) => LeftR a b -> a -> RHS b
--- -- -- given string literal ("true" :: String)
--- -- a ~ String
--- -- (<#>) :: (AppRHS String) => LeftR String b -> String -> RHS b
--- -- -- accept constraint 'AppRHS' and expand type family 'LeftR'
--- -- (<#>) :: b -> String -> RHS b
--- -- @
--- --
--- (<#>) :: (Functor (p i), AppRHS p r l i a) => LeftR a b -> a -> RHS p r l i b
--- f <#> x = pure f `appR` x
+{- | like '<$' or '<$>'.
 
--- -- | like '<*' or '<*>', given the type (see the 'AppRHS' instances in this
--- -- module).
--- --
--- -- e.g. inference for @TODO@ (__without__ @OverloadedStrings@):
--- --
--- -- @
--- (#) :: (Functor (p i), AppRHS p r l i a) => RHS p r l i (LeftR a b) -> a -> RHS p r l i b
--- (#) = appR
+@f <#> x = pure f `'appRHS'` x@
 
--- -- | specialized 'appR' has types:
--- --
--- -- * @a        -> String    -> RHS a@
--- -- * @(a -> b) -> Rule p r a -> RHS b@
--- -- * @(a -> b) -> RHS a     -> RHS b@
--- -- * etc.
--- --
--- class (ToRHS p r l i a) => AppRHS p r l i a where
---  type LeftR a b :: *
---  appR :: RHS p r l i (LeftR a b) -> a -> RHS p r l i b
+specialized:
 
--- instance (Functor (p String)) => AppRHS p r l String String            where
---  type LeftR String b              = b
---  appR f x = f <*  toR x
---  -- the equality constraint delays unification until after the instance head is committed to,
---  -- e.g. (p2 ~ EarleyProduction z) needs this; the z's universally quantified and unconstrained, and don't unify with each other when an RHS is defined.
--- instance ((p1 ~ p2), Functor (p2 i)) => AppRHS p1 r l i (RHS p2 r l i a) where
---  type LeftR (RHS p r l i a) b         = (a -> b)
---  appR f x = f <*>     x
+@
+(<#>) :: a        -> String      -> RHS n t f a@
+(<#>) :: (x -> a) -> RHS n t f x -> RHS n t f a@
+@
 
--- -- | inject @a@s of different types into an @RHS@.
--- --
--- -- the first parameters (i.e. @p@ and @r@) are always abstract;
--- -- they seem to be needed to be in scope to unify with themselves in @a@.
--- class ToRHS p r l i a where
---  type ToR a :: *
---  toR :: a -> RHS p r l i (ToR a)
+inferable/unambiguous, but only without @OverloadedStrings@.
 
--- instance              ToRHS p  r l String String              where
---   type ToR String                   = String;
---   toR = word
--- instance (p1 ~ p2) => ToRHS p1 r l i (RHS     p2 r   l i   a) where
---   type ToR (RHS     p2 r   l i   a) = a;
---   toR = id
--- -- instance (IsString i) => ToRHS p r l i String            where  type ToR String            = String;  toR = word . fromString
+-}
+(<#>) :: ((Functor (n t f)), Functor f, AppRHS n t f x a) => LeftRHS x a -> x -> RHS n t f a
+f <#> x = pure f `appRHS` x
 
+{- | like '<*' or '<*>'.
+
+inferable/unambiguous, but only without @OverloadedStrings@.
+
+-}
+(#) :: (Functor f, AppRHS n t f x a) => RHS n t f (LeftRHS x a) -> x -> RHS n t f a
+(#) = appRHS
+
+{- | sugar to ignore the result of strings (injected into right-hand sides), 
+but apply the result of right-hand sides themselves.
+
+specialized:
+
+* @appRHS :: RHS n t f a        -> String      -> RHS n t f a@
+* @appRHS :: RHS n t f (x -> a) -> RHS n t f x -> RHS n t f a@
+
+-}
+class (IsRHS n t f x) => (AppRHS n t f) x a where
+ type LeftRHS x a :: *
+ appRHS :: RHS n t f (LeftRHS x a) -> x -> RHS n t f a
+
+-- instance (Functor'RHS n t f, (t ~ String)) => AppRHS n t f String a where
+--  type LeftRHS String a = a
+--  appRHS f x = f <* toRHS x      --TODO inline apply definition, to remove functor constraint
+
+-- instance (Functor'RHS n t f, (t ~ Text)) => AppRHS n t f Text a where
+--  type LeftRHS Text a = a
+--  appRHS f x = f <* toRHS x      --TODO inline apply definition, to remove functor constraint
+
+instance (Functor'RHS n t f, (t ~ Text)) => AppRHS n t f String a where
+ type LeftRHS String a = a
+ appRHS f x = f <* toRHS x      --TODO inline apply definition, to remove functor constraint
+
+-- instance ((f' ~ f), Functor'RHS n t f) => AppRHS n t f' (RHS n t f x) a where
+instance ((f' ~ f), (n' ~ n), Functor'RHS n t f) => AppRHS n' t f' (RHS n t f x) a where
+ type LeftRHS (RHS n t f x) a = (x -> a)
+ appRHS f x = f <*> x --TODO inline apply definition, to remove functor constraint
+-- the equality constraint (f' ~ f) delays unification, which (somehow) lets the abstract (z)'s in each (DNSEarleyFunc z a) unify.
+
+-- | inject @a@s of different types into an @RHS@.
+--
+-- the first parameters (i.e. @n@ and @t@ and @f@) are always abstract;
+-- they seem to be needed to be in scope to unify with themselves in @a@.
+class IsRHS n t f r where
+ type ToRHS r :: *
+ toRHS :: r -> RHS n t f (ToRHS r)
+
+instance (t ~ Text) => IsRHS n t f String where
+  type ToRHS String = Text
+  toRHS = Terminal id . T.pack
+
+instance IsRHS n t f (RHS n t f a) where
+  type ToRHS (RHS n t f a) = a
+  toRHS = id
+-- instance (IsString i) => IsRHS n t f String            where  type ToRHS String            = String;  toR = word . fromString
+
+-- instance (t ~ String) => IsRHS n t f String where
+--   type ToRHS String = String
+--   toRHS = Terminal id
+
+-- instance (t ~ Text) => IsRHS n t f Text where
+--   type ToRHS Text = Text
+--   toRHS = Terminal id

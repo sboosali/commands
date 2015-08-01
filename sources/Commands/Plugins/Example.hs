@@ -20,7 +20,7 @@ import           Commands.Plugins.Example.Spacing
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding (from, ( # ), (&))
+import           Control.Lens                    hiding (from, (#))
 import           Control.Monad.Catch             (SomeException, catches)
 import qualified Data.Aeson                      as J
 import           Data.Bifunctor                  (second)
@@ -72,18 +72,18 @@ data Root
 root :: C z ApplicationDesugarer Actions_ Root
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root = 'root <=> empty
- -- <|> Repeat      # positive & root-- TODO no recursion for now
- <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
- -- TODO <|> ReplaceWith # "replace" & phrase & "with" & (phrase <|>? "blank")
- <|> Undo        # "no"         -- order matters..
- <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
- <|> Click_      # click
- <|> Edit_       # edit
- <|> Move_       # move
- <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has "say" prefix
- <|> Phrase_     # phrase  -- must be last, phrase falls back to wildcard.
- -- <|> Roots       # (multipleC root)
--- TODO <|> Frozen # "freeze" & root
+ -- <|> Repeat      <#> positive # root-- TODO no recursion for now
+ <|> ReplaceWith <#> "replace" # phrase # "with" # phrase-- TODO
+ -- TODO <|> ReplaceWith <#> "replace" # phrase # "with" # (phrase <|>? "blank")
+ <|> Undo        <#> "no"         -- order matters..
+ <|> Undo        <#> "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
+ <|> Click_      <#> click
+ <|> Edit_       <#> edit
+ <|> Move_       <#> move
+ <|> (Phrase_ . pPhrase . (:[])) <#> phraseC -- has "say" prefix
+ <|> Phrase_     <#> phrase  -- must be last, phrase falls back to wildcard.
+ -- <|> Roots       <#> (multipleC root)
+-- TODO <|> Frozen <#> "freeze" # root
 
  <%> \case
 
@@ -400,8 +400,8 @@ data Move
  | MoveTo Endpoint Region
  deriving (Show,Eq,Ord)
 move = 'move
- <=> Move   # direction & region
- <|> MoveTo # endpoint & region
+ <=> Move   <#> direction # region
+ <|> MoveTo <#> endpoint # region
 -- TODO scrap this boilerplate.
 --
 -- can't scrap it with GHC.generics because the grammars are values not instance methods.
@@ -420,13 +420,13 @@ move = 'move
 -- | Slice and Direction both have too many values.
 data Endpoint = Beginning | Ending deriving (Bounded,Enum,Eq,Ord,Read,Show)
 endpoint = 'endpoint
- <=> Beginning # "beg"
- <|> Ending    # "end"
+ <=> Beginning <#> "beg"
+ <|> Ending    <#> "end"
 
 -- | orthogonal directions in three-dimensional space.
 data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
 direction = tidyGrammar
- -- <=> Up_ # "up"
+ -- <=> Up_ <#> "up"
  -- <|> ...
 -- direction = transformedGrammar (filter (/= '_'))
 -- direction = qualifiedGrammarWith "_"
@@ -437,9 +437,9 @@ data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
 -- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
 -- slice = qualifiedGrammar
 slice = 'slice
- <=> Whole     # "whole"
- <|> Backwards # "back"
- <|> Forwards  # "for"
+ <=> Whole     <#> "whole"
+ <|> Backwards <#> "back"
+ <|> Forwards  <#> "for"
 
 -- "for" is homophone with "four", while both Positive and Slice can be the prefix (i.e. competing for the same recognition).
 
@@ -447,10 +447,10 @@ slice = 'slice
 
 data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
 
- -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @# "kill"@)
+ -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @<#> "kill"@)
  -- prefixes (e.g. "kill") must come before their superstrings (e.g. "kill for line").
  -- otherwise, the prefix is committed prematurely, and parsec won't backtrack.
- -- TODO but wouldn't @# action & (slice -?- Whole) & (region -?- That)@ match "kill" before @# "kill"@ does? yes it does
+ -- TODO but wouldn't @<#> action # (slice -?- Whole) # (region -?- That)@ match "kill" before @<#> "kill"@ does? yes it does
 
  -- TODO we want:
  -- "cop" -> Edit Copy Whole That
@@ -458,20 +458,20 @@ data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
  -- "kill for line" -> Edit Cut Forwards Line, not {unexpected 'f', expecting end of input}
 
 edit = 'edit
- <=> Edit Cut Forwards Line # "kill" -- TODO this is why I abandoned parsec: it didn't backtrack sufficiently
+ <=> Edit Cut Forwards Line <#> "kill" -- TODO this is why I abandoned parsec: it didn't backtrack sufficiently
 
  -- generic
- <|> Edit # action              & (slice -?- Whole) & (region -?- That) -- e.g. "cop" -> "cop whole that"
- <|> Edit # (action -?- Select) & (slice -?- Whole) & region            -- e.g. "word" -> "select whole word"
+ <|> Edit <#> action              # (slice -?- Whole) # (region -?- That) -- e.g. "cop" -> "cop whole that"
+ <|> Edit <#> (action -?- Select) # (slice -?- Whole) # region            -- e.g. "word" -> "select whole word"
 
 -- TODO ensure no alternative is empty, necessary? yes it is
  -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
- -- <|> editing # (action-?) & (slice-?) & (region-?)
+ -- <|> editing <#> (action-?) # (slice-?) # (region-?)
  -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
  -- I don't know why the alternatives following the annihilator didn't show up in the "expecting: ..." error though
 
 -- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
--- editWith editing = 'edit <=> editing # (direction-?) & (action-?) & (region-?)
+-- editWith editing = 'edit <=> editing <#> (direction-?) # (action-?) # (region-?)
 -- edit = editWith defEditing
 -- TODO
 -- maybe RHS should have access to a configuration environment? Oh my.
@@ -480,9 +480,9 @@ edit = 'edit
  -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
 editing :: Maybe Action -> Maybe Slice -> Maybe Region -> Edit
 editing = undefined
--- TODO defaults <|> Edit # action & region
- -- <|> Edit undefined # region
- -- <|> flip Edit undefined # action
+-- TODO defaults <|> Edit <#> action # region
+ -- <|> Edit undefined <#> region
+ -- <|> flip Edit undefined <#> action
 
 
 
@@ -497,12 +497,12 @@ data Action
  deriving (Show,Eq,Ord,Typeable)
 -- action = enumGrammar
 action = 'action <=> empty
- <|> Select      # "sell"
- <|> Copy        # "cop"
- <|> Cut         # "kill"
- <|> Delete      # "del"
- <|> Transpose   # "trans"
- <|> Google      # "google"
+ <|> Select      <#> "sell"
+ <|> Copy        <#> "cop"
+ <|> Cut         <#> "kill"
+ <|> Delete      <#> "del"
+ <|> Transpose   <#> "trans"
+ <|> Google      <#> "google"
 
 
 
@@ -527,21 +527,21 @@ data Region
  deriving (Show,Eq,Ord,Enum,Typeable)
 -- region = enumGrammar
 region = 'region
- <=> That       # "that"
- <|> Character  # "char"
- <|> Word_      # "word"
- <|> Token      # "toke"
- <|> Group      # "group"
- <|> Line       # "line"
- <|> Rectangle  # "wreck"
- <|> Block      # "block"
- <|> Page       # "page"
- <|> Screen     # "screen"
- <|> Everything # "all"
- <|> Definition # "def"
- <|> Function_  # "fun"
- <|> Reference  # "ref"
- <|> Structure  # "struct"
+ <=> That       <#> "that"
+ <|> Character  <#> "char"
+ <|> Word_      <#> "word"
+ <|> Token      <#> "toke"
+ <|> Group      <#> "group"
+ <|> Line       <#> "line"
+ <|> Rectangle  <#> "wreck"
+ <|> Block      <#> "block"
+ <|> Page       <#> "page"
+ <|> Screen     <#> "screen"
+ <|> Everything <#> "all"
+ <|> Definition <#> "def"
+ <|> Function_  <#> "fun"
+ <|> Reference  <#> "ref"
+ <|> Structure  <#> "struct"
 
 
 -- | 'Key's and 'Char'acters are "incomparable sets":
@@ -555,9 +555,9 @@ key = 'key <=> empty
 
 data Click = Click Times Button deriving (Show,Eq)
 click = 'click <=>
- Click # optionalEnum times & optionalEnum button & "click"
- -- type inference with the {&} sugar even works for:
- --  Click # optionalEnum enumGrammar & optionalEnum enumGrammar & "click"
+ Click <#> optionalEnum times # optionalEnum button # "click"
+ -- type inference with the {#} sugar even works for:
+ --  Click <#> optionalEnum enumGrammar # optionalEnum enumGrammar # "click"
  -- the terminal "click" makes the grammar "non-canonical" i.e.
  --  where product types are merged with <*> (after "lifting" into RHS)
  --  and sum types are merged with <|> (after "tagging" with the constructor)
@@ -579,17 +579,17 @@ TODO find out if this is necessary. I'd like positive to be defined generically.
 sources/Commands/Plugins/Example.hs:531:15:
     No instance for (AppRHS
                        Parser DNSReifying (Alter (Symbol p0 r0) Int))
-      arising from a use of ‘#’
+      arising from a use of ‘<#>’
     The type variables ‘p0’, ‘r0’ are ambiguous
     Note: there is a potential instance available:
       instance Functor p => AppRHS p r (RHS p r a)
         -- Defined in ‘Commands.Sugar’
     In the second argument of ‘(<=>)’, namely
-      ‘Positive # (asum . fmap int) [1 .. 9]’
+      ‘Positive <#> (asum . fmap int) [1 .. 9]’
     In the expression:
-      'positive <=> Positive # (asum . fmap int) [1 .. 9]
+      'positive <=> Positive <#> (asum . fmap int) [1 .. 9]
     In an equation for ‘positive’:
-        positive = 'positive <=> Positive # (asum . fmap int) [1 .. 9]
+        positive = 'positive <=> Positive <#> (asum . fmap int) [1 .. 9]
 
 sources/Commands/Plugins/Example.hs:531:18:
     No instance for (Functor p0) arising from a use of ‘asum’
@@ -606,7 +606,7 @@ sources/Commands/Plugins/Example.hs:531:18:
       ...plus 96 others
     In the first argument of ‘(.)’, namely ‘asum’
     In the expression: asum . fmap int
-    In the second argument of ‘(#)’, namely
+    In the second argument of ‘(<#>)’, namely
       ‘(asum . fmap int) [1 .. 9]’
 
 -}

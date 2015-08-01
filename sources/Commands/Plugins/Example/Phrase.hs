@@ -8,7 +8,7 @@ import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Spacing
 import           Data.Sexp
 
-import           Control.Lens                hiding (from, ( # ), (&))
+import           Control.Lens                hiding (from, (#))
 import           Data.List.NonEmpty          (NonEmpty (..))
 import qualified Data.List.NonEmpty          as NonEmpty
 import           Data.Semigroup
@@ -251,11 +251,11 @@ phrase = pPhrase <$> phrase_
 --
 phrase_ :: R z [Phrase_]
 phrase_ = 'phrase <=>
- (\ps p -> ps <> [p]) # ((phraseA -|- phraseB -|- phraseW)-*) & (phraseB -|- phraseC -|- phraseD)
+ (\ps p -> ps <> [p]) <#> ((phraseA -|- phraseB -|- phraseW)-*) # (phraseB -|- phraseC -|- phraseD)
 
  -- = Rule
  -- (unsafeLHSFromName 'phrase)
- -- (induceDNSReified (((phraseA -|- phraseB -|- phraseD)-*) & (phraseB -|- phraseC -|- phraseD)))
+ -- (induceDNSReified (((phraseA -|- phraseB -|- phraseD)-*) # (phraseB -|- phraseC -|- phraseD)))
  -- (induceEarleyProduction)
 
 -- | a sub-phrase where a phrase to the right is certain.
@@ -264,157 +264,157 @@ phrase_ = 'phrase <=>
 -- escaped, e.g. "quote greater equal unquote".
 phraseA :: R z Phrase_
 phraseA = 'phraseA <=> empty
- <|> Escaped_    # "lit" & keyword
- <|> Quoted_     # "quote" & dictation & "unquote"
- <|> Pasted_     # "paste"
- <|> Blank_      # "blank"
- <|> (Spelled_) # letter_
- <|> (Spelled_ . (:[])) # character
- <|> Separated_  # separator
- <|> Cased_      # casing
- <|> Joined_     # joiner
- <|> Surrounded_ # brackets
+ <|> Escaped_    <#> "lit" # keyword
+ <|> Quoted_     <#> "quote" # dictation # "unquote"
+ <|> Pasted_     <#> "paste"
+ <|> Blank_      <#> "blank"
+ <|> (Spelled_) <#> letter_
+ <|> (Spelled_ . (:[])) <#> character
+ <|> Separated_  <#> separator
+ <|> Cased_      <#> casing
+ <|> Joined_     <#> joiner
+ <|> Surrounded_ <#> brackets
 
 -- | a sub-phrase where a phrase to the right is possible.
 phraseB :: R z Phrase_
 phraseB = 'phraseB <=> empty
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
- -- <|> Spelled_  # "spell" & letters -- only, not characters
- <|> Spelled_  # "spell" & (character-+)
- <|> Capped_   # "caps" & (character-+)
+ -- <|> Spelled_  <#> "spell" # letters -- only, not characters
+ <|> Spelled_  <#> "spell" # (character-+)
+ <|> Capped_   <#> "caps" # (character-+)
  -- <$> alphabetRHS
 
 -- | a sub-phrase where a phrase to the right is impossible.
 phraseC :: R z Phrase_
-phraseC = 'phraseC <=> Dictated_ # "say" & dictation
+phraseC = 'phraseC <=> Dictated_ <#> "say" # dictation
 
 -- | injects dictation into phrase_
 phraseW :: R z Phrase_
-phraseW = 'phraseD <=> (Dictated_ . Dictation . (:[])) # word_
+phraseW = 'phraseD <=> (Dictated_ . Dictation . (:[])) <#> word_
 
 -- | injects dictation into phrase_
 phraseD :: R z Phrase_
-phraseD = 'phraseD <=> Dictated_ # dictation
+phraseD = 'phraseD <=> Dictated_ <#> dictation
 
 type Keyword = String -- TODO
 keyword :: R z Keyword
-keyword = 'keyword <=> id#word_
+keyword = 'keyword <=> id<#>word_
 
 newtype Separator = Separator String  deriving (Show,Eq,Ord)
 separator = 'separator <=> empty
- <|> Separator ""  # "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
- <|> Separator " " # "space"
- <|> Separator "," # "comma"
+ <|> Separator ""  <#> "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
+ <|> Separator " " <#> "space"
+ <|> Separator "," <#> "comma"
 
 casing = enumGrammar
 
 joiner = 'joiner
- <=> (\c -> Joiner [c]) # "join" & character
- <|> Joiner "_" # "snake"
- <|> Joiner "-" # "dash"
- <|> Joiner "/" # "file"
- <|> Joiner ""  # "squeeze"
- <|> CamelJoiner # "camel"
- <|> ClassJoiner # "class"
+ <=> (\c -> Joiner [c]) <#> "join" # character
+ <|> Joiner "_" <#> "snake"
+ <|> Joiner "-" <#> "dash"
+ <|> Joiner "/" <#> "file"
+ <|> Joiner ""  <#> "squeeze"
+ <|> CamelJoiner <#> "camel"
+ <|> ClassJoiner <#> "class"
 
 brackets :: R z Brackets
 brackets = 'brackets
- <=> bracket          # "round" & character
- <|> Brackets "(" ")" # "par"
- <|> Brackets "[" "]" # "square"
- <|> Brackets "{" "}" # "curl"
- <|> Brackets "<" ">" # "angle"
- <|> bracket '"'      # "string"
- <|> bracket '\''     # "ticked"
- <|> bracket '|'      # "norm"
- -- <|> Brackets "**" "**" # "bold"
+ <=> bracket          <#> "round" # character
+ <|> Brackets "(" ")" <#> "par"
+ <|> Brackets "[" "]" <#> "square"
+ <|> Brackets "{" "}" <#> "curl"
+ <|> Brackets "<" ">" <#> "angle"
+ <|> bracket '"'      <#> "string"
+ <|> bracket '\''     <#> "ticked"
+ <|> bracket '|'      <#> "norm"
+ -- <|> Brackets "**" "**" <#> "bold"
 
 character = 'character <=> empty
 
- <|> '`' # "grave"
- <|> '~' # "till"
- <|> '!' # "bang"
- <|> '@' # "axe"
- <|> '#' # "pound"
- <|> '$' # "doll"
- <|> '%' # "purse"
- <|> '^' # "care"
- <|> '&' # "amp"
- <|> '*' # "star"
- <|> '(' # "lore"
- <|> ')' # "roar"
- <|> '-' # "dash"
- <|> '_' # "score"
- <|> '=' # "eek"
- <|> '+' # "plus"
- <|> '[' # "lack"
- <|> '{' # "lace"
- <|> ']' # "rack"
- <|> '}' # "race"
- <|> '\\' # "stroke"
- <|> '|' # "pipe"
- <|> ';' # "sem"
- <|> ':' # "coal"
- <|> '\'' # "tick"
- <|> '"' # "quote"
- <|> ',' # "com"
- <|> '<' # "less"
- <|> '.' # "dot"
- <|> '>' # "great"
- <|> '/' # "slash"
- <|> '?' # "quest"
- <|> ' ' # "ace"
- <|> '\t' # "tab"
- <|> '\n' # "line"
+ <|> '`' <#> "grave"
+ <|> '~' <#> "till"
+ <|> '!' <#> "bang"
+ <|> '@' <#> "axe"
+ <|> '#' <#> "pound"
+ <|> '$' <#> "doll"
+ <|> '%' <#> "purse"
+ <|> '^' <#> "care"
+ <|> '&' <#> "amp"
+ <|> '*' <#> "star"
+ <|> '(' <#> "lore"
+ <|> ')' <#> "roar"
+ <|> '-' <#> "dash"
+ <|> '_' <#> "score"
+ <|> '=' <#> "eek"
+ <|> '+' <#> "plus"
+ <|> '[' <#> "lack"
+ <|> '{' <#> "lace"
+ <|> ']' <#> "rack"
+ <|> '}' <#> "race"
+ <|> '\\' <#> "stroke"
+ <|> '|' <#> "pipe"
+ <|> ';' <#> "sem"
+ <|> ':' <#> "coal"
+ <|> '\'' <#> "tick"
+ <|> '"' <#> "quote"
+ <|> ',' <#> "com"
+ <|> '<' <#> "less"
+ <|> '.' <#> "dot"
+ <|> '>' <#> "great"
+ <|> '/' <#> "slash"
+ <|> '?' <#> "quest"
+ <|> ' ' <#> "ace"
+ <|> '\t' <#> "tab"
+ <|> '\n' <#> "line"
 
- <|> '0' # "zero"
- <|> '1' # "one"
- <|> '2' # "two"
- <|> '3' # "three"
- <|> '4' # "four"
- <|> '5' # "five"
- <|> '6' # "six"
- <|> '7' # "seven"
- <|> '8' # "eight"
- <|> '9' # "nine"
+ <|> '0' <#> "zero"
+ <|> '1' <#> "one"
+ <|> '2' <#> "two"
+ <|> '3' <#> "three"
+ <|> '4' <#> "four"
+ <|> '5' <#> "five"
+ <|> '6' <#> "six"
+ <|> '7' <#> "seven"
+ <|> '8' <#> "eight"
+ <|> '9' <#> "nine"
 
- <|> 'a' # "ay"
- <|> 'b' # "bee"
- <|> 'c' # "sea"
- <|> 'd' # "dee"
- <|> 'e' # "eek"
- <|> 'f' # "eff"
- <|> 'g' # "gee"
- <|> 'h' # "aych"
- <|> 'i' # "eye"
- <|> 'j' # "jay"
- <|> 'k' # "kay"
- <|> 'l' # "el"
- <|> 'm' # "em"
- <|> 'n' # "en"
- <|> 'o' # "oh"
- <|> 'p' # "pea"
- <|> 'q' # "queue"
- <|> 'r' # "are"
- <|> 's' # "ess"
- <|> 't' # "tea"
- <|> 'u' # "you"
- <|> 'v' # "vee"
- <|> 'w' # "dub"
- <|> 'x' # "ex"
- <|> 'y' # "why"
- <|> 'z' # "zee"
+ <|> 'a' <#> "ay"
+ <|> 'b' <#> "bee"
+ <|> 'c' <#> "sea"
+ <|> 'd' <#> "dee"
+ <|> 'e' <#> "eek"
+ <|> 'f' <#> "eff"
+ <|> 'g' <#> "gee"
+ <|> 'h' <#> "aych"
+ <|> 'i' <#> "eye"
+ <|> 'j' <#> "jay"
+ <|> 'k' <#> "kay"
+ <|> 'l' <#> "el"
+ <|> 'm' <#> "em"
+ <|> 'n' <#> "en"
+ <|> 'o' <#> "oh"
+ <|> 'p' <#> "pea"
+ <|> 'q' <#> "queue"
+ <|> 'r' <#> "are"
+ <|> 's' <#> "ess"
+ <|> 't' <#> "tea"
+ <|> 'u' <#> "you"
+ <|> 'v' <#> "vee"
+ <|> 'w' <#> "dub"
+ <|> 'x' <#> "ex"
+ <|> 'y' <#> "why"
+ <|> 'z' <#> "zee"
  <|> alphabetRHS
 
 
 {- | equivalent to:
 
 @
- <|> 'a' # "A"
- <|> 'b' # "B"
- <|> 'c' # "C"
+ <|> 'a' <#> "A"
+ <|> 'b' <#> "B"
+ <|> 'c' <#> "C"
  <|> ...
- <|> 'z' # "Z"
+ <|> 'z' <#> "Z"
 @
 
 -}
@@ -438,5 +438,5 @@ letter_ = dragonGrammar 'letter_
 
 -- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
---  Letters # (letter-+)
+--  Letters <#> (letter-+)
  -- TODO greedy (many) versus non-greedy (manyUntil)

@@ -18,6 +18,7 @@ import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
 import Commands.Frontends.Dragon13
 import Data.Sexp
+import qualified Commands.Backends.OSX as OSX
 
 import Data.Void
 import Data.Bifunctor
@@ -633,7 +634,7 @@ reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
 
 serializeDNSGrammar' :: DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
 serializeDNSGrammar' uG = do
- let oG = uG                    -- optimizeDNSInfoGrammar
+ let oG = optimizeDNSInfoGrammar uG                    -- optimizeDNSInfoGrammar
  eG <- escapeDNSGrammar oG
  let sG = serializeGrammar eG
  return$ sG
@@ -671,7 +672,7 @@ specialized:
 inferable/unambiguous, but only without @OverloadedStrings@.
 
 -}
-(<#>) :: ((Functor (n t f)), Functor f, AppRHS n t f x a) => LeftRHS x a -> x -> RHS n t f a
+(<#>) :: ((Functor (n t f)), Functor f, AppRHS n t f x) => LeftRHS x a -> x -> RHS n t f a
 f <#> x = pure f `appRHS` x
 
 {- | like '<*' or '<*>'.
@@ -679,7 +680,7 @@ f <#> x = pure f `appRHS` x
 inferable/unambiguous, but only without @OverloadedStrings@.
 
 -}
-(#) :: (Functor f, AppRHS n t f x a) => RHS n t f (LeftRHS x a) -> x -> RHS n t f a
+(#) :: (Functor f, AppRHS n t f x) => RHS n t f (LeftRHS x a) -> x -> RHS n t f a
 (#) = appRHS
 
 {- | sugar to ignore the result of strings (injected into right-hand sides), 
@@ -691,7 +692,7 @@ specialized:
 * @appRHS :: RHS n t f (x -> a) -> RHS n t f x -> RHS n t f a@
 
 -}
-class (IsRHS n t f x) => (AppRHS n t f) x a where
+class (IsRHS n t f x) => (AppRHS n t f) x where
  type LeftRHS x a :: *
  appRHS :: RHS n t f (LeftRHS x a) -> x -> RHS n t f a
 
@@ -703,12 +704,12 @@ class (IsRHS n t f x) => (AppRHS n t f) x a where
 --  type LeftRHS Text a = a
 --  appRHS f x = f <* toRHS x      --TODO inline apply definition, to remove functor constraint
 
-instance (Functor'RHS n t f, (t ~ Text)) => AppRHS n t f String a where
+instance (Functor'RHS n t f, (t ~ Text)) => AppRHS n t f String where
  type LeftRHS String a = a
  appRHS f x = f <* toRHS x      --TODO inline apply definition, to remove functor constraint
 
 -- instance ((f' ~ f), Functor'RHS n t f) => AppRHS n t f' (RHS n t f x) a where
-instance ((f' ~ f), (n' ~ n), Functor'RHS n t f) => AppRHS n' t f' (RHS n t f x) a where
+instance ((f' ~ f), (n' ~ n), Functor'RHS n t f) => AppRHS n' t f' (RHS n t f x) where
  type LeftRHS (RHS n t f x) a = (x -> a)
  appRHS f x = f <*> x --TODO inline apply definition, to remove functor constraint
 -- the equality constraint (f' ~ f) delays unification, which (somehow) lets the abstract (z)'s in each (DNSEarleyFunc z a) unify.
@@ -737,3 +738,20 @@ instance IsRHS n t f (RHS n t f a) where
 -- instance (t ~ Text) => IsRHS n t f Text where
 --   type ToRHS Text = Text
 --   toRHS = Terminal id
+
+
+-- ================================================================ --
+
+data Command n t f c b a = Command
+ { _cRHS :: RHS n t f a
+ , _cDesugar :: c -> a -> b
+ }
+
+-- makeLenses ''Command
+
+type DNSEarleyCom z = Command (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) OSX.Application OSX.Actions_
+
+phraseCommand = Command phrase_ $ \case
+ _ -> \case
+   _ -> return () :: OSX.Actions_
+

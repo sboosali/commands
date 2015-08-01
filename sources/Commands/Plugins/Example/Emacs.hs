@@ -16,6 +16,7 @@ import qualified Data.HRefCache.Internal         as HRefCache
 -- import Commands.Plugins.Example.Phrase hiding  (phrase, casing, separator, joiner, brackets, keyword, char, dictation, word)
 import           Commands.Plugins.Example.Phrase (Phrase_ (..))
 import qualified Commands.Plugins.Example.Phrase as P
+import           Commands.Plugins.Example.Spacing
 import Commands.Frontends.Dragon13
 import Data.Sexp
 import qualified Commands.Backends.OSX as OSX
@@ -530,7 +531,7 @@ parseString r s = as
 
 parsePhrase :: Text -> String
 parsePhrase
- = (flip P.mungePhrase) P.defSpacing
+ = (flip P.mungePhrase) defSpacing
  . (flip P.splatPasted) "clipboard contents"
  . P.pPhrase
  . argmax qPhrase

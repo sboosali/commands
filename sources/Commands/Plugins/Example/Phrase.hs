@@ -1,10 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, MultiWayIf #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase #-}
 {-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell    #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
 import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
+import           Commands.Plugins.Example.Spacing
 import           Data.Sexp
 
 import           Control.Lens                hiding (from, ( # ), (&))
@@ -21,95 +22,18 @@ import           GHC.Exts                    (IsString (..))
 import           Prelude                     hiding (foldr1, mapM)
 
 
--- |
---
--- TODO prop> length xs < 2 ==> length (stagger xs) == 0
--- TODO prop> 2 <= length xs ==> length (stagger xs) + 1 == length xs
-stagger :: [a] -> [(a,a)]
-stagger []  = []
-stagger [_] = []
-stagger xs@(_:_) = zip (init xs) (tail xs)
-
--- |
---
-interstagger :: [a] -> [Either a (a,a)]
-interstagger xs = interweave (Left <$> xs) (Right <$> stagger xs)
-
--- | >>> interweave (Left <$> [1,2,3]) (Right <$> "ab")
--- [Left 1,Right 'a',Left 2,Right 'b',Left 3]
---
--- the input @interweave xs ys@ should satisfy @length xs == 1 + length ys@.
--- may truncate @ys@.
--- guarantees that the whole input @xs@ exists as a
--- <http://en.wikipedia.org/wiki/Subsequence subsequence> in the output.
---
--- TODO prop> subsequenceOf xs (interweave xs ys)
--- TODO prop> forall nonempty xs ==> head xs == head (interweave xs ys)
--- TODO prop> forall nonempty xs ==> last xs == last (interweave xs ys)
---
---
---
-interweave :: [a] -> [a] -> [a]
-interweave [] _ = []
-interweave (x:xs) ys = x : go (take (length xs) ys) xs -- forces both lists to share same length
- where
- go ys = concat . zipWith (\a b -> [a,b]) ys
-
-
-
--- | "Phrase Spacing".
---
--- configuration for combining adjacent words/symbols.
---
--- see 'defSpacing' for an example.
-newtype Spacing = Spacing { getSpacing :: SpacingX -> String }
--- type Spacing = (Map SpacingX String, String)
--- TODO replace the Map with generic "lookup" i.e. any function into
--- Maybe
--- Or a function from pairs of tokens to a separator
-
--- | "Spacing conteXt".
---
--- given a pair of words/symbols, how do we space them out when concatenating them?
---
-type SpacingX = (String, String)
-
--- | (specialized @Reader@; simplifies refactoring.)
-type Spaced a = Spacing -> a
-
--- |
---
--- we should put spaces:
---
--- * between words, but not between punctuation
--- * after a comma, but both before/after an equals sign.
---
-defSpacing :: Spacing
-defSpacing = Spacing $ \(l,r) -> if
- | null l || null r                     -> ""
- --- | all isAlphaNum l && all isAlphaNum r -> " "
- | isAlphaNum (last l) && isAlphaNum (head r) -> " "  -- earlier proven nonempty
- | l == ","                             -> " "
- | l == "=" || r == "="                 -> " "
- | otherwise                            -> ""
- -- cases should be disjoint (besides the last) for clarity
-
-spaceOut :: [String] -> Spaced String
-spaceOut xs spacing = concat $ fmap (either id (getSpacing spacing)) (interstagger xs)
-
-
+-- ================================================================ --
 
 -- | user-facing Phrase. exists at (DSL) parse-time.
 type Phrase  = PhraseF (Either Pasted PAtom)
--- | "Mungeable Phrase". exists at (DSL) run-time.
+-- | "Mungeable Phrase". exists only at (DSL) run-time.
 -- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
 type MPhrase = PhraseF [PAtom]
 type PhraseF = Sexp PFunc
-
 asPhrase :: String -> Phrase
 asPhrase = Atom . Right . PWord
 
--- | "Phrase Function".
+-- | a "Phrase Function".
 data PFunc
  = Cased      Casing
  | Joined     Joiner
@@ -139,12 +63,49 @@ instance IsString PAtom where fromString = PWord
 
 {- | a Pasted is like a 'Dictation'/'Quoted_' i.e. a list of words, not a single word.
 
-we know the Dictation at "parse time" i.e. 'phrase', but we only know the Pasted at
-"runtime" (wrt the DSL, not Haskell). Thus, it's a placeholder.
+we know (what words are in) the Dictation at (DSL-)"parse-time" i.e. 'phrase', 
+but we only know (what words are in) the Pasted at (DSL-)"runtime" 
+(i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
 
 
 -}
 data Pasted = Pasted  deriving (Show,Eq,Ord)
+
+{- | 'Phrase_' versus 'Phrase':
+
+@Phrase_@ is the unassociated concrete syntax list (e.g. tokens, parentheses),
+while @Phrase@ is the associated abstract syntax tree (e.g. s-expressions).
+
+-}
+data Phrase_
+ = Escaped_  Keyword -- ^ atom-like (wrt 'Sexp').
+ | Quoted_   Dictation -- ^ list-like.
+ | Pasted_ -- ^ atom-like.
+ | Blank_ -- ^ atom-like.
+ | Separated_ Separator -- ^ like a "close paren".
+ | Cased_      Casing -- ^ function-like (/ "open paren").
+ | Joined_     Joiner -- ^ function-like (/ "open paren").
+ | Surrounded_ Brackets -- ^ function-like (/ "open paren").
+ | Capped_   [Char] -- ^ atom-like.
+ | Spelled_  [Char] -- ^ list-like.
+ | Dictated_ Dictation -- ^ list-like.
+ deriving (Show,Eq,Ord)
+
+-- | used by 'pPhrase'.
+--
+--
+type PStack = NonEmpty PItem
+-- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
+-- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
+
+-- | an inlined subset of 'Sexp'.
+--
+-- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
+type PItem = (Maybe PFunc, [Phrase])
+
+
+
+-- ================================================================ --
 
 -- | splats the Pasted into PAtom's, after splitting the clipboard into words
 splatPasted :: Phrase -> String -> MPhrase
@@ -218,37 +179,6 @@ surroundWith (Brackets l r) as = do
 -- TODO generalize by renaming surround to transform: it shares the type with Interleave
 -- e.g. "par thread comma 123" -> (1,2,3)
 
--- |
---
--- 'Phrase_' is the unassociated concrete syntax list
--- (e.g. tokens, parentheses),
--- while 'Phrase' is the associated abstract syntax tree (e.g. s-expressions).
-data Phrase_
- = Escaped_  Keyword -- ^ atom-like.
- | Quoted_   Dictation -- ^ list-like.
- | Pasted_ -- ^ atom-like.
- | Blank_ -- ^ atom-like.
- | Separated_ Separator -- ^ like a "close paren".
- | Cased_      Casing -- ^ function-like (/ "open paren").
- | Joined_     Joiner -- ^ function-like (/ "open paren").
- | Surrounded_ Brackets -- ^ function-like (/ "open paren").
- | Capped_   [Char] -- ^ atom-like.
- | Spelled_  [Char] -- ^ list-like.
- | Dictated_ Dictation -- ^ list-like.
- deriving (Show,Eq,Ord)
-
--- | used by 'pPhrase'.
---
---
-type PStack = NonEmpty PItem
--- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
--- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
-
--- | an inlined subset of 'Sexp'.
---
--- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
-type PItem = (Maybe PFunc, [Phrase])
-
 joinSpelled :: [Phrase_] -> [Phrase_]
 joinSpelled = foldr' go []
  where
@@ -256,7 +186,7 @@ joinSpelled = foldr' go []
  go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
  go p ps = p:ps
 
--- | parses "tokens" into an "Sexp". a total function.
+-- | parses "tokens" into an "s-expression". a total function.
 pPhrase :: [Phrase_] -> Phrase
 pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
  -- (PSexp (PList [PAtom (PWord "")]))
@@ -308,6 +238,9 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
  fromPAtom :: PAtom -> Phrase
  fromPAtom = Atom . Right
+
+
+-- ================================================================ --
 
 -- |
 --

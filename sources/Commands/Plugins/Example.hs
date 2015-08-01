@@ -16,6 +16,7 @@ import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
 import           Commands.Symbol.Types
+import           Commands.Plugins.Example.Spacing
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async

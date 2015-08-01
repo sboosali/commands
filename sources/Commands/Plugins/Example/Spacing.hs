@@ -1,0 +1,83 @@
+{-# LANGUAGE LambdaCase, MultiWayIf #-}
+module Commands.Plugins.Example.Spacing where
+
+import           Data.Char
+
+
+-- | "Phrase Spacing".
+--
+-- configuration for combining adjacent words/symbols.
+--
+-- see 'defSpacing' for an example.
+newtype Spacing = Spacing { getSpacing :: SpacingX -> String }
+-- type Spacing = (Map SpacingX String, String)
+-- TODO replace the Map with generic "lookup" i.e. any function into
+-- Maybe
+-- Or a function from pairs of tokens to a separator
+
+-- | "Spacing conteXt".
+--
+-- given a pair of words/symbols, how do we space them out when concatenating them?
+--
+type SpacingX = (String, String)
+
+-- | (specialized @Reader@; simplifies refactoring.)
+type Spaced a = Spacing -> a
+
+
+-- ================================================================ --
+
+-- |
+--
+-- TODO prop> length xs < 2 ==> length (stagger xs) == 0
+-- TODO prop> 2 <= length xs ==> length (stagger xs) + 1 == length xs
+stagger :: [a] -> [(a,a)]
+stagger []  = []
+stagger [_] = []
+stagger xs@(_:_) = zip (init xs) (tail xs)
+
+-- |
+--
+interstagger :: [a] -> [Either a (a,a)]
+interstagger xs = interweave (Left <$> xs) (Right <$> stagger xs)
+
+-- | >>> interweave (Left <$> [1,2,3]) (Right <$> "ab")
+-- [Left 1,Right 'a',Left 2,Right 'b',Left 3]
+--
+-- the input @interweave xs ys@ should satisfy @length xs == 1 + length ys@.
+-- may truncate @ys@.
+-- guarantees that the whole input @xs@ exists as a
+-- <http://en.wikipedia.org/wiki/Subsequence subsequence> in the output.
+--
+-- TODO prop> subsequenceOf xs (interweave xs ys)
+-- TODO prop> forall nonempty xs ==> head xs == head (interweave xs ys)
+-- TODO prop> forall nonempty xs ==> last xs == last (interweave xs ys)
+--
+--
+--
+interweave :: [a] -> [a] -> [a]
+interweave [] _ = []
+interweave (x:xs) ys = x : go (take (length xs) ys) xs -- forces both lists to share same length
+ where
+ go ys = concat . zipWith (\a b -> [a,b]) ys
+
+-- |
+--
+-- we should put spaces:
+--
+-- * between words, but not between punctuation
+-- * after a comma, but both before/after an equals sign.
+--
+defSpacing :: Spacing
+defSpacing = Spacing $ \(l,r) -> if
+ | null l || null r                     -> ""
+ --- | all isAlphaNum l && all isAlphaNum r -> " "
+ | isAlphaNum (last l) && isAlphaNum (head r) -> " "  -- earlier proven nonempty
+ | l == ","                             -> " "
+ | l == "=" || r == "="                 -> " "
+ | otherwise                            -> ""
+ -- cases should be disjoint (besides the last) for clarity
+
+spaceOut :: [String] -> Spaced String
+spaceOut xs spacing = concat $ fmap (either id (getSpacing spacing)) (interstagger xs)
+

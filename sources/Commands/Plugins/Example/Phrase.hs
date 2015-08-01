@@ -22,8 +22,6 @@ import           GHC.Exts                    (IsString (..))
 import           Prelude                     hiding (foldr1, mapM)
 
 
--- ================================================================ --
-
 -- | user-facing Phrase. exists at (DSL) parse-time.
 type Phrase  = PhraseF (Either Pasted PAtom)
 -- | "Mungeable Phrase". exists only at (DSL) run-time.

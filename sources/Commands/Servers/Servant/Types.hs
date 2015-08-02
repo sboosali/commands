@@ -1,15 +1,44 @@
-{-# LANGUAGE DeriveGeneric, LambdaCase #-}
+{-# LANGUAGE DataKinds, DeriveGeneric, LambdaCase, RankNTypes, TypeOperators #-}
 module Commands.Servers.Servant.Types where
 import Commands.Backends.OSX.Types     (Actions_, Application,
                                         ApplicationDesugarer)
 import Commands.Mixins.DNS13OSX9.Types (C)
 
 import Data.Aeson
+import Servant
 -- import Data.Aeson.Types
 
--- import Data.Map         (Map)
+import Control.Monad.Trans.Either      (EitherT)
 import GHC.Generics                    (Generic)
+-- import Data.Map         (Map)
 
+
+type Response = EitherT ServantErr IO
+
+type CmdModel_ a = forall z. CmdModel z a
+
+{- |
+
+@
+POST /recognition
+@
+
+e.g.
+
+@
+$ export PORT=8666
+$ curl  -X POST  -H "Content-Type: application/json"  -d '["some","words"]'  "http://localhost:$PORT/recognition/"
+$ python -c 'import sys,os,json,urllib2; print (urllib2.urlopen(urllib2.Request("http://localhost:"+os.environ["PORT"]+"/recognition/", json.dumps(["some","words with spaces"]), {"Content-Type": "application/json"})).readline())'
+@
+
+-}
+type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON] ()
+-- type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
+
+{- |
+-}
+newtype DGNRecognition = DGNRecognition [String]  deriving (Show,Eq,Ord,Generic)
+instance FromJSON DGNRecognition
 
 {- | the Commands Model.
 
@@ -25,14 +54,6 @@ data CmdModel z a = CmdModel
  , _modContext :: Application   -- ^ the current context (e.g. the current application).
  -- , _mod ::
  }
-
-{- |
-
-
-
--}
-newtype DGNRecognition = DGNRecognition [String]  deriving (Show,Eq,Ord,Generic)
-instance FromJSON DGNRecognition
 
 {- |
 

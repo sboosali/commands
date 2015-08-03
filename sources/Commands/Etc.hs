@@ -1,10 +1,10 @@
 {-# LANGUAGE ConstraintKinds, DataKinds, DeriveGeneric               #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                             #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell, DeriveAnyClass                             #-}
 module Commands.Etc where
 import           Commands.Instances           ()
 
-import           Control.Lens                 (Lens', Prism', lens, prism')
+import           Control.Lens                 (Lens', Prism', lens, prism', makeLenses, makePrisms)
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
@@ -89,12 +89,23 @@ failure :: Name -> Possibly a
 failure = throwM . userError . showName
 
 showName :: Name -> String
-showName = either show showGUI . fromName
+showName = either show showGUI . fromGlobalName
+
+-- | could have fourth field: @Version@.
+data GUI = GUI
+ { _guiPackage    :: !Package
+ , _guiModule     :: !Module
+ , _guiIdentifier :: !Identifier
+ } deriving (Show,Eq,Ord,Generic,Hashable)
+
+newtype Package    = Package    String deriving (Show,Eq,Ord,Generic,Hashable)
+newtype Module     = Module     String deriving (Show,Eq,Ord,Generic,Hashable)
+newtype Identifier = Identifier String deriving (Show,Eq,Ord,Generic,Hashable)
 
 -- | only 'NameG' is global, i.e. is unique modulo package and module.
-fromName :: Name -> Possibly GUI
-fromName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
-fromName (Name (OccName occ) _) = failed occ
+fromGlobalName :: Name -> Possibly GUI
+fromGlobalName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
+fromGlobalName (Name (OccName occ) _) = failed occ
 
 -- | >>> showGUI (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
 -- "package-Module.SubModule.identifier"
@@ -120,14 +131,6 @@ constructors = enumFrom (toEnum 0)
 --
 enumDefault :: (Enum a) => a
 enumDefault = toEnum 0
-
-newtype Package    = Package    String deriving (Show, Eq, Ord, Generic); instance Hashable Package
-newtype Module     = Module     String deriving (Show, Eq, Ord, Generic); instance Hashable Module
-newtype Identifier = Identifier String deriving (Show, Eq, Ord, Generic); instance Hashable Identifier
-
--- | could have fourth field: @Version@.
-data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord, Generic)
-instance Hashable GUI
 
 displayDoc :: Doc -> Text
 displayDoc = displayT . renderPretty 1.0 80
@@ -257,4 +260,12 @@ sccs2cycles = mapMaybe $ \case
 
 snoc :: [a] -> a -> [a]
 snoc xs x = xs <> [x]
+
+
+-- ================================================================ --
+
+makeLenses ''GUI
+makePrisms ''Package
+makePrisms ''Module
+makePrisms ''Identifier
 

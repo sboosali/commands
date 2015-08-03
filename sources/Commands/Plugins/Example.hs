@@ -17,6 +17,7 @@ import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
 import           Commands.Symbol.Types
 import           Commands.Plugins.Example.Spacing
+import           Commands.Sugar.Alias
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async

@@ -1,9 +1,9 @@
 {-# LANGUAGE RankNTypes, TupleSections, TypeFamilies #-}
 module Commands.Servers.Servant.API where
 import           Commands.Backends.OSX          hiding (Application, Command)
-import           Commands.Core
-import           Commands.Mixins.DNS13OSX9      hiding (left, right)
+import           Commands.Plugins.Example.Emacs
 import           Commands.Servers.Servant.Types
+-- import           Commands.Core
 
 import           Control.Lens
 import           Control.Monad.Trans.Either
@@ -11,6 +11,9 @@ import qualified Data.ByteString.Lazy.Char8     as BSC
 import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as T
+import Data.Text.Lazy (Text)
 
 import           Control.Monad.IO.Class         (liftIO)
 
@@ -40,7 +43,7 @@ natlinkHandlers :: (Show a) => CmdModel_ a -> Server NatlinkAPI
 natlinkHandlers = postRecognition
 
 postRecognition :: (Show a) => CmdModel_ a -> DGNRecognition -> Response ()
-postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
+postRecognition cm (DGNRecognition ws) = handleInterpret cm ws
 
 {- | this handler:
 
@@ -50,17 +53,22 @@ postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
 
 
 -}
-handleInterpret :: (Show a) => CmdModel_ a -> String -> Response ()
-handleInterpret cm s = do
- liftIO $ putStrLn s
- v <- case ((cm&_modCommand)^.comRule) `parses` s of
+handleInterpret :: (Show a) => CmdModel_ a -> [Text] -> Response ()
+handleInterpret cm ts = do
+ liftIO$ putStrLn "" >> putStrLn "" >> putStrLn ""
+ dnsGrammar <- liftIO$ showRHS ((cm&_modCommand)^.cRHS)
+ liftIO$ T.putStrLn dnsGrammar
+ liftIO$ putStrLn ""
+ liftIO$ T.putStrLn$ T.intercalate (T.pack " ") ts
+ v <- case parseBest ((cm&_modCommand)^.cBest) ((cm&_modCommand)^.cRHS) ts of
   Left  e -> left  err400{errBody = BSC.pack (show e)}
-  Right x -> right x
- liftIO $ print v
- let a = ((cm&_modCommand) `compiles` v) (cm&_modContext)
- liftIO $ putStrLn $ showActions a
- liftIO $ runActions a
+  Right v -> right v
+ liftIO$ print v
+ let a = ((cm&_modCommand)^.cDesugar) (cm&_modContext) v
+ liftIO$ putStrLn $ showActions a
+ liftIO$ runActions a
  return ()
+
 
 -- handleInterpret :: (Show a) => CmdModel_ a -> String -> Response ()
 -- handleInterpret (CmdModel command def context) text = do

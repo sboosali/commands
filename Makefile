@@ -22,6 +22,7 @@ run:
 	cabal run
 
 serve:
+	echo 'curl  -X POST  -H "Content-Type: application/json"  -d '"'"'["par","round","grave","camel","lit","async","break","break","action"]'"'"' "http://localhost:8666/recognition/"'
 	cabal run serve
 
 bench:

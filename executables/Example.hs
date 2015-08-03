@@ -35,8 +35,8 @@ mainWith = \case
  -- OSX.main
 
 
-theModel :: Server.CmdModel z Example.Root
-theModel = (Server.CmdModel Example.root (Example.Phrase_ . Example.asPhrase) "emacs")
+theModel :: Server.CmdModel_ [Example.Phrase_]
+theModel = (Server.CmdModel phraseCommand "emacs")
 
 
 atomicModifyIORef_ f ref = atomicModifyIORef ref ((,()) . f) >> return ref

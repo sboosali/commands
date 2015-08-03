@@ -1,14 +1,14 @@
-{-# LANGUAGE DataKinds, DeriveGeneric, LambdaCase, RankNTypes, TypeOperators #-}
+{-# LANGUAGE DataKinds, DeriveGeneric, LambdaCase, RankNTypes, TypeOperators, DeriveAnyClass #-}
 module Commands.Servers.Servant.Types where
-import Commands.Backends.OSX.Types     (Actions_, Application,
-                                        ApplicationDesugarer)
-import Commands.Mixins.DNS13OSX9.Types (C)
+import Commands.Backends.OSX.Types     (Application)
+import Commands.Plugins.Example.Emacs (DNSEarleyCommand)
 
+import Control.Monad.Trans.Either      (EitherT)
+import Data.Text.Lazy (Text)
 import Data.Aeson
 import Servant
 -- import Data.Aeson.Types
 
-import Control.Monad.Trans.Either      (EitherT)
 import GHC.Generics                    (Generic)
 -- import Data.Map         (Map)
 
@@ -37,8 +37,7 @@ type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON
 
 {- |
 -}
-newtype DGNRecognition = DGNRecognition [String]  deriving (Show,Eq,Ord,Generic)
-instance FromJSON DGNRecognition
+newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Generic,FromJSON)
 
 {- | the Commands Model.
 
@@ -48,9 +47,7 @@ State that configures the server's handlers, and may be updated by clients.
 
 -}
 data CmdModel z a = CmdModel
- { _modCommand :: C z ApplicationDesugarer Actions_ a
- , _modDefault :: String -> a   -- ^ what a failed parse should default to
-  -- TODO (should move _modDefault into the parser, to make it total? But then we can't report errors unless the Either was desugar into an Action error, with ThrowA or something)
+ { _modCommand :: DNSEarleyCommand z a
  , _modContext :: Application   -- ^ the current context (e.g. the current application).
  -- , _mod ::
  }

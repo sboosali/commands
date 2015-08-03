@@ -3,8 +3,8 @@
 {-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase              #-}
 {-# LANGUAGE PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE PostfixOperators, RankNTypes, ScopedTypeVariables         #-}
-{-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo #-}
+{-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies, EmptyDataDecls, DataKinds  #-}
+{-# LANGUAGE UndecidableInstances, EmptyCase, RecursiveDo, TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, KindSignatures, ConstraintKinds  #-}
 -- {-# LANGUAGE OverloadedLists, OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
@@ -65,20 +65,20 @@ default (Text) -- TODO Necessary? Sufficient?
 t = T.pack
 
 mainEmacs = do
- print$ parseString edits (t"kill")
- print$ parseString edits (t"kill whole word")
+ print$ parseString edits ("kill")
+ print$ parseString edits ("kill whole word")
  -- [Edit Cut Forwards Line :| [Edit Select Whole Word_]  "kill" and "_ whole word"
  -- ,Edit Cut Whole That :| [Edit Select Whole Word_]  "kill _ _" and "_ whole word"
  -- ,Edit Cut Whole That :| [Edit Select Whole Word_]  ?
  -- ,Edit Cut Whole Word_ :| []
  -- ,Edit Cut Whole Word_ :| []
  -- ]                                          --
- print$ parseString edit (t"kill")            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
- print$ parseString edit (t"kill whole word") -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
+ print$ parseString edit ("kill")            -- [Edit Cut Forwards Line,Edit Cut Whole That] the correct order
+ print$ parseString edit ("kill whole word") -- [Edit Cut Whole Word_,Edit Cut Whole Word_] duplicate
 
- print$ parsePhrase (t"par round grave camel lit with async do break break action")
+ print$ parsePhrase_ (T.words$ t"par round grave camel lit with async do break break action")
  -- "(`async`action)"
- print$ length $ parseString phrase_ (t"par round grave camel lit async break break action")
+ print$ length $ parseString phrase_ ("par round grave camel lit async break break action")
 
  -- loop print$ parseString phrase "par round grave camel lit async break break action"
  -- print$ parseString root "replace par round grave camel lit with async break break action with blank"
@@ -502,45 +502,81 @@ buildEarley
  :: E.Prod (E.Rule s a) n t a
  -> [t]
  -> ST s (E.Result s n [t] a)
-buildEarley p xs = do
+buildEarley p ts = do
   s <- E.initialState p
-  E.parse [s] [] [] (return ()) [] 0 xs
+  E.parse [s] [] [] (return ()) [] 0 ts
 
 runEarley
  :: (Eq t)
  => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) t) a)
  -> [t]
  -> ST s (E.Result s String [t] a)
-runEarley r1 xs = do
+runEarley r1 ts = do
  r2 <- renameRHSToEarley >>= ($ r1)
- buildEarley (induceEarley r2) xs
+ buildEarley (induceEarley r2) ts
 
-parse
+parseRaw
  :: (Eq t)
  => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc r (ConstName (_,String)) t) a)
  -> [t]
  -> ([a], E.Report String [t])
-parse r xs = E.fullParses$ runEarley r xs
+parseRaw r ts = E.fullParses$ runEarley r ts
 
-parseString
+type EarleyEither e t = Either (E.Report e [t])
+
+parseEither
+ :: (Eq t)
+ => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc r (ConstName (_,String)) t) a)
+ -> [t]
+ -> EarleyEither String t (NonEmpty a)
+parseEither r
+ = toEarleyEither
+ . parseRaw r
+
+-- | refine an 'E.Report', forcing the results.
+-- 'Right' when there is at least one parse that has consumed the whole input.
+toEarleyEither
+ :: ([a], E.Report e [t])
+ -> EarleyEither e t (NonEmpty a)
+toEarleyEither = \case
+ ([],   e)               -> Left  e
+ (x:xs, E.Report _ _ []) -> Right (x:|xs)
+ (_,    e)               -> Left  e
+
+parseText
  :: (forall r. DNSEarleyRHS r a) -- Couldn't match type ‘z1’ with ‘r’ because type variable ‘r’ would escape its scope
- -> Text
- -> [a]
-parseString r s = as
- where (as,_) = E.fullParses$ runEarley r (T.words s)
+ -> [Text]
+ -> EarleyEither String Text (NonEmpty a)
+parseText r = parseEither r --  TODO
 
-parsePhrase :: Text -> String
-parsePhrase
- = (flip P.mungePhrase) defSpacing
- . (flip P.splatPasted) "clipboard contents"
- . P.pPhrase
+parseBest
+ :: (NonEmpty a -> a)
+ -> (forall r. DNSEarleyRHS r a)
+ -> [Text]
+ -> EarleyEither String Text a
+parseBest best r
+ = second best
+ . parseText r
+
+parseList :: (forall r. DNSEarleyRHS r a) -> [Text] -> [a]
+parseList r ts = as
+ where (as,_) = parseRaw r ts
+
+parseString :: (forall r. DNSEarleyRHS r a) -> String -> [a]
+parseString r = parseList r . (T.words . T.pack)
+
+parsePhrase_ :: [Text] -> String
+parsePhrase_
+ = runPhrase_ defSpacing "clipboard contents"
  . argmax qPhrase
- . parseString phrase_
+ . NonEmpty.fromList --  TODO
+ . parseList phrase_
 
+argmax :: Ord b => (a -> b) -> (NonEmpty a -> a)
+argmax f = maximumBy (compare `on` f)
 -- argmax :: (a -> Int) -> (a -> a -> Ordering)
 -- argmax f = maximumBy (comparing `on` f)
 -- argmax f = maximumBy (\x y -> f x `compare` f y)
-argmax f = maximumBy (compare `on` f)
 
 -- the specificity ("probability") of the phrase parts. bigger is better.
 qPhrase :: [P.Phrase_] -> Int
@@ -744,15 +780,38 @@ instance IsRHS n t f (RHS n t f a) where
 -- ================================================================ --
 
 data Command n t f c b a = Command
- { _cRHS :: RHS n t f a
- , _cDesugar :: c -> a -> b
+ { _cRHS :: RHS n t f a         -- ^ the root of a grammar
+ , _cBest :: NonEmpty a -> a    -- ^ for disambiguating multiple parse results
+ , _cDesugar :: c -> a -> b    -- ^ "desugar" the parse result into "bytecode" actions
  }
 
--- makeLenses ''Command
+-- instance ((f' ~ f), (n' ~ n), Functor'RHS n t f) => AppRHS n' t f' (Command n t f c b x) where
+--  type LeftRHS (Command n t f c b x) a = (x -> a)
+--  appRHS f x = f <*> toRHS x 
 
-type DNSEarleyCom z = Command (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) OSX.Application OSX.Actions_
+-- instance IsRHS n t f (Command n t f c b a) where
+--   type ToRHS (Command n t f c b a) = a
+--   toRHS = _cRHS
 
-phraseCommand = Command phrase_ $ \case
- _ -> \case
-   _ -> return () :: OSX.Actions_
+type DNSEarleyCommand z = Command
+ (DNSEarleyName String)
+ Text
+ (DNSEarleyFunc z (DNSEarleyName String) Text)
+ OSX.Application
+ OSX.Actions_
 
+runPhrase_ :: Spacing -> String -> [Phrase_] -> String
+runPhrase_ spacing clipboard
+ = (flip P.mungePhrase) spacing
+ . (flip P.splatPasted) clipboard
+ . P.pPhrase
+
+phraseCommand :: DNSEarleyCommand z [Phrase_]
+phraseCommand = Command phrase_ (argmax qPhrase) $ \_ p -> do
+ s <- OSX.getClipboard
+ OSX.sendText (runPhrase_ defSpacing s p)
+
+
+-- ================================================================ --
+
+makeLenses ''Command

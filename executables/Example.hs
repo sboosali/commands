@@ -29,9 +29,9 @@ mainWith = \case
  ["serve"] -> do
   print "serveCommands 8666 root"
   Server.serveNatlink 8666 theModel
- _ -> mainEmacs
+ -- _ -> mainEmacs
  -- _ -> sharingMain
- -- _ -> Example.main
+ _ -> Example.main
  -- OSX.main
 
 

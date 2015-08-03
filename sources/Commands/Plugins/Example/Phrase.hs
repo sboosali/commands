@@ -28,8 +28,6 @@ type Phrase  = PhraseF (Either Pasted PAtom)
 -- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
 type MPhrase = PhraseF [PAtom]
 type PhraseF = Sexp PFunc
-asPhrase :: String -> Phrase
-asPhrase = Atom . Right . PWord
 
 -- | a "Phrase Function".
 data PFunc
@@ -44,8 +42,6 @@ data Brackets = Brackets String String deriving (Show,Eq,Ord)
 -- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
 -- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
 -- maybe some type from data.split package, that both supports decidable equality and that can build functions
-bracket :: Char -> Brackets
-bracket c = Brackets [c] [c]
 
 -- | "Phrase Atom".
 --
@@ -102,140 +98,6 @@ type PStack = NonEmpty PItem
 type PItem = (Maybe PFunc, [Phrase])
 
 
-
--- ================================================================ --
-
--- | splats the Pasted into PAtom's, after splitting the clipboard into words
-splatPasted :: Phrase -> String -> MPhrase
-splatPasted p clipboard = either (substPasted clipboard) (:[]) <$> p
- where
- substPasted pasted Pasted = fmap PWord (words pasted)
-
-mungePhrase :: MPhrase -> Spaced String
-mungePhrase p = concatPAtoms =<< evalSplatSexp applyPFunc p
-
-{- |
-
-
->>> :set -XOverloadedStrings
->>> concatPAtoms ["",""]
-PWord ""
->>> concatPAtoms ["",""]
-PWord ""
-
--}
-concatPAtoms :: [PAtom] -> Spaced String
-concatPAtoms xs e = (flip spaceOut) e . fmap mungePAtom $ xs
-
-mungePAtom :: PAtom -> String
-mungePAtom = \case
- PWord    x  -> x
- PAcronym cs -> upper cs
-
-applyPFunc :: [PAtom] -> PFunc -> Spaced [PAtom]
-applyPFunc as = \case
-  Cased      g -> traverse (return . caseWith g) as
-  Joined     g -> return [joinWith g as]
-  Surrounded g -> surroundWith g as
-
-caseWith :: Casing -> (PAtom -> PAtom)
-caseWith casing = mapPAtom (fromCasing casing)
-
-fromCasing :: Casing -> (String -> String)
-fromCasing = \case
- Upper  -> upper
- Lower  -> lower
- Capper -> capitalize
-
-mapPAtom :: (String -> String) -> (PAtom -> PAtom)
-mapPAtom f = \case
- PWord    x  -> PWord    $ f x
- PAcronym cs -> PAcronym $ f cs
- -- PWord . f . mungePAtom
-
-joinWith :: Joiner -> ([PAtom] -> PAtom)
-joinWith = \case
- -- Joiner s    -> List.interleave (PWord s)
- Joiner s    -> PWord . List.intercalate s . fmap mungePAtom
- CamelJoiner -> PWord . camelAtoms
- ClassJoiner -> PWord . classAtoms
-
-camelAtoms :: [PAtom] -> String
-camelAtoms []     = ""
-camelAtoms (x:xs) = lower (mungePAtom x) <> (classAtoms xs)
-
-classAtoms :: [PAtom] -> String
-classAtoms = squeezeCase . (fmap $ \case
- PWord w     -> capitalize w
- PAcronym cs -> upper cs)
--- TODO distinguish Capped from Acronym to preserve capitalization?
-
-surroundWith :: Brackets -> ([PAtom] -> Spaced [PAtom])
-surroundWith (Brackets l r) as = do
- -- xs <- traverse mungePAtom as
- return $ ([PWord l] <> as <> [PWord r])
--- TODO generalize by renaming surround to transform: it shares the type with Interleave
--- e.g. "par thread comma 123" -> (1,2,3)
-
-joinSpelled :: [Phrase_] -> [Phrase_]
-joinSpelled = foldr' go []
- where
- go :: Phrase_ -> [Phrase_] -> [Phrase_]
- go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
- go p ps = p:ps
-
--- | parses "tokens" into an "s-expression". a total function.
-pPhrase :: [Phrase_] -> Phrase
-pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
- -- (PSexp (PList [PAtom (PWord "")]))
- where
- go :: PStack -> Phrase_ -> PStack
- go ps = \case
-  (Escaped_  (x))            -> update ps $ fromPAtom (PWord x)
-  (Quoted_   (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
-  (Dictated_ (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
-  (Capped_   cs)             -> update ps $ fromPAtom (PAcronym cs)
-  (Spelled_  cs)             -> update ps $ fromPAtom (PAcronym cs)
-  Pasted_                    -> update ps $ fromPasted
-  Blank_                     -> update ps $ fromPAtom (PWord "")
-  Separated_ (Separator x) -> update (pop ps) $ fromPAtom (PWord x)
-  -- Separated_ Broken -> update (pop ps)
-  (Cased_     f)  -> push ps (Cased f)
-  (Joined_    f)  -> push ps (Joined f)
-  (Surrounded_ f) -> push ps (Surrounded f)
-
- pop :: PStack -> PStack
- -- break from the innermost PFunc, it becomes an argument to the outer PFunc
- -- i.e. close the S expression with a right parenthesis "...)"
- pop ((Nothing,ps):|(q:qs)) = update (q:|qs) (List ps)
- pop ((Just f ,ps):|(q:qs)) = update (q:|qs) (Sexp f ps)
- -- if too many breaks, just ignore
- pop stack = stack
- -- i.e. open a left parenthesis with some function "(f ..."
- push :: PStack -> PFunc -> PStack
- push (p:|ps) f = (Just f, []) :| (p:ps)
-
- update :: PStack -> Phrase -> PStack
- update ((f,ps):|qs) p = (f, ps <> [p]) :| qs
-
- -- right-associate the PFunc's.
- fromStack :: PStack -> Phrase
- fromStack = fromItem . foldr1 associateItem . NonEmpty.reverse
-
- associateItem :: PItem -> PItem -> PItem
- associateItem (f,ps) = \case
-  (Nothing,qs) -> (f, ps <> [List   qs])
-  (Just g ,qs) -> (f, ps <> [Sexp g qs])
-
- fromItem :: PItem -> Phrase
- fromItem (Nothing, ps) = List   ps
- fromItem (Just f,  ps) = Sexp f ps
-
- fromPasted :: Phrase
- fromPasted = Atom . Left $ Pasted
-
- fromPAtom :: PAtom -> Phrase
- fromPAtom = Atom . Right
 
 
 -- ================================================================ --
@@ -438,3 +300,147 @@ letter_ = dragonGrammar 'letter_
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
 --  Letters <#> (letter-+)
  -- TODO greedy (many) versus non-greedy (manyUntil)
+
+
+
+
+-- ================================================================ --
+
+asPhrase :: String -> Phrase
+asPhrase = Atom . Right . PWord
+
+bracket :: Char -> Brackets
+bracket c = Brackets [c] [c]
+
+-- | splats the Pasted into PAtom's, after splitting the clipboard into words
+splatPasted :: Phrase -> String -> MPhrase
+splatPasted p clipboard = either (substPasted clipboard) (:[]) <$> p
+ where
+ substPasted pasted Pasted = fmap PWord (words pasted)
+
+mungePhrase :: MPhrase -> Spaced String
+mungePhrase p = concatPAtoms =<< evalSplatSexp applyPFunc p
+
+{- |
+
+
+>>> :set -XOverloadedStrings
+>>> concatPAtoms ["",""]
+PWord ""
+>>> concatPAtoms ["",""]
+PWord ""
+
+-}
+concatPAtoms :: [PAtom] -> Spaced String
+concatPAtoms xs e = (flip spaceOut) e . fmap mungePAtom $ xs
+
+mungePAtom :: PAtom -> String
+mungePAtom = \case
+ PWord    x  -> x
+ PAcronym cs -> upper cs
+
+applyPFunc :: [PAtom] -> PFunc -> Spaced [PAtom]
+applyPFunc as = \case
+  Cased      g -> traverse (return . caseWith g) as
+  Joined     g -> return [joinWith g as]
+  Surrounded g -> surroundWith g as
+
+caseWith :: Casing -> (PAtom -> PAtom)
+caseWith casing = mapPAtom (fromCasing casing)
+
+fromCasing :: Casing -> (String -> String)
+fromCasing = \case
+ Upper  -> upper
+ Lower  -> lower
+ Capper -> capitalize
+
+mapPAtom :: (String -> String) -> (PAtom -> PAtom)
+mapPAtom f = \case
+ PWord    x  -> PWord    $ f x
+ PAcronym cs -> PAcronym $ f cs
+ -- PWord . f . mungePAtom
+
+joinWith :: Joiner -> ([PAtom] -> PAtom)
+joinWith = \case
+ -- Joiner s    -> List.interleave (PWord s)
+ Joiner s    -> PWord . List.intercalate s . fmap mungePAtom
+ CamelJoiner -> PWord . camelAtoms
+ ClassJoiner -> PWord . classAtoms
+
+camelAtoms :: [PAtom] -> String
+camelAtoms []     = ""
+camelAtoms (x:xs) = lower (mungePAtom x) <> (classAtoms xs)
+
+classAtoms :: [PAtom] -> String
+classAtoms = squeezeCase . (fmap $ \case
+ PWord w     -> capitalize w
+ PAcronym cs -> upper cs)
+-- TODO distinguish Capped from Acronym to preserve capitalization?
+
+surroundWith :: Brackets -> ([PAtom] -> Spaced [PAtom])
+surroundWith (Brackets l r) as = do
+ -- xs <- traverse mungePAtom as
+ return $ ([PWord l] <> as <> [PWord r])
+-- TODO generalize by renaming surround to transform: it shares the type with Interleave
+-- e.g. "par thread comma 123" -> (1,2,3)
+
+joinSpelled :: [Phrase_] -> [Phrase_]
+joinSpelled = foldr' go []
+ where
+ go :: Phrase_ -> [Phrase_] -> [Phrase_]
+ go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
+ go p ps = p:ps
+
+-- | parses "tokens" into an "s-expression". a total function.
+pPhrase :: [Phrase_] -> Phrase
+pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
+ -- (PSexp (PList [PAtom (PWord "")]))
+ where
+ go :: PStack -> Phrase_ -> PStack
+ go ps = \case
+  (Escaped_  (x))            -> update ps $ fromPAtom (PWord x)
+  (Quoted_   (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
+  (Dictated_ (Dictation xs)) -> update ps $ List ((fromPAtom . PWord) <$> xs)
+  (Capped_   cs)             -> update ps $ fromPAtom (PAcronym cs)
+  (Spelled_  cs)             -> update ps $ fromPAtom (PAcronym cs)
+  Pasted_                    -> update ps $ fromPasted
+  Blank_                     -> update ps $ fromPAtom (PWord "")
+  Separated_ (Separator x) -> update (pop ps) $ fromPAtom (PWord x)
+  -- Separated_ Broken -> update (pop ps)
+  (Cased_     f)  -> push ps (Cased f)
+  (Joined_    f)  -> push ps (Joined f)
+  (Surrounded_ f) -> push ps (Surrounded f)
+
+ pop :: PStack -> PStack
+ -- break from the innermost PFunc, it becomes an argument to the outer PFunc
+ -- i.e. close the S expression with a right parenthesis "...)"
+ pop ((Nothing,ps):|(q:qs)) = update (q:|qs) (List ps)
+ pop ((Just f ,ps):|(q:qs)) = update (q:|qs) (Sexp f ps)
+ -- if too many breaks, just ignore
+ pop stack = stack
+ -- i.e. open a left parenthesis with some function "(f ..."
+ push :: PStack -> PFunc -> PStack
+ push (p:|ps) f = (Just f, []) :| (p:ps)
+
+ update :: PStack -> Phrase -> PStack
+ update ((f,ps):|qs) p = (f, ps <> [p]) :| qs
+
+ -- right-associate the PFunc's.
+ fromStack :: PStack -> Phrase
+ fromStack = fromItem . foldr1 associateItem . NonEmpty.reverse
+
+ associateItem :: PItem -> PItem -> PItem
+ associateItem (f,ps) = \case
+  (Nothing,qs) -> (f, ps <> [List   qs])
+  (Just g ,qs) -> (f, ps <> [Sexp g qs])
+
+ fromItem :: PItem -> Phrase
+ fromItem (Nothing, ps) = List   ps
+ fromItem (Just f,  ps) = Sexp f ps
+
+ fromPasted :: Phrase
+ fromPasted = Atom . Left $ Pasted
+
+ fromPAtom :: PAtom -> Phrase
+ fromPAtom = Atom . Right
+

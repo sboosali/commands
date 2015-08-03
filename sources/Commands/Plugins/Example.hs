@@ -61,32 +61,30 @@ data Root
  = Repeat Positive Root
  | Edit_ Edit
  | Undo
- | ReplaceWith Phrase Phrase
+ | ReplaceWith Phrase' Phrase'
  | Click_ Click
  | Move_ Move
- | Phrase_ Phrase
+ | Phrase_ Phrase'
  -- Roots [Root]
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
 -- TODO currently throws "grammar too complex" :-(
-root :: C z ApplicationDesugarer Actions_ Root
+root :: R z Root
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root = 'root <=> empty
  -- <|> Repeat      <#> positive # root-- TODO no recursion for now
- <|> ReplaceWith <#> "replace" # phrase # "with" # phrase-- TODO
+ <|> ReplaceWith <#> "replace" # phrase_ # "with" # phrase_ -- TODO
  -- TODO <|> ReplaceWith <#> "replace" # phrase # "with" # (phrase <|>? "blank")
  <|> Undo        <#> "no"         -- order matters..
  <|> Undo        <#> "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
  <|> Click_      <#> click
  <|> Edit_       <#> edit
  <|> Move_       <#> move
- <|> (Phrase_ . pPhrase . (:[])) <#> phraseC -- has "say" prefix
- <|> Phrase_     <#> phrase  -- must be last, phrase falls back to wildcard.
+ <|> (Phrase_ . (:[])) <#> phraseC -- has "say" prefix
+ <|> Phrase_     <#> phrase_  -- must be last, phrase falls back to wildcard.
  -- <|> Roots       <#> (multipleC root)
 -- TODO <|> Frozen <#> "freeze" # root
-
- <%> runRoot
 
 data Move
  = Move Direction Region
@@ -172,8 +170,7 @@ edit = 'edit
 -- if it were State not Reader, it could also support contextual (mutable) vocabularies;
  -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
 editing :: Maybe Action -> Maybe Slice -> Maybe Region -> Edit
-editing = undefined
--- TODO defaults <|> Edit <#> action # region
+editing = undefined -- TODO defaults <|> Edit <#> action # region
  -- <|> Edit undefined <#> region
  -- <|> flip Edit undefined <#> action
 
@@ -265,79 +262,6 @@ button = qualifiedGrammar
 positive = 'positive
  <=> Positive <$> (asum . fmap int) [1..9]
 
-{- the type annotation on positive was needed to disambiguate this type error, which I don't like:
-
-TODO find out if this is necessary. I'd like positive to be defined generically.
-
-sources/Commands/Plugins/Example.hs:531:15:
-    No instance for (AppRHS
-                       Parser DNSReifying (Alter (Symbol p0 r0) Int))
-      arising from a use of ‘<#>’
-    The type variables ‘p0’, ‘r0’ are ambiguous
-    Note: there is a potential instance available:
-      instance Functor p => AppRHS p r (RHS p r a)
-        -- Defined in ‘Commands.Sugar’
-    In the second argument of ‘(<=>)’, namely
-      ‘Positive <#> (asum . fmap int) [1 .. 9]’
-    In the expression:
-      'positive <=> Positive <#> (asum . fmap int) [1 .. 9]
-    In an equation for ‘positive’:
-        positive = 'positive <=> Positive <#> (asum . fmap int) [1 .. 9]
-
-sources/Commands/Plugins/Example.hs:531:18:
-    No instance for (Functor p0) arising from a use of ‘asum’
-    The type variable ‘p0’ is ambiguous
-    Note: there are several potential instances:
-      instance Functor m =>
-               Functor (MonadRandom-0.3.0.2:Control.Monad.Random.RandT g m)
-        -- Defined in ‘MonadRandom-0.3.0.2:Control.Monad.Random’
-      instance Functor p =>
-               Functor (Control.Applicative.Permutation.Branch p)
-        -- Defined in ‘Control.Applicative.Permutation’
-      instance Functor p => Functor (Perms p)
-        -- Defined in ‘Control.Applicative.Permutation’
-      ...plus 96 others
-    In the first argument of ‘(.)’, namely ‘asum’
-    In the expression: asum . fmap int
-    In the second argument of ‘(<#>)’, namely
-      ‘(asum . fmap int) [1 .. 9]’
-
--}
-
-
-
-
--- ================================================================ --
-
-runRoot = \case
-
-  ReplaceWith this that -> \case
-   "emacs" -> runEmacsWithP "replace-regexp" [this, that]
-   "Intellij" -> do
-    press M r
-    (insert =<< munge this) >> press tab
-    slot =<< munge that
-   _ -> nothing
-
-  Undo -> always $ press met z
-
-  Edit_ a -> onlyWhen "emacs" $ editEmacs a
-  Move_ a -> onlyWhen "emacs" $ moveEmacs a
-
-  Repeat n c ->
-   \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
-
-  Phrase_ p -> always $ do
-   insert =<< munge p
-
--- TODO Frozen r -> \case
---    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
---  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
-
-  _ -> always nothing
-
-type ElispSexp = String
--- -- type ElispSexp = Sexp String String
 
 {-
 
@@ -375,11 +299,50 @@ type ElispSexp = String
 
 -}
 
+
+-- ================================================================ --
+
+
+bestRoot = \case                --TODO fold over every field of every case, normalizing each case
+ _ -> 1
+
+runRoot = \case
+
+  ReplaceWith this that -> \case
+   "emacs" -> runEmacsWithP "replace-regexp" [this, that]
+   "Intellij" -> do
+    press M r
+    (munge this >>= insert) >> press tab
+    munge that >>= slot
+   _ -> nothing
+
+  Undo -> always $ press met z
+
+  Edit_ a -> onlyWhen "emacs" $ editEmacs a
+  Move_ a -> onlyWhen "emacs" $ moveEmacs a
+
+  Repeat n c ->
+   \x -> replicateM_ (getPositive n) $ (runRoot c) x
+
+  Phrase_ p -> always $ do
+   insert =<< munge p
+
+-- TODO Frozen r -> \case
+--    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
+--  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
+
+  _ -> always nothing
+
+type Phrase' = [Phrase_]
+
+type ElispSexp = String
+-- -- type ElispSexp = Sexp String String
+
 nothing = return ()
 
-munge :: Phrase -> Actions String
+munge :: Phrase' -> Actions String
 munge p = do
- q <- splatPasted p <$> getClipboard
+ q <- splatPasted (pPhrase p) <$> getClipboard
  return $ mungePhrase q defSpacing
 
 slot s = do
@@ -462,7 +425,7 @@ runEmacsWithA f as = do
 -- | like 'runEmacsWith', but takes phrases as arguments $
 --
 -- e.g. @runEmacsWithP "regexp-search" ['PAtom' 'Pasted']@
-runEmacsWithP :: String -> [Phrase] -> Actions ()
+runEmacsWithP :: String -> [Phrase'] -> Actions ()
 runEmacsWithP f ps = do
  xs <- traverse munge ps
  runEmacsWith f xs
@@ -720,7 +683,7 @@ printSerializedGrammar SerializedGrammar{..} = do
 realMain = do
 
  putStrLn ""
- let rootG = (root^.comRule)
+ let rootG = root
  attemptSerialize rootG
  -- attemptSerialize phrase
 
@@ -818,7 +781,7 @@ realMain = do
 
  attemptMunge "par round grave camel lit with async break break action"
 
- attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
+ -- attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
  -- Earley is too slow without sharing, even with phraseW
 
 main = do

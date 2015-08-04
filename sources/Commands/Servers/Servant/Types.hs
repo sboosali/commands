@@ -1,15 +1,16 @@
-{-# LANGUAGE DataKinds, DeriveGeneric, LambdaCase, RankNTypes, TypeOperators, DeriveAnyClass #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveGeneric, LambdaCase #-}
+{-# LANGUAGE RankNTypes, TypeOperators                            #-}
 module Commands.Servers.Servant.Types where
-import Commands.Backends.OSX.Types     (Application)
-import Commands.Plugins.Example.Emacs (DNSEarleyCommand)
+import Commands.Backends.OSX.Types (Application)
+import Commands.Mixins.DNS13OSX9   (DNSEarleyCommand)
 
-import Control.Monad.Trans.Either      (EitherT)
-import Data.Text.Lazy (Text)
+import Control.Monad.Trans.Either  (EitherT)
 import Data.Aeson
+import Data.Text.Lazy              (Text)
 import Servant
 -- import Data.Aeson.Types
 
-import GHC.Generics                    (Generic)
+import GHC.Generics                (Generic)
 -- import Data.Map         (Map)
 
 

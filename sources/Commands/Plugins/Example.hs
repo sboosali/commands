@@ -6,55 +6,58 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example where
-import           Commands.Backends.OSX           hiding (Command)
-import qualified Commands.Backends.OSX           as OSX
-import           Commands.Core
+import           Commands.Backends.OSX            hiding (Command)
+import qualified Commands.Backends.OSX            as OSX
+import           Commands.Etc
+-- import           Commands.Core
 import           Commands.Frontends.Dragon13
-import           Commands.LHS
+-- import           Commands.LHS
 import           Commands.Mixins.DNS13OSX9
-import           Commands.Parsers.Earley
+-- import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
-import           Commands.Symbol.Types
+-- import           Commands.Symbol.Types
 import           Commands.Plugins.Example.Spacing
 import           Commands.Sugar.Alias
+import           Commands.Sugar.Press
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding (from, (#))
-import           Control.Monad.Catch             (SomeException, catches)
-import qualified Data.Aeson                      as J
-import           Data.Bifunctor                  (second)
+import           Control.Lens                     hiding (from, ( # ))
+import           Control.Monad.Catch              (SomeException, catches)
+import qualified Data.Aeson                       as J
+import           Data.Bifunctor                   (second)
 import           Data.Bitraversable
-import qualified Data.ByteString.Lazy.Char8      as B
+import qualified Data.ByteString.Lazy.Char8       as B
 import           Data.IORef
-import           Data.List.NonEmpty              (NonEmpty (..), fromList)
-import qualified Data.List.NonEmpty              as NonEmpty
-import qualified Data.Text.Lazy                  as T
-import qualified Data.Text.Lazy.IO               as T
+import           Data.List.NonEmpty               (NonEmpty (..), fromList)
+import qualified Data.List.NonEmpty               as NonEmpty
+import qualified Data.Text.Lazy                   as T
+import qualified Data.Text.Lazy.IO                as T
 import           Data.Typeable
-import           Language.Python.Version2.Parser (parseModule)
-import           Numeric.Natural                 ()
-import qualified Text.Parsec                     as Parsec
-import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
-                                                  (<$>), (<>))
+import           Language.Python.Version2.Parser  (parseModule)
+import           Numeric.Natural                  ()
+import qualified Text.Parsec                      as Parsec
+import           Text.PrettyPrint.Leijen.Text     hiding (brackets, empty, int,
+                                                   (<$>), (<>))
 
-import           Control.Applicative             hiding (many, optional)
+import           Control.Applicative              hiding (many, optional)
+import           Control.Arrow                    ((>>>))
 import           Control.Concurrent
-import           Control.Monad                   (replicateM_, void, (<=<),
-                                                  (>=>))
-import           Control.Monad.Reader            (asks)
+import           Control.Monad                    (replicateM_, void, (<=<),
+                                                   (>=>))
+import           Control.Monad.Reader             (asks)
 import           Control.Parallel
-import           Data.Char                       (toUpper)
-import           Data.Either                     (either)
-import           Data.Foldable                   (Foldable (..), asum,
-                                                  traverse_)
-import qualified Data.List                       as List
-import qualified Data.Map                        as Map
-import           Data.Monoid                     ((<>))
+import           Data.Char                        (toUpper)
+import           Data.Either                      (either)
+import           Data.Foldable                    (Foldable (..), asum,
+                                                   traverse_)
+import qualified Data.List                        as List
+import qualified Data.Map                         as Map
+import           Data.Monoid
 import           Data.Unique
-import           Prelude                         hiding (foldl, foldr1)
-import           System.Timeout                  (timeout)
+import           Prelude                          hiding (foldl, foldr1)
+import           System.Timeout                   (timeout)
 
 
 data Root
@@ -70,7 +73,7 @@ data Root
  deriving (Show,Eq)
 
 -- TODO currently throws "grammar too complex" :-(
-root :: R z Root
+
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root = 'root <=> empty
  -- <|> Repeat      <#> positive # root-- TODO no recursion for now
@@ -104,8 +107,7 @@ move = 'move
 --
 -- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
 -- move = defaultRule 'move
--- defaultRule "move"
--- spliceRule ''Move
+-- defaultRule "move" OR spliceRule ''Move
 --
 
 -- | Slice and Direction both have too many values.
@@ -114,11 +116,9 @@ endpoint = 'endpoint
  <=> Beginning <#> "beg"
  <|> Ending    <#> "end"
 
--- | orthogonal directions in three-dimensional space.
+-- | orthogonal directions in three-dimensional space. @... <=> Up_ <#> "up" <|> ...@
 data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
 direction = tidyGrammar
- -- <=> Up_ <#> "up"
- -- <|> ...
 -- direction = transformedGrammar (filter (/= '_'))
 -- direction = qualifiedGrammarWith "_"
 
@@ -253,12 +253,11 @@ click = 'click <=>
  --  and sum types are merged with <|> (after "tagging" with the constructor)
 
 data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = enumGrammar -- :: R_ Times
+times = enumGrammar
 
 data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
 button = qualifiedGrammar
 
--- positive :: R_ Positive
 positive = 'positive
  <=> Positive <$> (asum . fmap int) [1..9]
 
@@ -302,38 +301,50 @@ positive = 'positive
 
 -- ================================================================ --
 
+rootCommand = Command root (argmax rankRoot) runRoot
 
-bestRoot = \case                --TODO fold over every field of every case, normalizing each case
- _ -> 1
+rankRoot = \case                --TODO fold over every field of every case, normalizing each case
+ Repeat _ r -> rankRoot r
+ Edit_ _ -> 1
+ Undo -> 1
+ ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
+ Click_ _ -> 1
+ Move_ _ -> 1
+ Phrase_ p -> rankPhrase p
 
 runRoot = \case
 
-  ReplaceWith this that -> \case
-   "emacs" -> runEmacsWithP "replace-regexp" [this, that]
-   "Intellij" -> do
-    press M r
-    (munge this >>= insert) >> press tab
-    munge that >>= slot
-   _ -> nothing
+ "emacs" -> \case
+   ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
+   Edit_ a -> editEmacs a
+   Move_ a -> moveEmacs a
+   x -> runRoot_ x
 
-  Undo -> always $ press met z
+ "Intellij" -> \case
+   ReplaceWith this that -> do
+     press M r
+     (munge this >>= insert) >> press tab
+     munge that >>= slot
+   x -> runRoot_ x
 
-  Edit_ a -> onlyWhen "emacs" $ editEmacs a
-  Move_ a -> onlyWhen "emacs" $ moveEmacs a
+ context -> \case
+   Repeat n c -> replicateM_ (getPositive n) $ runRoot context c
+   x -> runRoot_ x
 
-  Repeat n c ->
-   \x -> replicateM_ (getPositive n) $ (runRoot c) x
+ where
+ -- unconditional runRoot (i.e. any context / global context)
+ runRoot_ = \case
 
-  Phrase_ p -> always $ do
+  Undo -> press met z
+
+  Phrase_ p -> do
    insert =<< munge p
+
+  _ -> nothing
 
 -- TODO Frozen r -> \case
 --    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
 --  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
-
-  _ -> always nothing
-
-type Phrase' = [Phrase_]
 
 type ElispSexp = String
 -- -- type ElispSexp = Sexp String String
@@ -594,21 +605,30 @@ attemptAsynchronously seconds action = do
 
 attempt = attemptAsynchronously 1
 
+-- runRuleParser
+--  :: (forall z. Rule (EarleyProduction z l) r l t a)
+--  -> [t]
+--  -> Possibly (NonEmpty a)
+-- runRuleParser rule ts = case toEarleyError $ runEarleyProduction (rule^.ruleParser) ts of
+--  Left  e  -> throwM e
+--  Right xs -> return xs
+
 attemptMunge :: String -> IO ()
 attemptMunge s = do
  putStrLn ""
  putStrLn ""
  putStrLn ""
  print s
- attempt $ runRuleParser phrase_ (words s) >>= \case
-  (raw_p :| _) -> do
+ attempt $ parseBest bestPhrase phrase_ ((T.words . T.pack) s) & \case
+  Left e -> print e
+  Right raw_p -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
    let munged_p   = mungePhrase splatted_p defSpacing
    ol [ show raw_p
       , show pasted_p
       , show splatted_p
-      , show munged_p
+      , munged_p
       ]
 
 attemptMungeAll :: String -> IO ()
@@ -617,13 +637,13 @@ attemptMungeAll s = do
  putStrLn ""
  putStrLn ""
  print s
- attempt $ runRuleParser phrase_ (words s) >>= \case
+ attempt $ parseThrow phrase_ ((T.words . T.pack) s) >>= \case
   (raw_p :| raw_ps) -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
    let munged_p   = mungePhrase splatted_p defSpacing
    ol [ show raw_p
-      , List.intercalate "\n , " $ map show $ raw_ps
+      , List.intercalate "\n , " $ map show $ raw_ps -- generate lazily
       , show pasted_p
       , show splatted_p
       , show munged_p
@@ -634,14 +654,16 @@ ol xs = ifor_ xs $ \i x -> do
  putStrLn ""
  putStrLn $ fold [show i, ". ", x]
 
-attemptParse :: (Show a) => (forall  z. R z a) -> String -> IO ()
+attemptParse :: (Show a) => (forall  z. DNSEarleyRHS z a) -> String -> IO ()
 attemptParse rule s = do
  putStrLn ""
- attempt $ runRuleParser rule (words s) >>= \case
+ attempt $ parseThrow rule ((T.words . T.pack) s) >>= \case
   x :| _ -> print x
 
 -- TODO remove the [{emptyList}]
-attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
+attemptSerialize rhs = attemptAsynchronously 3 $ do
+ serialized <- formatRHS rhs
+ either print printSerializedGrammar serialized
 
 printSerializedGrammar SerializedGrammar{..} = do
  replicateM_ 3 $ putStrLn ""

@@ -1,15 +1,15 @@
 {-# LANGUAGE FlexibleInstances, LambdaCase, TupleSections, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-binds -fno-warn-unused-matches -fno-warn-orphans #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
-import qualified Commands.Plugins.Example        as Example
-import qualified Commands.Plugins.Example.Phrase as Example
-import qualified Commands.Servers.Servant        as Server
+import qualified Commands.Plugins.Example as Example
+-- import qualified Commands.Plugins.Example.Phrase as Example
+import qualified Commands.Servers.Servant as Server
 -- import qualified Commands.Backends.OSX.Example as OSX
-import           Commands.Plugins.Example.Emacs
-import qualified Data.RefCache                   as RefCache
+-- import           Commands.Plugins.Example.Emacs
+import qualified Data.RefCache            as RefCache
 
 import           Data.Reify
-import           System.Environment              (getArgs)
+import           System.Environment       (getArgs)
 -- import Data.Unique
 import           Control.Monad
 import           Control.Monad.ST
@@ -34,10 +34,14 @@ mainWith = \case
  _ -> Example.main
  -- OSX.main
 
+-- theModel :: Server.CmdModel_ [Example.Phrase_]
+-- theModel = (Server.CmdModel phraseCommand "emacs")
 
-theModel :: Server.CmdModel_ [Example.Phrase_]
-theModel = (Server.CmdModel phraseCommand "emacs")
+theModel :: Server.CmdModel_ Example.Root
+theModel = (Server.CmdModel Example.rootCommand "emacs")
 
+
+-- ================================================================ --
 
 atomicModifyIORef_ f ref = atomicModifyIORef ref ((,()) . f) >> return ref
 
@@ -118,3 +122,5 @@ sharingMain = do
  -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Identity shared, Identity shared, Identity shared]
  -- print =<< reifyGraph =<< (RefCache.traverseSharedIO return) [Lazy     shared, Lazy     shared, Lazy     shared]
 
+
+-- ================================================================ --

@@ -1,4 +1,5 @@
 module Commands.Munging where
+
 import Data.List.Split
 
 import Control.Arrow

@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
-{-# LANGUAGE TemplateHaskell, TypeOperators, TypeFamilies                           #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators              #-}
 module Commands.RHS.Types where
 
 -- import           Control.Lens
@@ -13,7 +13,7 @@ import           Control.Applicative
 import           Control.Lens
 import           Data.Foldable       (asum)
 import           Data.Monoid
-import           GHC.Exts            (IsString (..), IsList (..))
+import           GHC.Exts            (IsList (..), IsString (..))
 
 
 data RHS n t f a where
@@ -99,7 +99,8 @@ liftRHS f = Pure id `Apply` f
 @t@ can default to String.
 
 -}
-instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString s = Terminal id t where t = fromString s
+instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where --TODO remove Show constraint or show it's needed for defaulting
+ fromString s = Terminal id t where t = fromString s
 -- instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where fromString = Terminal id . fromString
 -- instance (IsString t, Show t, a ~ String) => IsString (RHS n t f a) where fromString = Terminal show . fromString
 -- instance (IsString t, Show t) => IsString (RHS n t f String) where fromString = Terminal show . fromString
@@ -254,6 +255,24 @@ data SomeRHS n t f = SomeRHS { _unSomeRHS :: forall x. RHS n t f x }
 --  Terminal i t -> Terminal (i.intoT) (fromT t)
 --  r ->
 
+data Command n t f c b a = Command
+ { _cRHS     :: RHS n t f a         -- ^ the root of a grammar
+ , _cBest    :: NonEmpty a -> a    -- ^ for disambiguating multiple parse results
+ , _cDesugar :: c -> a -> b    -- ^ "desugar" the parse result into "bytecode" actions
+ }
+
+-- instance ((f' ~ f), (n' ~ n), Functor'RHS n t f) => AppRHS n' t f' (Command n t f c b x) where
+--  type LeftRHS (Command n t f c b x) a = (x -> a)
+--  appRHS f x = f <*> toRHS x
+
+-- instance IsRHS n t f (Command n t f c b a) where
+--   type ToRHS (Command n t f c b a) = a
+--   toRHS = _cRHS
+
+
+-- ================================================================ --
+-- lenses
+
 _NonTerminal :: Prism' (RHS n t f a) (n t f a, RHS n t f a)
 _NonTerminal = prism (uncurry NonTerminal) $ \case
  NonTerminal l r -> Right (l, r)
@@ -261,4 +280,4 @@ _NonTerminal = prism (uncurry NonTerminal) $ \case
 -- makePrisms ''RHS
 makeLenses ''ConstName
 makeLenses ''SomeRHS
-
+makeLenses ''Command

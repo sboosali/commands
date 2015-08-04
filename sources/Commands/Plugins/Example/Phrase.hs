@@ -1,69 +1,35 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase #-}
-{-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell    #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase          #-}
+{-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
-import           Commands.Core
+-- import           Commands.Core
+import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
+import           Commands.Munging
 import           Commands.Plugins.Example.Spacing
 import           Data.Sexp
+import qualified Commands.Backends.OSX           as OSX
 
-import           Control.Lens                hiding (from, (#))
-import           Data.List.NonEmpty          (NonEmpty (..))
-import qualified Data.List.NonEmpty          as NonEmpty
+import           Control.Lens                     hiding (from, snoc, ( # ))
+import           Data.List.NonEmpty               (NonEmpty (..))
+import qualified Data.List.NonEmpty               as NonEmpty
 import           Data.Semigroup
+import qualified Data.Text.Lazy                   as T
 
 import           Control.Applicative
 import           Data.Char
-import           Data.Foldable               (Foldable (..))
-import qualified Data.List                   as List
-import           Data.Typeable               (Typeable)
-import           GHC.Exts                    (IsString (..))
-import           Prelude                     hiding (foldr1, mapM)
+import           Data.Foldable                    (Foldable (..))
+import qualified Data.List                        as List
+import           Data.Typeable                    (Typeable)
+import           GHC.Exts                         (IsString (..))
+import           Prelude                          hiding (foldr1, mapM)
 
 
--- | user-facing Phrase. exists at (DSL) parse-time.
-type Phrase  = PhraseF (Either Pasted PAtom)
--- | "Mungeable Phrase". exists only at (DSL) run-time.
--- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
-type MPhrase = PhraseF [PAtom]
-type PhraseF = Sexp PFunc
+-- ================================================================ --
+-- Phrase_ types
 
--- | a "Phrase Function".
-data PFunc
- = Cased      Casing
- | Joined     Joiner
- | Surrounded Brackets
- deriving (Show,Eq,Ord)
-
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
-data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
-data Brackets = Brackets String String deriving (Show,Eq,Ord)
--- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
--- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
--- maybe some type from data.split package, that both supports decidable equality and that can build functions
-
--- | "Phrase Atom".
---
--- 'PAcronym's behave differently from 'PWord's under some 'Joiner's (e.g. class case).
--- a 'PAcronym' should hold only uppercase letters.
-data PAtom
- = PWord String
- | PAcronym [Char]
- deriving (Show,Eq,Ord)
-
--- | for doctest
-instance IsString PAtom where fromString = PWord
-
-{- | a Pasted is like a 'Dictation'/'Quoted_' i.e. a list of words, not a single word.
-
-we know (what words are in) the Dictation at (DSL-)"parse-time" i.e. 'phrase', 
-but we only know (what words are in) the Pasted at (DSL-)"runtime" 
-(i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
-
-
--}
-data Pasted = Pasted  deriving (Show,Eq,Ord)
+type Phrase' = [Phrase_]
 
 {- | 'Phrase_' versus 'Phrase':
 
@@ -85,9 +51,57 @@ data Phrase_
  | Dictated_ Dictation -- ^ list-like.
  deriving (Show,Eq,Ord)
 
+data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
+data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
+data Brackets = Brackets String String deriving (Show,Eq,Ord)
+newtype Separator = Separator String  deriving (Show,Eq,Ord)
+type Keyword = String -- TODO
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+
+-- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
+-- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
+-- maybe some type from data.split package, that both supports decidable equality and that can build functions
+
+
+-- ================================================================ --
+-- Phrase types
+
+-- | user-facing Phrase. exists at (DSL) parse-time.
+type Phrase  = PhraseF (Either Pasted PAtom)
+-- | "Mungeable Phrase". exists only at (DSL) run-time.
+-- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
+type MPhrase = PhraseF [PAtom]
+type PhraseF = Sexp PFunc
+
+-- | a "Phrase Function".
+data PFunc
+ = Cased      Casing
+ | Joined     Joiner
+ | Surrounded Brackets
+ deriving (Show,Eq,Ord)
+
+-- | "Phrase Atom".
+--
+-- 'PAcronym's behave differently from 'PWord's under some 'Joiner's (e.g. class case).
+-- a 'PAcronym' should hold only uppercase letters.
+data PAtom
+ = PWord String
+ | PAcronym [Char]
+ deriving (Show,Eq,Ord)
+
+-- | for doctest
+instance IsString PAtom where fromString = PWord
+
+{- | a Pasted is like a 'Dictation'/'Quoted_' i.e. a list of words, not a single word.
+
+we know (what words are in) the Dictation at (DSL-)"parse-time" i.e. 'phrase',
+but we only know (what words are in) the Pasted at (DSL-)"runtime"
+(i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
+
+-}
+data Pasted = Pasted  deriving (Show,Eq,Ord)
+
 -- | used by 'pPhrase'.
---
---
 type PStack = NonEmpty PItem
 -- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
 -- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
@@ -102,67 +116,58 @@ type PItem = (Maybe PFunc, [Phrase])
 
 -- ================================================================ --
 
--- |
---
--- transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
-phrase = pPhrase <$> phrase_
+-- -- | transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
+-- phrase = pPhrase <$> phrase_
 
--- |
---
-phrase_ :: R z [Phrase_]
-phrase_ = 'phrase <=>
- (\ps p -> ps <> [p]) <#> ((phraseA -|- phraseB -|- phraseW)-*) # (phraseB -|- phraseC -|- phraseD)
-
- -- = Rule
- -- (unsafeLHSFromName 'phrase)
- -- (induceDNSReified (((phraseA -|- phraseB -|- phraseD)-*) # (phraseB -|- phraseC -|- phraseD)))
- -- (induceEarleyProduction)
+phrase_ :: DNSEarleyRHS z Phrase'
+phrase_ = complexGrammar 'phrase_
+ (snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (snoc <$> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
 
 -- | a sub-phrase where a phrase to the right is certain.
 --
 -- this ordering prioritizes the escaping Escaped_/Quoted_ over the
 -- escaped, e.g. "quote greater equal unquote".
-phraseA :: R z Phrase_
+phraseA :: DNSEarleyRHS z Phrase_
 phraseA = 'phraseA <=> empty
  <|> Escaped_    <#> "lit" # keyword
  <|> Quoted_     <#> "quote" # dictation # "unquote"
  <|> Pasted_     <#> "paste"
  <|> Blank_      <#> "blank"
- <|> (Spelled_) <#> letter_
- <|> (Spelled_ . (:[])) <#> character
+ -- <|> (Spelled_ . (:[])) <$> char --TODO
+ -- <|> (Spelled_) <#> letter_
+ -- <|> (Spelled_ . (:[])) <#> character
+ <|> Spelled_    <#> "spell" # (character-++)
  <|> Separated_  <#> separator
  <|> Cased_      <#> casing
  <|> Joined_     <#> joiner
  <|> Surrounded_ <#> brackets
 
 -- | a sub-phrase where a phrase to the right is possible.
-phraseB :: R z Phrase_
+phraseB :: DNSEarleyRHS z Phrase_
 phraseB = 'phraseB <=> empty
+ <|> Spelled_  <#> "spell" # (character-++)
+ <|> Capped_   <#> "caps" # (character-++)
+ -- <$> alphabetRHS
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
  -- <|> Spelled_  <#> "spell" # letters -- only, not characters
- <|> Spelled_  <#> "spell" # (character-+)
- <|> Capped_   <#> "caps" # (character-+)
- -- <$> alphabetRHS
 
 -- | a sub-phrase where a phrase to the right is impossible.
-phraseC :: R z Phrase_
-phraseC = 'phraseC <=> Dictated_ <#> "say" # dictation
+phraseC :: DNSEarleyRHS z Phrase_
+phraseC = 'phraseC <=>
+ Dictated_ <#> "say" # dictation
+
+-- | injects word_ into phrase_
+phraseW :: DNSEarleyRHS z Phrase_
+phraseW = 'phraseW <=>
+ (Dictated_ . Dictation . (:[])) <#> word_
 
 -- | injects dictation into phrase_
-phraseW :: R z Phrase_
-phraseW = 'phraseD <=> (Dictated_ . Dictation . (:[])) <#> word_
-
--- | injects dictation into phrase_
-phraseD :: R z Phrase_
+phraseD :: DNSEarleyRHS z Phrase_
 phraseD = 'phraseD <=> Dictated_ <#> dictation
 
-type Keyword = String -- TODO
-keyword :: R z Keyword
-keyword = 'keyword <=> id<#>word_
-
-newtype Separator = Separator String  deriving (Show,Eq,Ord)
 separator = 'separator <=> empty
- <|> Separator ""  <#> "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
+ <|> Separator ""  <#> "break" --TODO separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
  <|> Separator " " <#> "space"
  <|> Separator "," <#> "comma"
 
@@ -177,7 +182,6 @@ joiner = 'joiner
  <|> CamelJoiner <#> "camel"
  <|> ClassJoiner <#> "class"
 
-brackets :: R z Brackets
 brackets = 'brackets
  <=> bracket          <#> "round" # character
  <|> Brackets "(" ")" <#> "par"
@@ -189,6 +193,7 @@ brackets = 'brackets
  <|> bracket '|'      <#> "norm"
  -- <|> Brackets "**" "**" <#> "bold"
 
+character :: DNSEarleyRHS z Char
 character = 'character <=> empty
 
  <|> '`' <#> "grave"
@@ -278,24 +283,27 @@ character = 'character <=> empty
 @
 
 -}
+alphabetRHS :: DNSEarleyRHS z Char
 -- alphabetRHS :: Functor (p i) => RHS p r l String Char
-alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z']
--- TODO What will we get back from Dragon anyway?
+alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z'] -- TODO What will we get back from Dragon anyway?
 
-
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
 dictation = dragonGrammar 'dictation
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (EarleyProduction $ Dictation <$> some anyToken)
+ ((Dictation . fmap T.unpack) <$> some anyWord)
+ (DGNDictation)
+{-# NOINLINE dictation #-} --TODO doesn't help with the unshared <dictation__4>/<dictation__14>/<dictation__16>
 
 word_ = dragonGrammar 'word_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
- (EarleyProduction $ anyToken)
+ (T.unpack <$> anyWord)
+ (DGNWords)
 
-letter_ = dragonGrammar 'letter_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (EarleyProduction $ anyLetter)
+keyword = dragonGrammar 'keyword
+ (T.unpack <$> anyWord)
+ (DGNWords)
+ -- <=> Keyword <$> word_
 
+letter = dragonGrammar 'letter
+ (T.unpack <$> anyLetter)
+ (DGNLetters)
 -- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
 --  Letters <#> (letter-+)
@@ -313,7 +321,7 @@ bracket :: Char -> Brackets
 bracket c = Brackets [c] [c]
 
 -- | splats the Pasted into PAtom's, after splitting the clipboard into words
-splatPasted :: Phrase -> String -> MPhrase
+splatPasted :: Phrase -> OSX.ClipboardText -> MPhrase
 splatPasted p clipboard = either (substPasted clipboard) (:[]) <$> p
  where
  substPasted pasted Pasted = fmap PWord (words pasted)
@@ -443,4 +451,44 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
 
  fromPAtom :: PAtom -> Phrase
  fromPAtom = Atom . Right
+
+
+-- ================================================================ --
+
+phraseCommand :: DNSEarleyCommand z [Phrase_]
+phraseCommand = Command phrase_ (argmax rankPhrase) $ \_ p -> do
+ s <- OSX.getClipboard
+ OSX.sendText (runPhrase_ defSpacing s p)
+
+runPhrase_ :: Spacing -> OSX.ClipboardText -> [Phrase_] -> String
+runPhrase_ spacing clipboard
+ = flip(mungePhrase) spacing
+ . flip(splatPasted) clipboard
+ . pPhrase
+
+bestPhrase :: NonEmpty [Phrase_] -> [Phrase_]
+bestPhrase = argmax rankPhrase
+
+-- the specificity ("probability") of the phrase parts. bigger is better.
+rankPhrase :: [Phrase_] -> Int
+rankPhrase = sum . fmap (\case
+ Escaped_ _ -> 1
+ Quoted_ _ -> 1
+ Pasted_  -> 1
+ Blank_  -> 1
+ Spelled_ _ -> 1
+ Capped_ _ -> 1
+ Separated_ _ -> 1
+ Cased_ _ -> 1
+ Joined_ _ -> 1
+ Surrounded_ _ -> 1
+ Dictated_ _ -> 0)
+
+-- -- | convenience function for testing how phrase_ parses
+-- parsePhrase_ :: [Text] -> String
+-- parsePhrase_
+--  = runPhrase_ defSpacing "clipboard contents"
+--  . argmax rankPhrase
+--  . NonEmpty.fromList --  TODO
+--  . parseList phrase_
 

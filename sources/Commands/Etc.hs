@@ -1,10 +1,14 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, DeriveGeneric               #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell, DeriveAnyClass                             #-}
-module Commands.Etc where
-import           Commands.Instances           ()
+{-# LANGUAGE ConstraintKinds, DataKinds, DeriveAnyClass, DeriveGeneric #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase   #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell                               #-}
+module Commands.Etc
+ ( module Commands.Etc
+ , module Commands.Instances
+ ) where
+import           Commands.Instances
 
-import           Control.Lens                 (Lens', Prism', lens, prism', makeLenses, makePrisms)
+import           Control.Lens                 (Lens', Prism', lens, makeLenses,
+                                               makePrisms, prism')
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
@@ -47,24 +51,6 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 --
 --
 type Possibly a = forall m. (MonadThrow m) => m a
-
--- | the superclass constraints on 'Exception'. uses @ConstraintKinds@.
---
--- when you see
---
--- @
--- myHandler :: (Exceptional a) => a -> ...
--- @
---
--- it implies the provenance of those constraints is something like:
---
--- @
--- data MyError a = ...
--- instance ('Typeable' a, 'Show' a) => 'Exception' (MyError a)
--- @
---
--- this helps with reading/refactoring heavily-constrained types.
-type Exceptional a = (Typeable a, Show a)
 
 failed :: String -> Possibly a
 failed = throwM . userError

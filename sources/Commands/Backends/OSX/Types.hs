@@ -19,8 +19,8 @@ data ActionF k
  | SendText        String                           k -- ^ a logical grouping for debugging and optimizing
  | SendMouseClick  [Modifier] Positive MouseButton  k
 
- | GetClipboard                                     (ClipboardContents -> k)
- | SetClipboard    ClipboardContents                k
+ | GetClipboard                                     (ClipboardText -> k)
+ | SetClipboard    ClipboardText                k
  | CurrentApplication                               (Application -> k)
  | OpenApplication Application                      k
  | OpenURL         URL                              k
@@ -30,7 +30,7 @@ data ActionF k
  -- TODO   | PerformIO       (IO a)                           (a -> k)
  deriving (Functor)
 
-type ClipboardContents = String
+type ClipboardText = String
 
 type Application = String
 -- newtype Application = Application String  deriving (Show,Eq,Ord)

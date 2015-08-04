@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase, MultiWayIf #-}
 module Commands.Plugins.Example.Spacing where
 
-import           Data.Char
+import Data.Char
 
 
 -- | "Phrase Spacing".

@@ -1,19 +1,19 @@
 {-# LANGUAGE RankNTypes, TupleSections, TypeFamilies #-}
 module Commands.Servers.Servant.API where
 import           Commands.Backends.OSX          hiding (Application, Command)
-import           Commands.Plugins.Example.Emacs
+import           Commands.Mixins.DNS13OSX9
 import           Commands.Servers.Servant.Types
 -- import           Commands.Core
 
 import           Control.Lens
 import           Control.Monad.Trans.Either
 import qualified Data.ByteString.Lazy.Char8     as BSC
+import           Data.Text.Lazy                 (Text)
+import qualified Data.Text.Lazy                 as T
+import qualified Data.Text.Lazy.IO              as T
 import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.IO as T
-import Data.Text.Lazy (Text)
 
 import           Control.Monad.IO.Class         (liftIO)
 

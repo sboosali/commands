@@ -22,11 +22,9 @@ data ShimR t = ShimR
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
  , __serverHost__ :: t  -- ^ a Python String
  , __serverPort__ :: t  -- ^ a Python Int
- , __clientHost__ :: t  -- ^ a Python String
- , __clientPort__ :: t  -- ^ a Python Int
  } deriving (Show,Eq,Ord,Functor)
 
--- | syntactically correct Python files.
+-- | syntactically correct Python files (when constructed with 'newPythonFile').
 newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord)
 
 
@@ -44,20 +42,14 @@ newPythonFile s = case parseModule (T.unpack s) "" of
 
 {- |
 
-e.g.
+given valid input, output will be a syntactically-valid Python (2.6)
+Module, that only depends on the standard library and @natlink@.
 
-@
-getShim (ShimR "'''_'''" "{'_':'_'}" "'_'" "'_'")
-@
+>>> let Right{} = newPythonFile (getShim (ShimR "'''rules'''" "{'list':''}" "export" "localhost" "8666"))
 
 the '__export__' must be exported by '__rules__'.
 
-TODO http://stackoverflow.com/questions/11177809/how-to-ping-ubuntu-guest-on-virtualbox
- the Haskell server runs at @('__serverHost__', '__serverPort__')@ on the host,
-while the Python client runs at @('__clientHost__', '__clientPort__')@ on the guest.
-
-given valid input, output will be a syntactically-valid Python (2.6)
-Module, that only depends on the standard library and @natlink@.
+the Haskell server runs at @('__serverHost__', '__serverPort__')@ on the host.
 
 some specializations:
 
@@ -69,9 +61,11 @@ getShim :: ShimR Doc    -> Doc
 
 = Implementation
 
-inside the 'qc', besides escaping backslashes (@r'\\\\'@ renders as r'\\') and interpolating between bracesa(@{...}@), "what you see is what you get".
+inside the 'qc', "what you see is what you get", besides:
 
-the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with the quasiquoter's interpolation syntax.
+* escaping backslashes (e.g. @r'\\\\'@ renders as r'\\')
+* interpolating between braces (e.g. @{...}@ is not a dict). the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with the quasiquoter's interpolation syntax.
+
 -}
 getShim :: (IsString t, Monoid t) => ShimR t -> t
 getShim ShimR{..} = [qc|
@@ -99,9 +93,6 @@ H_SERVER_HOST = {__serverHost__}
 H_SERVER_PORT = {__serverPort__}
 
 server_address = "http://%s:%s/" % (H_SERVER_HOST, H_SERVER_PORT)
-
-# H_CLIENT_HOST = {__clientHost__}
-# H_CLIENT_PORT = {__clientPort__}
 
 
 # the grammar
@@ -294,3 +285,11 @@ def unload():
 
 load()
 |]
+
+ -- , __clientHost__ :: t  -- ^ a Python String
+ -- , __clientPort__ :: t  -- ^ a Python Int
+
+-- while the Python client runs at @('__clientHost__', '__clientPort__')@ on the guest.
+
+-- # H_CLIENT_HOST = {__clientHost__}
+-- # H_CLIENT_PORT = {__clientPort__}

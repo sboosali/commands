@@ -30,11 +30,6 @@ data SerializedGrammar = SerializedGrammar
  , serializedExport :: Doc
  }
 
--- | (for debugging)
-displaySerializedGrammar :: SerializedGrammar -> Text
-displaySerializedGrammar SerializedGrammar{..} =
- displayDoc $ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
-
 {- $setup
 
 >>> :set -XOverloadedLists -XOverloadedStrings -XNamedFieldPuns
@@ -67,18 +62,9 @@ let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
 -}
 
-{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
 
-* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
-* the Python file doesn't parse (with 'newPythonFile')
 
->>> let Right{} = shimmySerialization "'localhost'" (serializeGrammar grammar)
-
-a Kleisli arrow (when partially applied).
-
--}
-shimmySerialization :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> Possibly PythonFile
-shimmySerialization diff = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR diff
+-- ================================================================ --
 
 {- | serializes an (escaped) grammar into a Python Docstring and a
 Python Dict.
@@ -307,18 +293,34 @@ escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar
 escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSText) (eitherToValidations . escapeDNSName)
 
 
+
+-- ================================================================ --
+
 data Address = Address Host Port
- -- TODO  deriving (Show,Eq,Ord)
-type Host = String -- TODO 
-type Port = String -- TODO 
+ deriving (Show,Eq,Ord)
+type Host = String
+type Port = String
 
-type ShimR_minus_SerializedGrammar = (Address, Address) -- TODO 
+{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
 
--- | lol: @(x-y) + y = x@
-from_SerializedGrammar_to_ShimR :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> ShimR Doc
-from_SerializedGrammar_to_ShimR
- ( Address (T.pack -> text -> serverHost) (T.pack -> text -> serverPort)
- , Address (T.pack -> text -> clientHost) (T.pack -> text -> clientPort))
- SerializedGrammar{..}
- = ShimR serializedRules serializedLists serializedExport serverHost serverPort clientHost clientPort -- TODO 
+* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
+* the Python file doesn't parse (with 'newPythonFile')
+
+>>> let Right{} = shimmySerialization "'localhost'" (serializeGrammar grammar)
+
+a Kleisli arrow (when partially applied).
+
+-}
+shimmySerialization :: Address -> SerializedGrammar -> Possibly PythonFile
+shimmySerialization address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
+
+-- | @SerializedGrammar = ShimR - Address@
+from_SerializedGrammar_to_ShimR :: Address -> SerializedGrammar -> ShimR Doc
+from_SerializedGrammar_to_ShimR (Address (T.pack -> text -> serverHost) (T.pack -> text -> serverPort)) SerializedGrammar{..}
+ = ShimR serializedRules serializedLists serializedExport serverHost serverPort
+
+-- | (for debugging)
+displaySerializedGrammar :: SerializedGrammar -> Text
+displaySerializedGrammar SerializedGrammar{..} =
+ displayDoc $ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
 

@@ -3,13 +3,13 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
 -- import           Commands.Core
+import qualified Commands.Backends.OSX            as OSX
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Munging
 import           Commands.Plugins.Example.Spacing
 import           Data.Sexp
-import qualified Commands.Backends.OSX           as OSX
 
 import           Control.Lens                     hiding (from, snoc, ( # ))
 import           Data.List.NonEmpty               (NonEmpty (..))

@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module Commands.Test.Properties where
-import           Commands.Etc                      hiding (failed)
+import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
@@ -20,4 +20,4 @@ prop_DNSGrammar grammar = case shimmySerialization address (serializeGrammar gra
 -- rejected = result { ok = Nothing }  i.e.  Discard  i.e.  as if precondition were False
  where
  -- diff = (Address (T.pack "'localhost'") (T.pack "'8000'"), Address (T.pack "'localhost'") (T.pack "'8000'"))
- address = Address ("'localhost'") ("'8000'")
+ address = Address (Host "localhost") (Port 8000)

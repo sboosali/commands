@@ -1,6 +1,7 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, DeriveAnyClass, DeriveGeneric #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase   #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                               #-}
+{-# LANGUAGE AutoDeriveTypeable, ConstraintKinds, DataKinds, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts     #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
+{-# LANGUAGE TemplateHaskell                                                #-}
 module Commands.Etc
  ( module Commands.Etc
  , module Commands.Instances
@@ -17,6 +18,7 @@ import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.Hashable
 import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Text.Lazy               (Text)
+import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
@@ -248,10 +250,27 @@ snoc :: [a] -> a -> [a]
 snoc xs x = xs <> [x]
 
 
+data Address = Address
+ { _host :: Host
+ , _port :: Port
+ } deriving (Show,Eq,Ord)
+newtype Host = Host String deriving (Show,Eq,Ord)
+newtype Port = Port Int deriving (Show,Eq,Ord)
+
+-- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
+-- "http://localhost:8000"
+displayAddress :: Address -> Text
+displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown) h p
+
+
 -- ================================================================ --
 
 makeLenses ''GUI
 makePrisms ''Package
 makePrisms ''Module
 makePrisms ''Identifier
+
+makeLenses ''Address
+makePrisms ''Host
+makePrisms ''Port
 

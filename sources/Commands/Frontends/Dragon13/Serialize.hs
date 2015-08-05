@@ -296,11 +296,6 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 
 -- ================================================================ --
 
-data Address = Address Host Port
- deriving (Show,Eq,Ord)
-type Host = String
-type Port = String
-
 {- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
 
 * the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
@@ -314,10 +309,18 @@ a Kleisli arrow (when partially applied).
 shimmySerialization :: Address -> SerializedGrammar -> Possibly PythonFile
 shimmySerialization address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
 
--- | @SerializedGrammar = ShimR - Address@
+{- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
+
+@SerializedGrammar = ShimR - Address@
+-}
 from_SerializedGrammar_to_ShimR :: Address -> SerializedGrammar -> ShimR Doc
-from_SerializedGrammar_to_ShimR (Address (T.pack -> text -> serverHost) (T.pack -> text -> serverPort)) SerializedGrammar{..}
- = ShimR serializedRules serializedLists serializedExport serverHost serverPort
+from_SerializedGrammar_to_ShimR
+ (Address (Host (        T.pack -> text -> squotes -> serverHost))
+          (Port (show -> T.pack -> text -> squotes -> serverPort))
+ )
+ SerializedGrammar{..}
+ =
+ ShimR serializedRules serializedLists serializedExport serverHost serverPort
 
 -- | (for debugging)
 displaySerializedGrammar :: SerializedGrammar -> Text

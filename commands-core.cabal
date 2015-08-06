@@ -61,6 +61,8 @@ library
 
   Commands.Core
 
+  Commands.RHS.Types
+
   Commands.Symbol
   Commands.Symbol.Types
 --  Commands.Symbol.Proofs
@@ -98,6 +100,7 @@ library
 
   Commands.Sugar
   Commands.Sugar.Press
+  Commands.Sugar.Alias
 
   Commands.Etc
   Commands.Etc.Generics
@@ -107,9 +110,16 @@ library
 
   Commands.Plugins.Example
   Commands.Plugins.Example.Phrase
+  Commands.Plugins.Example.Spacing
+  Commands.Plugins.Example.Emacs
 
   Data.RefCache
+  Data.RefCache.Internal
   Data.HRefCache
+  Data.HRefCache.Internal
+  Data.RefCache.Etc
+
+  Data.Sexp
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
@@ -130,6 +140,7 @@ library
 -- https://downloads.haskell.org/~ghc/7.10.1/docs/html/users_guide/release-7-10-1.html
   , transformers              ==0.4.2.*
   , ghc-prim  ==0.4.0.0
+  , base-prelude ==0.1.*
 
   , vinyl  ==0.5.*
   , exceptions                ==0.6.*
@@ -139,15 +150,16 @@ library
   , action-permutations       ==0.0.*
   , split                     ==0.2.2.*
   , kan-extensions            ==4.2.*
+  , recursion-schemes  ==4.1.*
 
-  , Earley                    ==0.7.*
+  , Earley                    >=0.8.3 && <0.9.0
   , parsec                    ==3.1.*
   , ListLike                  ==4.2.*
   , data-reify ==0.6.*
 
   , text                      ==1.2.*
   , wl-pprint-text            ==1.1.*
-  , language-python           ==0.4.*
+  , language-python           ==0.5.*
   , reducers                  ==3.10.*
   , formatting                ==6.2.*
   , interpolatedstring-perl6  ==0.9.*
@@ -159,8 +171,8 @@ library
   , http-types ==0.8.6.*
 
   , aeson  ==0.8.*
-  , servant-server ==0.2.*
-  , servant ==0.2.*
+  , servant-server ==0.4.*
+  , servant ==0.4.*
   , bytestring  ==0.10.*
   , wai  ==3.0.*
   , warp  ==3.0.*
@@ -198,8 +210,12 @@ test-suite tests
     commands-core
 
   , base       ==4.8.*
+  , Cabal >=1.22.3 && <1.23
+  , template-haskell  ==2.10.*
+
   , text       ==1.2.*
   , semigroups ==0.16.*
+  , lens
 
   , QuickCheck       ==2.8.*
   , doctest          ==0.9.*
@@ -217,13 +233,16 @@ executable example
   -Wall
   -fno-warn-name-shadowing
   -threaded
-  -O2
   "-with-rtsopts=-N"
+  -- -O2
 
  build-depends:
+  commands-core,
+
+  data-reify ==0.6.*,
+  lens,
+
   base ==4.8.*
-  , commands-core
-  , data-reify ==0.6.*
 
 
 

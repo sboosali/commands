@@ -1,285 +1,84 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, MultiWayIf #-}
-{-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell    #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase          #-}
+{-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
-
-import           Commands.Core
+-- import           Commands.Core
+import qualified Commands.Backends.OSX            as OSX
+import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
+import           Commands.Munging
+import           Commands.Plugins.Example.Spacing
+import           Data.Sexp
 
-import           Control.Lens                hiding (from, ( # ), (&))
-import           Data.List.NonEmpty          (NonEmpty (..))
-import qualified Data.List.NonEmpty          as NonEmpty
+import           Control.Lens                     hiding (from, snoc, ( # ))
+import           Data.List.NonEmpty               (NonEmpty (..))
+import qualified Data.List.NonEmpty               as NonEmpty
 import           Data.Semigroup
+import qualified Data.Text.Lazy                   as T
 
 import           Control.Applicative
 import           Data.Char
-import           Data.Foldable               (Foldable (..))
-import qualified Data.List                   as List
-import           Data.Traversable
-import           Data.Typeable               (Typeable)
-import           GHC.Exts                    (IsString (..))
-import           Prelude                     hiding (foldr1, mapM)
+import           Data.Foldable                    (Foldable (..))
+import qualified Data.List                        as List
+import           Data.Typeable                    (Typeable)
+import           GHC.Exts                         (IsString (..))
+import           Prelude                          hiding (foldr1, mapM)
 
 
--- |
---
--- prop> length xs < 2 ==> length (stagger xs) == 0
--- prop> 2 <= length xs ==> length (stagger xs) + 1 == length xs
-stagger :: [a] -> [(a,a)]
-stagger []  = []
-stagger [_] = []
-stagger xs@(_:_) = zip (init xs) (tail xs)
+-- ================================================================ --
+-- Phrase_ types
 
--- |
---
-interstagger :: [a] -> [Either a (a,a)]
-interstagger xs = interweave (Left <$> xs) (Right <$> stagger xs)
+type Phrase' = [Phrase_]
 
--- | >>> interweave (Left <$> [1,2,3]) (Right <$> "ab")
--- [Left 1,Right 'a',Left 2,Right 'b',Left 3]
---
--- the input @interweave xs ys@ should satisfy @length xs == 1 + length ys@.
--- may truncate @ys@.
--- guarantees that the whole input @xs@ exists as a
--- <http://en.wikipedia.org/wiki/Subsequence subsequence> in the output.
---
--- TODO prop> subsequenceOf xs (interweave xs ys)
--- TODO prop> forall nonempty xs ==> head xs == head (interweave xs ys)
--- TODO prop> forall nonempty xs ==> last xs == last (interweave xs ys)
---
---
---
-interweave :: [a] -> [a] -> [a]
-interweave [] _ = []
-interweave (x:xs) ys = x : go (take (length xs) ys) xs -- forces both lists to share same length
- where
- go ys = concat . zipWith (\a b -> [a,b]) ys
+{- | 'Phrase_' versus 'Phrase':
 
-
-{- | a heterogenous list.
-a <http://en.wikipedia.org/wiki/Common_Lisp#The_function_namespace Lisp-2> S-expression, where:
-
-* @f@ is the function namespace
-* @a@ is the atom namespace
-
-you could @type Lisp1 a = Sexp a a@, but:
-
-* @f@ is ignored by 'Monad'ic methods like 'joinSexp'
-* you might want to make sure to eval the @f@ to some normal form,
-like when matching against it in 'evalSexp'
-* @plate@ doesn't reach the @f@, even when @f ~ a@,
-as the 'Plated' instance is manual, not automatic via @Data@.
-
-'List' is just a specialized @'Sexp' ()@, but easier to work with than:
-
-* @Sexp (Maybe f) [Sexp f a]@ (where Nothing would represent 'List')
-* forcing each concrete @f@ to hold a unit (which would represent 'List')
-
+@Phrase_@ is the unassociated concrete syntax list (e.g. tokens, parentheses),
+while @Phrase@ is the associated abstract syntax tree (e.g. s-expressions).
 
 -}
-data Sexp f a
- = Atom a
- | List   [Sexp f a]
- | Sexp f [Sexp f a]
- deriving (Show,Eq,Ord, Functor)
-
--- | default from the 'Monad' subclass.
-instance Applicative (Sexp f) where
- pure = return
- (<*>) f x = f >>= (\g -> x >>= (return.g))
-
-{- |
-
-@
- 'return' = 'returnSexp'
- '(>>=)' = 'bindSexp'
-@
-
-proofs of laws:
-
-
-* TODO : @join . return = id@
-
-@
-joinSexp (returnSexp m)
-joinSexp (Atom m)
-m
-@
-
-
-* TODO : @join . fmap return = id@
-
-@
-joinSexp (fmap returnSexp m)
-TODO
-
-m
-@
-
-
-* associativity: @join . join = join . fmap join@
-
-@
-TODO
-@
-
-
-
-laws, verified as @QuickCheck@ properties:
-
-TODO
-
-
--}
-instance Monad (Sexp f) where
- return = returnSexp
- (>>=) = bindSexp
-
-instance Semigroup (Sexp f a) where (<>)   = appendSexp
-instance Monoid    (Sexp f a) where mempty = nilSexp; mappend = (<>)
-
-instance Plated (Sexp f a) where
- plate f = \case
-  Atom a    -> Atom   <$> pure a
-  List   ps -> List   <$> traverse f ps
-  Sexp g ps -> Sexp g <$> traverse f ps
-
-
-
-returnSexp :: a -> Sexp f a
-returnSexp = Atom
-{-# INLINE returnSexp #-}
-
-bindSexp :: Sexp f a -> (a -> Sexp f b) -> Sexp f b
-bindSexp s f = (joinSexp . fmap f) s
-{-# INLINE bindSexp #-}
-
-joinSexp :: Sexp f (Sexp f a) -> Sexp f a
-joinSexp = \case
- Atom     s -> s
- List   sss -> List   (joinSexp <$> sss)
- Sexp f sss -> Sexp f (joinSexp <$> sss)
-{-# INLINEABLE joinSexp #-} -- to hit the Atom I hope.
-
--- | refines any Sexp to a list, which can be given to the List variant.
---
-toSexpList :: Sexp f a -> [Sexp f a]
-toSexpList = \case
- List ss -> ss
- s       -> [s]
-{-# INLINE toSexpList #-}
-
--- |
-appendSexp :: Sexp f a -> Sexp f a -> Sexp f a
-appendSexp x y = List (toSexpList x <> toSexpList y)
-{-# INLINE appendSexp #-}
-
-nilSexp :: Sexp f a
-nilSexp = List []
-{-# INLINE nilSexp #-}
-
--- | strictly evaluate a sexp ("all the way") to an atom.
---
--- e.g. when specializing @f ~ ((->) e)@, then
---
--- @evalSexp :: ([a] -> e -> a) -> ([a] -> g -> e -> a) -> Sexp g a -> (e -> a)@
---
--- and evaluation just takes an environment, passing it down to the two evaluators.
---
-evalSexp :: (Monad m) => ([a] -> m a) -> ([a] -> g -> m a) -> Sexp g a -> m a
-evalSexp list apply = \case
- Atom a    -> return a
- List   ss -> list           =<< mapM (evalSexp list apply) ss
- Sexp g ss -> (flip apply) g =<< mapM (evalSexp list apply) ss
-
--- |
---
--- when a Sexp\'s atoms are 'Monoid'al ("list-like"),
--- after evaluating some expressions into atoms,
--- we can "splat" them back together.
---
--- @splatList@ takes: a monadic evaluator @eval@
--- and a list of s-expressions @ss@ to evaluate in sequence.
-splatList :: (Applicative m, Monoid xs) => (Sexp g xs -> m xs) -> [Sexp g xs] -> m xs
-splatList eval ss = fold <$> traverse eval ss
-
--- |
---
--- e.g. @evalSplatSexp :: ([x] -> g -> Maybe [x]) -> (Sexp g [x] -> Maybe [x])@
---
-evalSplatSexp :: (Applicative m, Monad m, Monoid xs) => (xs -> g -> m xs) -> (Sexp g xs -> m xs)
-evalSplatSexp apply = evalSexp (return.fold) (apply.fold)
-
-
-
--- | "Phrase Spacing".
---
--- configuration for combining adjacent words/symbols.
---
--- see 'defSpacing' for an example.
-newtype Spacing = Spacing { getSpacing :: SpacingX -> String }
--- type Spacing = (Map SpacingX String, String)
--- TODO replace the Map with generic "lookup" i.e. any function into
--- Maybe
--- Or a function from pairs of tokens to a separator
-
--- | "Spacing conteXt".
---
--- given a pair of words/symbols, how do we space them out when concatenating them?
---
-type SpacingX = (String, String)
-
--- | (specialized @Reader@; simplifies refactoring.)
-type Spaced a = Spacing -> a
-
--- |
---
--- we should put spaces:
---
--- * between words, but not between punctuation
--- * after a comma, but both before/after an equals sign.
---
-defSpacing :: Spacing
-defSpacing = Spacing $ \(l,r) -> if
- | null l || null r                     -> ""
- --- | all isAlphaNum l && all isAlphaNum r -> " "
- | isAlphaNum (last l) && isAlphaNum (head r) -> " "  -- earlier proven nonempty
- | l == ","                             -> " "
- | l == "=" || r == "="                 -> " "
- | otherwise                            -> ""
- -- cases should be disjoint (besides the last) for clarity
-
-spaceOut :: [String] -> Spaced String
-spaceOut xs spacing = concat $ fmap (either id (getSpacing spacing)) (interstagger xs)
-
-
-
--- | user-facing Phrase. exists at (DSL) parse-time.
-type Phrase  = PhraseF (Either Pasted PAtom)
--- | "Mungeable Phrase". exists at (DSL) run-time.
--- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
-type MPhrase = PhraseF [PAtom]
-type PhraseF = Sexp PFunc
-
-asPhrase :: String -> Phrase
-asPhrase = Atom . Right . PWord
-
--- | "Phrase Function".
-data PFunc
- = Cased      Casing
- | Joined     Joiner
- | Surrounded Brackets
+data Phrase_
+ = Escaped_  Keyword -- ^ atom-like (wrt 'Sexp').
+ | Quoted_   Dictation -- ^ list-like.
+ | Pasted_ -- ^ atom-like.
+ | Blank_ -- ^ atom-like.
+ | Separated_ Separator -- ^ like a "close paren".
+ | Cased_      Casing -- ^ function-like (/ "open paren").
+ | Joined_     Joiner -- ^ function-like (/ "open paren").
+ | Surrounded_ Brackets -- ^ function-like (/ "open paren").
+ | Capped_   [Char] -- ^ atom-like.
+ | Spelled_  [Char] -- ^ list-like.
+ | Dictated_ Dictation -- ^ list-like.
  deriving (Show,Eq,Ord)
 
 data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
 data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
 data Brackets = Brackets String String deriving (Show,Eq,Ord)
+newtype Separator = Separator String  deriving (Show,Eq,Ord)
+type Keyword = String -- TODO
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+
 -- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
 -- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
 -- maybe some type from data.split package, that both supports decidable equality and that can build functions
-bracket :: Char -> Brackets
-bracket c = Brackets [c] [c]
+
+
+-- ================================================================ --
+-- Phrase types
+
+-- | user-facing Phrase. exists at (DSL) parse-time.
+type Phrase  = PhraseF (Either Pasted PAtom)
+-- | "Mungeable Phrase". exists only at (DSL) run-time.
+-- the atom is really a list of atoms, but not a full Sexp. this supports "splatting". We interpret a list of atoms as string of words with white space between, more or less.
+type MPhrase = PhraseF [PAtom]
+type PhraseF = Sexp PFunc
+
+-- | a "Phrase Function".
+data PFunc
+ = Cased      Casing
+ | Joined     Joiner
+ | Surrounded Brackets
+ deriving (Show,Eq,Ord)
 
 -- | "Phrase Atom".
 --
@@ -295,15 +94,234 @@ instance IsString PAtom where fromString = PWord
 
 {- | a Pasted is like a 'Dictation'/'Quoted_' i.e. a list of words, not a single word.
 
-we know the Dictation at "parse time" i.e. 'phrase', but we only know the Pasted at
-"runtime" (wrt the DSL, not Haskell). Thus, it's a placeholder.
-
+we know (what words are in) the Dictation at (DSL-)"parse-time" i.e. 'phrase',
+but we only know (what words are in) the Pasted at (DSL-)"runtime"
+(i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
 
 -}
 data Pasted = Pasted  deriving (Show,Eq,Ord)
 
+-- | used by 'pPhrase'.
+type PStack = NonEmpty PItem
+-- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
+-- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
+
+-- | an inlined subset of 'Sexp'.
+--
+-- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
+type PItem = (Maybe PFunc, [Phrase])
+
+
+
+
+-- ================================================================ --
+
+-- -- | transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
+-- phrase = pPhrase <$> phrase_
+
+phrase_ :: DNSEarleyRHS z Phrase'
+phrase_ = complexGrammar 'phrase_
+ (snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (snoc <$> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
+
+-- | a sub-phrase where a phrase to the right is certain.
+--
+-- this ordering prioritizes the escaping Escaped_/Quoted_ over the
+-- escaped, e.g. "quote greater equal unquote".
+phraseA :: DNSEarleyRHS z Phrase_
+phraseA = 'phraseA <=> empty
+ <|> Escaped_    <#> "lit" # keyword
+ <|> Quoted_     <#> "quote" # dictation # "unquote"
+ <|> Pasted_     <#> "paste"
+ <|> Blank_      <#> "blank"
+ -- <|> (Spelled_ . (:[])) <$> char --TODO
+ -- <|> (Spelled_) <#> letter_
+ -- <|> (Spelled_ . (:[])) <#> character
+ <|> Spelled_    <#> "spell" # (character-++)
+ <|> Separated_  <#> separator
+ <|> Cased_      <#> casing
+ <|> Joined_     <#> joiner
+ <|> Surrounded_ <#> brackets
+
+-- | a sub-phrase where a phrase to the right is possible.
+phraseB :: DNSEarleyRHS z Phrase_
+phraseB = 'phraseB <=> empty
+ <|> Spelled_  <#> "spell" # (character-++)
+ <|> Capped_   <#> "caps" # (character-++)
+ -- <$> alphabetRHS
+ -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
+ -- <|> Spelled_  <#> "spell" # letters -- only, not characters
+
+-- | a sub-phrase where a phrase to the right is impossible.
+phraseC :: DNSEarleyRHS z Phrase_
+phraseC = 'phraseC <=>
+ Dictated_ <#> "say" # dictation
+
+-- | injects word_ into phrase_
+phraseW :: DNSEarleyRHS z Phrase_
+phraseW = 'phraseW <=>
+ (Dictated_ . Dictation . (:[])) <#> word_
+
+-- | injects dictation into phrase_
+phraseD :: DNSEarleyRHS z Phrase_
+phraseD = 'phraseD <=> Dictated_ <#> dictation
+
+separator = 'separator <=> empty
+ <|> Separator ""  <#> "break" --TODO separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
+ <|> Separator " " <#> "space"
+ <|> Separator "," <#> "comma"
+
+casing = enumGrammar
+
+joiner = 'joiner
+ <=> (\c -> Joiner [c]) <#> "join" # character
+ <|> Joiner "_" <#> "snake"
+ <|> Joiner "-" <#> "dash"
+ <|> Joiner "/" <#> "file"
+ <|> Joiner ""  <#> "squeeze"
+ <|> CamelJoiner <#> "camel"
+ <|> ClassJoiner <#> "class"
+
+brackets = 'brackets
+ <=> bracket          <#> "round" # character
+ <|> Brackets "(" ")" <#> "par"
+ <|> Brackets "[" "]" <#> "square"
+ <|> Brackets "{" "}" <#> "curl"
+ <|> Brackets "<" ">" <#> "angle"
+ <|> bracket '"'      <#> "string"
+ <|> bracket '\''     <#> "ticked"
+ <|> bracket '|'      <#> "norm"
+ -- <|> Brackets "**" "**" <#> "bold"
+
+character :: DNSEarleyRHS z Char
+character = 'character <=> empty
+
+ <|> '`' <#> "grave"
+ <|> '~' <#> "till"
+ <|> '!' <#> "bang"
+ <|> '@' <#> "axe"
+ <|> '#' <#> "pound"
+ <|> '$' <#> "doll"
+ <|> '%' <#> "purse"
+ <|> '^' <#> "care"
+ <|> '&' <#> "amp"
+ <|> '*' <#> "star"
+ <|> '(' <#> "lore"
+ <|> ')' <#> "roar"
+ <|> '-' <#> "dash"
+ <|> '_' <#> "score"
+ <|> '=' <#> "eek"
+ <|> '+' <#> "plus"
+ <|> '[' <#> "lack"
+ <|> '{' <#> "lace"
+ <|> ']' <#> "rack"
+ <|> '}' <#> "race"
+ <|> '\\' <#> "stroke"
+ <|> '|' <#> "pipe"
+ <|> ';' <#> "sem"
+ <|> ':' <#> "coal"
+ <|> '\'' <#> "tick"
+ <|> '"' <#> "quote"
+ <|> ',' <#> "com"
+ <|> '<' <#> "less"
+ <|> '.' <#> "dot"
+ <|> '>' <#> "great"
+ <|> '/' <#> "slash"
+ <|> '?' <#> "quest"
+ <|> ' ' <#> "ace"
+ <|> '\t' <#> "tab"
+ <|> '\n' <#> "line"
+
+ <|> '0' <#> "zero"
+ <|> '1' <#> "one"
+ <|> '2' <#> "two"
+ <|> '3' <#> "three"
+ <|> '4' <#> "four"
+ <|> '5' <#> "five"
+ <|> '6' <#> "six"
+ <|> '7' <#> "seven"
+ <|> '8' <#> "eight"
+ <|> '9' <#> "nine"
+
+ <|> 'a' <#> "ay"
+ <|> 'b' <#> "bee"
+ <|> 'c' <#> "sea"
+ <|> 'd' <#> "dee"
+ <|> 'e' <#> "eek"
+ <|> 'f' <#> "eff"
+ <|> 'g' <#> "gee"
+ <|> 'h' <#> "aych"
+ <|> 'i' <#> "eye"
+ <|> 'j' <#> "jay"
+ <|> 'k' <#> "kay"
+ <|> 'l' <#> "el"
+ <|> 'm' <#> "em"
+ <|> 'n' <#> "en"
+ <|> 'o' <#> "oh"
+ <|> 'p' <#> "pea"
+ <|> 'q' <#> "queue"
+ <|> 'r' <#> "are"
+ <|> 's' <#> "ess"
+ <|> 't' <#> "tea"
+ <|> 'u' <#> "you"
+ <|> 'v' <#> "vee"
+ <|> 'w' <#> "dub"
+ <|> 'x' <#> "ex"
+ <|> 'y' <#> "why"
+ <|> 'z' <#> "zee"
+ <|> alphabetRHS
+
+
+{- | equivalent to:
+
+@
+ <|> 'a' <#> "A"
+ <|> 'b' <#> "B"
+ <|> 'c' <#> "C"
+ <|> ...
+ <|> 'z' <#> "Z"
+@
+
+-}
+alphabetRHS :: DNSEarleyRHS z Char
+-- alphabetRHS :: Functor (p i) => RHS p r l String Char
+alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z'] -- TODO What will we get back from Dragon anyway?
+
+dictation = dragonGrammar 'dictation
+ ((Dictation . fmap T.unpack) <$> some anyWord)
+ (DGNDictation)
+{-# NOINLINE dictation #-} --TODO doesn't help with the unshared <dictation__4>/<dictation__14>/<dictation__16>
+
+word_ = dragonGrammar 'word_
+ (T.unpack <$> anyWord)
+ (DGNWords)
+
+keyword = dragonGrammar 'keyword
+ (T.unpack <$> anyWord)
+ (DGNWords)
+ -- <=> Keyword <$> word_
+
+letter = dragonGrammar 'letter
+ (T.unpack <$> anyLetter)
+ (DGNLetters)
+-- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
+-- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
+--  Letters <#> (letter-+)
+ -- TODO greedy (many) versus non-greedy (manyUntil)
+
+
+
+
+-- ================================================================ --
+
+asPhrase :: String -> Phrase
+asPhrase = Atom . Right . PWord
+
+bracket :: Char -> Brackets
+bracket c = Brackets [c] [c]
+
 -- | splats the Pasted into PAtom's, after splitting the clipboard into words
-splatPasted :: Phrase -> String -> MPhrase
+splatPasted :: Phrase -> OSX.ClipboardText -> MPhrase
 splatPasted p clipboard = either (substPasted clipboard) (:[]) <$> p
  where
  substPasted pasted Pasted = fmap PWord (words pasted)
@@ -374,57 +392,6 @@ surroundWith (Brackets l r) as = do
 -- TODO generalize by renaming surround to transform: it shares the type with Interleave
 -- e.g. "par thread comma 123" -> (1,2,3)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- |
---
--- 'Phrase_' is the unassociated concrete syntax list
--- (e.g. tokens, parentheses),
--- while 'Phrase' is the associated abstract syntax tree (e.g. s-expressions).
-data Phrase_
- = Escaped_  Keyword -- ^ atom-like.
- | Quoted_   Dictation -- ^ list-like.
- | Pasted_ -- ^ atom-like.
- | Blank_ -- ^ atom-like.
- | Separated_ Separator -- ^ like a "close paren".
- | Cased_      Casing -- ^ function-like (/ "open paren").
- | Joined_     Joiner -- ^ function-like (/ "open paren").
- | Surrounded_ Brackets -- ^ function-like (/ "open paren").
- | Capped_   [Char] -- ^ atom-like.
- | Spelled_  [Char] -- ^ list-like.
- | Dictated_ Dictation -- ^ list-like.
- deriving (Show,Eq,Ord)
-
--- | used by 'pPhrase'.
---
---
-type PStack = NonEmpty PItem
--- -- the Left represents 'List', the Right represents 'Sexp', 'Atom' is not represented.
--- type PStack = NonEmpty (Either [Phrase] (PFunc, [Phrase]))
-
--- | an inlined subset of 'Sexp'.
---
--- Nothing represents 'List', Just represents 'Sexp', 'Atom' is not represented.
-type PItem = (Maybe PFunc, [Phrase])
-
 joinSpelled :: [Phrase_] -> [Phrase_]
 joinSpelled = foldr' go []
  where
@@ -432,7 +399,7 @@ joinSpelled = foldr' go []
  go (Spelled_ xs) (Spelled_ ys : ps) = (Spelled_ $ xs <> ys) : ps
  go p ps = p:ps
 
--- | parses "tokens" into an "Sexp". a total function.
+-- | parses "tokens" into an "s-expression". a total function.
 pPhrase :: [Phrase_] -> Phrase
 pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
  -- (PSexp (PList [PAtom (PWord "")]))
@@ -486,219 +453,42 @@ pPhrase = fromStack . foldl' go ((Nothing, []) :| []) . joinSpelled
  fromPAtom = Atom . Right
 
 
+-- ================================================================ --
 
+phraseCommand :: DNSEarleyCommand z [Phrase_]
+phraseCommand = Command phrase_ (argmax rankPhrase) $ \_ p -> do
+ s <- OSX.getClipboard
+ OSX.sendText (runPhrase_ defSpacing s p)
 
+runPhrase_ :: Spacing -> OSX.ClipboardText -> [Phrase_] -> String
+runPhrase_ spacing clipboard
+ = flip(mungePhrase) spacing
+ . flip(splatPasted) clipboard
+ . pPhrase
 
+bestPhrase :: NonEmpty [Phrase_] -> [Phrase_]
+bestPhrase = argmax rankPhrase
 
+-- the specificity ("probability") of the phrase parts. bigger is better.
+rankPhrase :: [Phrase_] -> Int
+rankPhrase = sum . fmap (\case
+ Escaped_ _ -> 1
+ Quoted_ _ -> 1
+ Pasted_  -> 1
+ Blank_  -> 1
+ Spelled_ _ -> 1
+ Capped_ _ -> 1
+ Separated_ _ -> 1
+ Cased_ _ -> 1
+ Joined_ _ -> 1
+ Surrounded_ _ -> 1
+ Dictated_ _ -> 0)
 
+-- -- | convenience function for testing how phrase_ parses
+-- parsePhrase_ :: [Text] -> String
+-- parsePhrase_
+--  = runPhrase_ defSpacing "clipboard contents"
+--  . argmax rankPhrase
+--  . NonEmpty.fromList --  TODO
+--  . parseList phrase_
 
-
-
-
-
-
-
-
-
-
-
-
-
--- |
---
--- transforms "token"s from 'phrase_' into an "s-expression" with 'pPhrase'.
-phrase = pPhrase <$> phrase_
-
--- |
---
-phrase_ :: R z [Phrase_]
-phrase_ = 'phrase <=>
- (\ps p -> ps <> [p]) # ((phraseA -|- phraseB -|- phraseW)-*) & (phraseB -|- phraseC -|- phraseD)
-
- -- = Rule
- -- (unsafeLHSFromName 'phrase)
- -- (induceDNSReified (((phraseA -|- phraseB -|- phraseD)-*) & (phraseB -|- phraseC -|- phraseD)))
- -- (induceEarleyProduction)
-
--- | a sub-phrase where a phrase to the right is certain.
---
--- this ordering prioritizes the escaping Escaped_/Quoted_ over the
--- escaped, e.g. "quote greater equal unquote".
-phraseA :: R z Phrase_
-phraseA = 'phraseA <=> empty
- <|> Escaped_    # "lit" & keyword
- <|> Quoted_     # "quote" & dictation & "unquote"
- <|> Pasted_     # "paste"
- <|> Blank_      # "blank"
- <|> (Spelled_) # letter_
- <|> (Spelled_ . (:[])) # character
- <|> Separated_  # separator
- <|> Cased_      # casing
- <|> Joined_     # joiner
- <|> Surrounded_ # brackets
-
--- | a sub-phrase where a phrase to the right is possible.
-phraseB :: R z Phrase_
-phraseB = 'phraseB <=> empty
- -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
- -- <|> Spelled_  # "spell" & letters -- only, not characters
- <|> Spelled_  # "spell" & (character-+)
- <|> Capped_   # "caps" & (character-+)
- -- <$> alphabetRHS
-
--- | a sub-phrase where a phrase to the right is impossible.
-phraseC :: R z Phrase_
-phraseC = 'phraseC <=> Dictated_ # "say" & dictation
-
--- | injects dictation into phrase_
-phraseW :: R z Phrase_
-phraseW = 'phraseD <=> (Dictated_ . Dictation . (:[])) # word_
-
--- | injects dictation into phrase_
-phraseD :: R z Phrase_
-phraseD = 'phraseD <=> Dictated_ # dictation
-
-type Keyword = String -- TODO
-keyword :: R z Keyword
-keyword = 'keyword <=> id#word_
-
-newtype Separator = Separator String  deriving (Show,Eq,Ord)
-separator = 'separator <=> empty
- <|> Separator ""  # "break" -- separation should depend on context i.e. blank between symbols, a space between words, space after a comma but not before it. i.e. the choice is delayed until munging.
- <|> Separator " " # "space"
- <|> Separator "," # "comma"
-
-casing = enumGrammar
-
-joiner = 'joiner
- <=> (\c -> Joiner [c]) # "join" & character
- <|> Joiner "_" # "snake"
- <|> Joiner "-" # "dash"
- <|> Joiner "/" # "file"
- <|> Joiner ""  # "squeeze"
- <|> CamelJoiner # "camel"
- <|> ClassJoiner # "class"
-
-brackets :: R z Brackets
-brackets = 'brackets
- <=> bracket          # "round" & character
- <|> Brackets "(" ")" # "par"
- <|> Brackets "[" "]" # "square"
- <|> Brackets "{" "}" # "curl"
- <|> Brackets "<" ">" # "angle"
- <|> bracket '"'      # "string"
- <|> bracket '\''     # "ticked"
- <|> bracket '|'      # "norm"
- -- <|> Brackets "**" "**" # "bold"
-
-character = 'character <=> empty
-
- <|> '`' # "grave"
- <|> '~' # "till"
- <|> '!' # "bang"
- <|> '@' # "axe"
- <|> '#' # "pound"
- <|> '$' # "doll"
- <|> '%' # "purse"
- <|> '^' # "care"
- <|> '&' # "amp"
- <|> '*' # "star"
- <|> '(' # "lore"
- <|> ')' # "roar"
- <|> '-' # "dash"
- <|> '_' # "score"
- <|> '=' # "eek"
- <|> '+' # "plus"
- <|> '[' # "lack"
- <|> '{' # "lace"
- <|> ']' # "rack"
- <|> '}' # "race"
- <|> '\\' # "stroke"
- <|> '|' # "pipe"
- <|> ';' # "sem"
- <|> ':' # "coal"
- <|> '\'' # "tick"
- <|> '"' # "quote"
- <|> ',' # "com"
- <|> '<' # "less"
- <|> '.' # "dot"
- <|> '>' # "great"
- <|> '/' # "slash"
- <|> '?' # "quest"
- <|> ' ' # "ace"
- <|> '\t' # "tab"
- <|> '\n' # "line"
-
- <|> '0' # "zero"
- <|> '1' # "one"
- <|> '2' # "two"
- <|> '3' # "three"
- <|> '4' # "four"
- <|> '5' # "five"
- <|> '6' # "six"
- <|> '7' # "seven"
- <|> '8' # "eight"
- <|> '9' # "nine"
-
- <|> 'a' # "ay"
- <|> 'b' # "bee"
- <|> 'c' # "sea"
- <|> 'd' # "dee"
- <|> 'e' # "eek"
- <|> 'f' # "eff"
- <|> 'g' # "gee"
- <|> 'h' # "aych"
- <|> 'i' # "eye"
- <|> 'j' # "jay"
- <|> 'k' # "kay"
- <|> 'l' # "el"
- <|> 'm' # "em"
- <|> 'n' # "en"
- <|> 'o' # "oh"
- <|> 'p' # "pea"
- <|> 'q' # "queue"
- <|> 'r' # "are"
- <|> 's' # "ess"
- <|> 't' # "tea"
- <|> 'u' # "you"
- <|> 'v' # "vee"
- <|> 'w' # "dub"
- <|> 'x' # "ex"
- <|> 'y' # "why"
- <|> 'z' # "zee"
- <|> alphabetRHS
-
-
-{- | equivalent to:
-
-@
- <|> 'a' # "A"
- <|> 'b' # "B"
- <|> 'c' # "C"
- <|> ...
- <|> 'z' # "Z"
-@
-
--}
--- alphabetRHS :: Functor (p i) => RHS p r l String Char
-alphabetRHS = foldMap (\c -> c <$ word [toUpper c]) ['a'..'z']
--- TODO What will we get back from Dragon anyway?
-
-
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
-dictation = dragonGrammar 'dictation
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNDictation)))
- (EarleyProduction $ Dictation <$> some anyToken)
-
-word_ = dragonGrammar 'word_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNWords)))
- (EarleyProduction $ anyToken)
-
-letter_ = dragonGrammar 'letter_
- (DNSNonTerminal (SomeDNSLHS (DNSBuiltinRule DGNLetters)))
- (EarleyProduction $ anyLetter)
-
--- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
--- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
---  Letters # (letter-+)
- -- TODO greedy (many) versus non-greedy (manyUntil)

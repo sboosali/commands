@@ -7,7 +7,7 @@ import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9.Types
 
 import           Control.Lens
-import           Data.Bifunctor                  (second)
+import           Data.Bifunctor
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Text.Lazy                  as T
@@ -85,7 +85,7 @@ interpret c x s = case (c^.comRule) `parses` s of
 serialized :: R z x -> Either [SomeException] SerializedGrammar
 serialized rule = do
  let uG = DNSGrammar (getDescendentProductions rule) [] dnsHeader
- let oG = second T.pack (optimizeGrammar uG)
+ let oG = first T.pack (optimizeGrammar' uG)
  vG <- escapeDNSGrammar oG
  return$ serializeGrammar vG
  -- TODO let grammar store multiple productions, or productions and vocabularies, or a whole grammar, even though the grammar doesn't need to store its transitive dependencies.

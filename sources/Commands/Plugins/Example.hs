@@ -1,133 +1,267 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules  #-}
-{-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns               #-}
-{-# LANGUAGE PartialTypeSignatures, PatternSynonyms, PostfixOperators #-}
-{-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables         #-}
-{-# LANGUAGE TemplateHaskell, TupleSections                           #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ImplicitParams, LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns, PartialTypeSignatures, PatternSynonyms        #-}
+{-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards                 #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections           #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example where
-import           Commands.Backends.OSX           hiding (Command)
-import qualified Commands.Backends.OSX           as OSX
-import           Commands.Core
+import           Commands.Backends.OSX                 hiding (Command)
+import qualified Commands.Backends.OSX                 as OSX
+import           Commands.Etc
+-- import           Commands.Core
 import           Commands.Frontends.Dragon13
-import           Commands.LHS
+import           Commands.Frontends.Dragon13.Serialize
+-- import           Commands.LHS
 import           Commands.Mixins.DNS13OSX9
-import           Commands.Parsers.Earley
+-- import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
 import           Commands.Servers.Servant
-import           Commands.Symbol.Types
-import qualified Data.RefCache                   as RefCache
+-- import           Commands.Symbol.Types
+import           Commands.Plugins.Example.Spacing
+import           Commands.Sugar.Alias
+import           Commands.Sugar.Press
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
-import           Control.Lens                    hiding (from, ( # ), (&))
-import           Control.Monad.Catch             (SomeException, catches)
-import qualified Data.Aeson                      as J
-import           Data.Bifunctor                  (second)
+import           Control.Lens                          hiding (from, ( # ))
+import           Control.Monad.Catch                   (SomeException, catches)
+import qualified Data.Aeson                            as J
+import           Data.Bifunctor                        (second)
 import           Data.Bitraversable
-import qualified Data.ByteString.Lazy.Char8      as B
+import qualified Data.ByteString.Lazy.Char8            as B
 import           Data.IORef
-import           Data.List.NonEmpty              (NonEmpty (..), fromList)
-import qualified Data.List.NonEmpty              as NonEmpty
-import qualified Data.Text.Lazy                  as T
-import qualified Data.Text.Lazy.IO               as T
+import           Data.List.NonEmpty                    (NonEmpty (..), fromList)
+import qualified Data.List.NonEmpty                    as NonEmpty
+import qualified Data.Text.Lazy                        as T
+import qualified Data.Text.Lazy.IO                     as T
 import           Data.Typeable
-import           Language.Python.Version2.Parser (parseModule)
-import           Numeric.Natural                 ()
-import qualified Text.Parsec                     as Parsec
-import           Text.PrettyPrint.Leijen.Text    hiding (brackets, empty, int,
-                                                  (<$>), (<>))
+import           Language.Python.Version2.Parser       (parseModule)
+import           Numeric.Natural                       ()
+import qualified Text.Earley.Internal                  as E
+import qualified Text.Parsec                           as Parsec
+import           Text.PrettyPrint.Leijen.Text          hiding (brackets, empty,
+                                                        int, (<$>), (<>))
 
-import           Control.Applicative             hiding (many, optional)
+import           Control.Applicative                   hiding (many, optional)
+import           Control.Arrow                         ((>>>))
 import           Control.Concurrent
-import           Control.Monad                   (replicateM_, void, (<=<),
-                                                  (>=>))
-import           Control.Monad.Reader            (asks)
+import           Control.Monad                         (replicateM_, void,
+                                                        (<=<), (>=>))
+import           Control.Monad.Reader                  (asks)
 import           Control.Parallel
-import           Data.Char                       (toUpper)
-import           Data.Either                     (either)
-import           Data.Foldable                   (Foldable (..), asum,
-                                                  traverse_)
-import qualified Data.List                       as List
-import qualified Data.Map                        as Map
-import           Data.Monoid                     ((<>))
+import           Data.Char                             (toUpper)
+import           Data.Either                           (either)
+import           Data.Foldable                         (Foldable (..), asum,
+                                                        traverse_)
+import qualified Data.List                             as List
+import qualified Data.Map                              as Map
+import           Data.Monoid
 import           Data.Unique
-import           Prelude                         hiding (foldl, foldr1)
-import           System.Timeout                  (timeout)
+import           Prelude                               hiding (foldl, foldr1)
+import           System.IO.Unsafe
+import           System.Timeout                        (timeout)
 
 
 data Root
  = Repeat Positive Root
  | Edit_ Edit
  | Undo
- | ReplaceWith Phrase Phrase
+ | ReplaceWith Phrase' Phrase'
  | Click_ Click
  | Move_ Move
- | Phrase_ Phrase
+ | Phrase_ Phrase'
  -- Roots [Root]
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
 -- TODO currently throws "grammar too complex" :-(
-root :: C z ApplicationDesugarer Actions_ Root
+
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root = 'root <=> empty
- -- <|> Repeat      # positive & root-- TODO no recursion for now
- <|> ReplaceWith # "replace" & phrase & "with" & phrase-- TODO
- -- TODO <|> ReplaceWith # "replace" & phrase & "with" & (phrase <|>? "blank")
- <|> Undo        # "no"         -- order matters..
- <|> Undo        # "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
- <|> Click_      # click
- <|> Edit_       # edit
- <|> Move_       # move
- <|> (Phrase_ . pPhrase . (:[])) # phraseC -- has "say" prefix
- <|> Phrase_     # phrase  -- must be last, phrase falls back to wildcard.
- -- <|> Roots       # (multipleC root)
--- TODO <|> Frozen # "freeze" & root
+ -- <|> Repeat      <#> positive # root-- TODO no recursion for now
+ <|> ReplaceWith <#> "replace" # phrase_ # "with" # phrase_ -- TODO
+ -- TODO <|> ReplaceWith <#> "replace" # phrase # "with" # (phrase <|>? "blank")
+ <|> Undo        <#> "no"         -- order matters..
+ <|> Undo        <#> "no way"     -- .. the superstring "no way" should come before the substring "no" (unlike this example)
+ <|> Click_      <#> click
+ <|> Edit_       <#> edit
+ <|> Move_       <#> move
+ <|> (Phrase_ . (:[])) <#> phraseC -- has "say" prefix
+ <|> Phrase_     <#> phrase_  -- must be last, phrase falls back to wildcard.
+ -- <|> Roots       <#> (multipleC root)
+-- TODO <|> Frozen <#> "freeze" # root
 
- <%> \case
+data Move
+ = Move Direction Region
+ | MoveTo Endpoint Region
+ deriving (Show,Eq,Ord)
+move = 'move
+ <=> Move   <#> direction # region
+ <|> MoveTo <#> endpoint # region
+-- TODO scrap this boilerplate.
+--
+-- can't scrap it with GHC.generics because the grammars are values not instance methods.
+-- but maybe we can:
+ -- with singleton stuff (?)
+ -- with reflection, by building a new instance at runtime?
+ -- given all children derive Generic and/or Data, by building a new generic grammar for each
+ -- given all children derive Grammatical. and DeriveAnyClass makes this easier! deriving (Generic, Grammatical)
+--
+-- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
+-- move = defaultRule 'move
+-- defaultRule "move" OR spliceRule ''Move
+--
 
-  ReplaceWith this that -> \case
-   "emacs" -> runEmacsWithP "replace-regexp" [this, that]
-   "Intellij" -> do
-    press M r
-    (insert =<< munge this) >> press tab
-    slot =<< munge that
-   _ -> nothing
+-- | Slice and Direction both have too many values.
+data Endpoint = Beginning | Ending deriving (Bounded,Enum,Eq,Ord,Read,Show)
+endpoint = 'endpoint
+ <=> Beginning <#> "beg"
+ <|> Ending    <#> "end"
 
-  Undo -> always $ press met z
+-- | orthogonal directions in three-dimensional space. @... <=> Up_ <#> "up" <|> ...@
+data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
+direction = tidyGrammar
+-- direction = transformedGrammar (filter (/= '_'))
+-- direction = qualifiedGrammarWith "_"
 
-  Edit_ a -> onlyWhen "emacs" $ editEmacs a
-  Move_ a -> onlyWhen "emacs" $ moveEmacs a
+{- | slice the region between the cursor and the 'Slice'. induces a string.
+-}
+data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
+-- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
+-- slice = qualifiedGrammar
+slice = 'slice
+ <=> Whole     <#> "whole"
+ <|> Backwards <#> "back"
+ <|> Forwards  <#> "for"
 
-  Repeat n c ->
-   \x -> replicateM_ (getPositive n) $ (root `compiles` c) x
-
-  Phrase_ p -> always $ do
-   insert =<< munge p
-
--- TODO Frozen r -> \case
---    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
---  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
-
-  _ -> always nothing
-
-
-always = const
-when :: [Application] -> Actions () -> (Application -> Actions ())
-when theseContexts thisAction = \theContext -> do
- if theContext `List.elem` theseContexts
- then thisAction
- else nothing
-onlyWhen = when . (:[])
-whenEmacs = onlyWhen "emacs"
-
-munge :: Phrase -> Actions String
-munge p = do
- q <- splatPasted p <$> getClipboard
- return $ mungePhrase q defSpacing
+-- "for" is homophone with "four", while both Positive and Slice can be the prefix (i.e. competing for the same recognition).
 
 
+
+data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
+
+ -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @<#> "kill"@)
+ -- prefixes (e.g. "kill") must come before their superstrings (e.g. "kill for line").
+ -- otherwise, the prefix is committed prematurely, and parsec won't backtrack.
+ -- TODO but wouldn't @<#> action # (slice -?- Whole) # (region -?- That)@ match "kill" before @<#> "kill"@ does? yes it does
+
+ -- TODO we want:
+ -- "cop" -> Edit Copy Whole That
+ -- "kill" -> Edit Cut Forwards Line, not Edit Cut Whole That
+ -- "kill for line" -> Edit Cut Forwards Line, not {unexpected 'f', expecting end of input}
+
+edit = 'edit
+ <=> Edit Cut Forwards Line <#> "kill" -- TODO this is why I abandoned parsec: it didn't backtrack sufficiently
+
+ -- generic
+ <|> Edit <#> action              # (slice -?- Whole) # (region -?- That) -- e.g. "cop" -> "cop whole that"
+ <|> Edit <#> (action -?- Select) # (slice -?- Whole) # region            -- e.g. "word" -> "select whole word"
+
+-- TODO ensure no alternative is empty, necessary? yes it is
+ -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
+ -- <|> editing <#> (action-?) # (slice-?) # (region-?)
+ -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
+ -- I don't know why the alternatives following the annihilator didn't show up in the "expecting: ..." error though
+
+-- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
+-- editWith editing = 'edit <=> editing <#> (direction-?) # (action-?) # (region-?)
+-- edit = editWith defEditing
+-- TODO
+-- maybe RHS should have access to a configuration environment? Oh my.
+-- could also provide the keyword (i.e. only literals) feature, rather than forcing it on the parser.
+-- if it were State not Reader, it could also support contextual (mutable) vocabularies;
+ -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
+editing :: Maybe Action -> Maybe Slice -> Maybe Region -> Edit
+editing = undefined -- TODO defaults <|> Edit <#> action # region
+ -- <|> Edit undefined <#> region
+ -- <|> flip Edit undefined <#> action
+
+
+
+
+data Action
+ = Select                       -- read-only.
+ | Copy                         -- read-only.
+ | Cut                          -- read/write.
+ | Delete                       -- read/write.
+ | Transpose                    -- read/write.
+ | Google                       -- read-only.
+ deriving (Show,Eq,Ord,Typeable)
+-- action = enumGrammar
+action = 'action <=> empty
+ <|> Select      <#> "sell"
+ <|> Copy        <#> "cop"
+ <|> Cut         <#> "kill"
+ <|> Delete      <#> "del"
+ <|> Transpose   <#> "trans"
+ <|> Google      <#> "google"
+
+
+
+data Region
+ = That
+
+ | Character
+ | Word_                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all two 'Word_'s
+ | Token                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all one 'Token's
+ | Group                        -- ^ 'Bracket's delimit 'Group's (e.g. @"(...)"@ or @"<...>"@ or @"[|...|]"@)
+ | Line
+ | Rectangle
+ | Block
+ | Page
+ | Screen
+ | Everything
+
+ | Definition
+ | Function_
+ | Reference
+ | Structure
+ deriving (Show,Eq,Ord,Enum,Typeable)
+-- region = enumGrammar
+region = 'region
+ <=> That       <#> "that"
+ <|> Character  <#> "char"
+ <|> Word_      <#> "word"
+ <|> Token      <#> "toke"
+ <|> Group      <#> "group"
+ <|> Line       <#> "line"
+ <|> Rectangle  <#> "wreck"
+ <|> Block      <#> "block"
+ <|> Page       <#> "page"
+ <|> Screen     <#> "screen"
+ <|> Everything <#> "all"
+ <|> Definition <#> "def"
+ <|> Function_  <#> "fun"
+ <|> Reference  <#> "ref"
+ <|> Structure  <#> "struct"
+
+
+-- | 'Key's and 'Char'acters are "incomparable sets":
+--
+-- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
+-- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
+--
+-- so we can't embed the one into the other, but we'll just keep things simple with duplication.
+--
+key = 'key <=> empty
+
+data Click = Click Times Button deriving (Show,Eq)
+click = 'click <=>
+ Click <#> optionalEnum times # optionalEnum button # "click"
+ -- type inference with the {#} sugar even works for:
+ --  Click <#> optionalEnum enumGrammar # optionalEnum enumGrammar # "click"
+ -- the terminal "click" makes the grammar "non-canonical" i.e.
+ --  where product types are merged with <*> (after "lifting" into RHS)
+ --  and sum types are merged with <|> (after "tagging" with the constructor)
+
+data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
+times = enumGrammar
+
+data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
+button = qualifiedGrammar
+
+positive = 'positive
+ <=> Positive <$> (asum . fmap int) [1..9]
 
 
 {-
@@ -166,14 +300,82 @@ munge p = do
 
 -}
 
+
+-- ================================================================ --
+
+rootCommand = Command root (argmax rankRoot) runRoot
+
+rankRoot = \case                --TODO fold over every field of every case, normalizing each case
+ Repeat _ r -> rankRoot r
+ Edit_ _ -> 1
+ Undo -> 1
+ ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
+ Click_ _ -> 1
+ Move_ _ -> 1
+ Phrase_ p -> rankPhrase p
+
+runRoot = \case
+
+ "emacs" -> \case
+   ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
+   Edit_ a -> editEmacs a
+   Move_ a -> moveEmacs a
+   x -> runRoot_ x
+
+ "Intellij" -> \case
+   ReplaceWith this that -> do
+     press M r
+     (munge this >>= insert) >> press tab
+     munge that >>= slot
+   x -> runRoot_ x
+
+ context -> \case
+   Repeat n c -> replicateM_ (getPositive n) $ runRoot context c
+   x -> runRoot_ x
+
+ where
+ -- unconditional runRoot (i.e. any context / global context)
+ runRoot_ = \case
+
+  Undo -> press met z
+
+  Phrase_ p -> do
+   insert =<< munge p
+
+  _ -> nothing
+
+-- TODO Frozen r -> \case
+--    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
+--  (inverse of parsing), rather than executing. For debugging/practicing, and maybe for batching.
+
+type ElispSexp = String
+-- -- type ElispSexp = Sexp String String
+
 nothing = return ()
+
+munge :: Phrase' -> Actions String
+munge p = do
+ q <- splatPasted (pPhrase p) <$> getClipboard
+ return $ mungePhrase q defSpacing
 
 slot s = do
  delay 10
  sendText s
  sendKeyPress [] ReturnKey
 
-execute_extended_command = press C w -- non-standard: make this configurable? ImplicitParams?
+always = const
+
+when :: [Application] -> Actions () -> (Application -> Actions ())
+when theseContexts thisAction = \theContext -> do
+ if theContext `List.elem` theseContexts
+ then thisAction
+ else nothing
+
+onlyWhen = when . (:[])
+
+whenEmacs = onlyWhen "emacs"
+
+execute_extended_command = press C w --TODO non-standard: make this configurable? ImplicitParams?
 
 eval_expression = press M ':'
 
@@ -186,9 +388,6 @@ evalEmacs :: ElispSexp -> Actions ()
 evalEmacs sexp = do
  eval_expression
  slot sexp
-
-type ElispSexp = String
--- -- type ElispSexp = Sexp String String
 
 -- parseSexp :: String -> Possibly ElispSexp
 -- parseSexp = undefined
@@ -239,7 +438,7 @@ runEmacsWithA f as = do
 -- | like 'runEmacsWith', but takes phrases as arguments $
 --
 -- e.g. @runEmacsWithP "regexp-search" ['PAtom' 'Pasted']@
-runEmacsWithP :: String -> [Phrase] -> Actions ()
+runEmacsWithP :: String -> [Phrase'] -> Actions ()
 runEmacsWithP f ps = do
  xs <- traverse munge ps
  runEmacsWith f xs
@@ -395,235 +594,12 @@ editEmacs = \case
  _ -> nothing
 
 
-data Move
- = Move Direction Region
- | MoveTo Endpoint Region
- deriving (Show,Eq,Ord)
-move = 'move
- <=> Move   # direction & region
- <|> MoveTo # endpoint & region
--- TODO scrap this boilerplate.
---
--- can't scrap it with GHC.generics because the grammars are values not instance methods.
--- but maybe we can:
- -- with singleton stuff (?)
- -- with reflection, by building a new instance at runtime?
- -- given all children derive Generic and/or Data, by building a new generic grammar for each
- -- given all children derive Grammatical. and DeriveAnyClass makes this easier! deriving (Generic, Grammatical)
---
--- we could scrap it with TemplateHaskell if we were really wanted to, to gain that edit-once property, lowercasing the type to get the value, but I don't want to.
--- move = defaultRule 'move
--- defaultRule "move"
--- spliceRule ''Move
---
-
--- | Slice and Direction both have too many values.
-data Endpoint = Beginning | Ending deriving (Bounded,Enum,Eq,Ord,Read,Show)
-endpoint = 'endpoint
- <=> Beginning # "beg"
- <|> Ending    # "end"
-
--- | orthogonal directions in three-dimensional space.
-data Direction = Up_ | Down_ | Left_ | Right_ | In_ | Out_  deriving (Show,Eq,Ord,Enum,Typeable)
-direction = tidyGrammar
- -- <=> Up_ # "up"
- -- <|> ...
--- direction = transformedGrammar (filter (/= '_'))
--- direction = qualifiedGrammarWith "_"
-
-{- | slice the region between the cursor and the 'Slice'. induces a string.
--}
-data Slice = Whole | Backwards | Forwards  deriving (Show,Eq,Ord,Enum,Typeable)
--- data Slice = BackSlice | WholeSlice | ForSlice deriving (Show,Eq,Ord,Enum,Typeable)
--- slice = qualifiedGrammar
-slice = 'slice
- <=> Whole     # "whole"
- <|> Backwards # "back"
- <|> Forwards  # "for"
-
--- "for" is homophone with "four", while both Positive and Slice can be the prefix (i.e. competing for the same recognition).
-
-
-
-data Edit = Edit Action Slice Region deriving (Show,Eq,Ord)
-
- -- aliases: constructors are more specific (e.g. @Edit Cut Forwards Line@) than later alternatives; 'RHS's are prefixes (or identical) to later alternatives (e.g. @# "kill"@)
- -- prefixes (e.g. "kill") must come before their superstrings (e.g. "kill for line").
- -- otherwise, the prefix is committed prematurely, and parsec won't backtrack.
- -- TODO but wouldn't @# action & (slice -?- Whole) & (region -?- That)@ match "kill" before @# "kill"@ does? yes it does
-
- -- TODO we want:
- -- "cop" -> Edit Copy Whole That
- -- "kill" -> Edit Cut Forwards Line, not Edit Cut Whole That
- -- "kill for line" -> Edit Cut Forwards Line, not {unexpected 'f', expecting end of input}
-
-edit = 'edit
- <=> Edit Cut Forwards Line # "kill" -- TODO this is why I abandoned parsec: it didn't backtrack sufficiently
-
- -- generic
- <|> Edit # action              & (slice -?- Whole) & (region -?- That) -- e.g. "cop" -> "cop whole that"
- <|> Edit # (action -?- Select) & (slice -?- Whole) & region            -- e.g. "word" -> "select whole word"
-
--- TODO ensure no alternative is empty, necessary? yes it is
- -- this causes the errors in parsing "say 638 Pine St., Redwood City 94063":
- -- <|> editing # (action-?) & (slice-?) & (region-?)
- -- probably because it always succeeds, because [zero*zero*zero = zero] i.e.
- -- I don't know why the alternatives following the annihilator didn't show up in the "expecting: ..." error though
-
--- TODO This should be exposed as a configuration. editConfig? editWith defEditing?
--- editWith editing = 'edit <=> editing # (direction-?) & (action-?) & (region-?)
--- edit = editWith defEditing
--- TODO
--- maybe RHS should have access to a configuration environment? Oh my.
--- could also provide the keyword (i.e. only literals) feature, rather than forcing it on the parser.
--- if it were State not Reader, it could also support contextual (mutable) vocabularies;
- -- no, that makes the code to hard to read I think. The controller should handle the mutation/reloading, not the model.
-editing :: Maybe Action -> Maybe Slice -> Maybe Region -> Edit
-editing = undefined
--- TODO defaults <|> Edit # action & region
- -- <|> Edit undefined # region
- -- <|> flip Edit undefined # action
-
-
-
-
-data Action
- = Select                       -- read-only.
- | Copy                         -- read-only.
- | Cut                          -- read/write.
- | Delete                       -- read/write.
- | Transpose                    -- read/write.
- | Google                       -- read-only.
- deriving (Show,Eq,Ord,Typeable)
--- action = enumGrammar
-action = 'action <=> empty
- <|> Select      # "sell"
- <|> Copy        # "cop"
- <|> Cut         # "kill"
- <|> Delete      # "del"
- <|> Transpose   # "trans"
- <|> Google      # "google"
-
-
-
-data Region
- = That
-
- | Character
- | Word_                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all two 'Word_'s
- | Token                        -- ^ e.g. @"camelCase"@, @"lisp-case"@, @"snake_case"@ are all one 'Token's
- | Group                        -- ^ 'Bracket's delimit 'Group's (e.g. @"(...)"@ or @"<...>"@ or @"[|...|]"@)
- | Line
- | Rectangle
- | Block
- | Page
- | Screen
- | Everything
-
- | Definition
- | Function_
- | Reference
- | Structure
- deriving (Show,Eq,Ord,Enum,Typeable)
--- region = enumGrammar
-region = 'region
- <=> That       # "that"
- <|> Character  # "char"
- <|> Word_      # "word"
- <|> Token      # "toke"
- <|> Group      # "group"
- <|> Line       # "line"
- <|> Rectangle  # "wreck"
- <|> Block      # "block"
- <|> Page       # "page"
- <|> Screen     # "screen"
- <|> Everything # "all"
- <|> Definition # "def"
- <|> Function_  # "fun"
- <|> Reference  # "ref"
- <|> Structure  # "struct"
-
-
--- | 'Key's and 'Char'acters are "incomparable sets":
---
--- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
--- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
---
--- so we can't embed the one into the other, but we'll just keep things simple with duplication.
---
-key = 'key <=> empty
-
-data Click = Click Times Button deriving (Show,Eq)
-click = 'click <=>
- Click # optionalEnum times & optionalEnum button & "click"
- -- type inference with the {&} sugar even works for:
- --  Click # optionalEnum enumGrammar & optionalEnum enumGrammar & "click"
- -- the terminal "click" makes the grammar "non-canonical" i.e.
- --  where product types are merged with <*> (after "lifting" into RHS)
- --  and sum types are merged with <|> (after "tagging" with the constructor)
-
-data Times = Single | Double | Triple deriving (Show,Eq,Enum,Typeable)
-times = enumGrammar -- :: R_ Times
-
-data Button = LeftButton | MiddleButton | RightButton deriving (Show,Eq,Enum,Typeable)
-button = qualifiedGrammar
-
--- positive :: R_ Positive
-positive = 'positive
- <=> Positive <$> (asum . fmap int) [1..9]
-
-{- the type annotation on positive was needed to disambiguate this type error, which I don't like:
-
-TODO find out if this is necessary. I'd like positive to be defined generically.
-
-sources/Commands/Plugins/Example.hs:531:15:
-    No instance for (AppRHS
-                       Parser DNSReifying (Alter (Symbol p0 r0) Int))
-      arising from a use of ‘#’
-    The type variables ‘p0’, ‘r0’ are ambiguous
-    Note: there is a potential instance available:
-      instance Functor p => AppRHS p r (RHS p r a)
-        -- Defined in ‘Commands.Sugar’
-    In the second argument of ‘(<=>)’, namely
-      ‘Positive # (asum . fmap int) [1 .. 9]’
-    In the expression:
-      'positive <=> Positive # (asum . fmap int) [1 .. 9]
-    In an equation for ‘positive’:
-        positive = 'positive <=> Positive # (asum . fmap int) [1 .. 9]
-
-sources/Commands/Plugins/Example.hs:531:18:
-    No instance for (Functor p0) arising from a use of ‘asum’
-    The type variable ‘p0’ is ambiguous
-    Note: there are several potential instances:
-      instance Functor m =>
-               Functor (MonadRandom-0.3.0.2:Control.Monad.Random.RandT g m)
-        -- Defined in ‘MonadRandom-0.3.0.2:Control.Monad.Random’
-      instance Functor p =>
-               Functor (Control.Applicative.Permutation.Branch p)
-        -- Defined in ‘Control.Applicative.Permutation’
-      instance Functor p => Functor (Perms p)
-        -- Defined in ‘Control.Applicative.Permutation’
-      ...plus 96 others
-    In the first argument of ‘(.)’, namely ‘asum’
-    In the expression: asum . fmap int
-    In the second argument of ‘(#)’, namely
-      ‘(asum . fmap int) [1 .. 9]’
-
--}
-
-
-
-
-
-
-
-
-
+-- ================================================================ --
 
 -- it seems to be synchronous, even with threaded I guess?
 attemptAsynchronously :: Int -> IO () -> IO ()
 attemptAsynchronously seconds action = do
- (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
+ (timeout (seconds * round (1e6::Double)) action) `withAsync` (waitCatch >=> \case
    Left error     -> print error
    Right Nothing  -> putStrLn "..."
    Right (Just _) -> return ()
@@ -631,21 +607,30 @@ attemptAsynchronously seconds action = do
 
 attempt = attemptAsynchronously 1
 
+-- runRuleParser
+--  :: (forall z. Rule (EarleyProduction z l) r l t a)
+--  -> [t]
+--  -> Possibly (NonEmpty a)
+-- runRuleParser rule ts = case toEarleyError $ runEarleyProduction (rule^.ruleParser) ts of
+--  Left  e  -> throwM e
+--  Right xs -> return xs
+
 attemptMunge :: String -> IO ()
 attemptMunge s = do
  putStrLn ""
  putStrLn ""
  putStrLn ""
  print s
- attempt $ runRuleParser phrase_ (words s) >>= \case
-  (raw_p :| _) -> do
+ attempt $ parseBest bestPhrase phrase_ ((T.words . T.pack) s) & \case
+  Left e -> print e
+  Right raw_p -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
    let munged_p   = mungePhrase splatted_p defSpacing
    ol [ show raw_p
       , show pasted_p
       , show splatted_p
-      , show munged_p
+      , munged_p
       ]
 
 attemptMungeAll :: String -> IO ()
@@ -654,13 +639,13 @@ attemptMungeAll s = do
  putStrLn ""
  putStrLn ""
  print s
- attempt $ runRuleParser phrase_ (words s) >>= \case
+ attempt $ parseThrow phrase_ ((T.words . T.pack) s) >>= \case
   (raw_p :| raw_ps) -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
    let munged_p   = mungePhrase splatted_p defSpacing
    ol [ show raw_p
-      , List.intercalate "\n , " $ map show $ raw_ps
+      , List.intercalate "\n , " $ map show $ raw_ps -- generate lazily
       , show pasted_p
       , show splatted_p
       , show munged_p
@@ -671,20 +656,22 @@ ol xs = ifor_ xs $ \i x -> do
  putStrLn ""
  putStrLn $ fold [show i, ". ", x]
 
-attemptParse :: (Show a) => (forall  z. R z a) -> String -> IO ()
+attemptParse :: (Show a) => (forall  z. DNSEarleyRHS z a) -> String -> IO ()
 attemptParse rule s = do
  putStrLn ""
- attempt $ runRuleParser rule (words s) >>= \case
+ attempt $ parseThrow rule ((T.words . T.pack) s) >>= \case
   x :| _ -> print x
 
 -- TODO remove the [{emptyList}]
-attemptSerialize grammar = attemptAsynchronously 3 $ either print printSerializedGrammar $ serialized grammar
+attemptSerialize rhs = attemptAsynchronously 3 $ do
+ serialized <- formatRHS rhs
+ either print printSerializedGrammar serialized
 
 printSerializedGrammar SerializedGrammar{..} = do
  replicateM_ 3 $ putStrLn ""
- T.putStrLn $ display serializedRules
+ T.putStrLn $ displayDoc serializedRules
  putStrLn ""
- T.putStrLn $ display serializedLists
+ T.putStrLn $ displayDoc serializedLists
 
 -- failingParse grammar s = do
 --  putStrLn ""
@@ -708,7 +695,7 @@ printSerializedGrammar SerializedGrammar{..} = do
 -- attemptPython g = do
 --  let Right sg = serialized g
 --  let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
---  PythonFile pf <- shimmySerialization addresses sg
+--  PythonFile pf <- shimSerialization addresses sg
 --  runActions $ setClipboard (T.unpack pf)
 --  T.putStrLn $ pf
 --  -- TODO why does the unary Test fail? Optimization?
@@ -720,7 +707,7 @@ printSerializedGrammar SerializedGrammar{..} = do
 realMain = do
 
  putStrLn ""
- let rootG = (root^.comRule)
+ let rootG = root
  attemptSerialize rootG
  -- attemptSerialize phrase
 
@@ -818,21 +805,69 @@ realMain = do
 
  attemptMunge "par round grave camel lit with async break break action"
 
- attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
+ -- attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
  -- Earley is too slow without sharing, even with phraseW
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 main = do
  realMain
+
+
+
+-- ================================================================ --
+
+rootServe = de'serve rootPlugin
+
+-- de'serve :: (Show a) => (VPlugin_ r a) -> IO ()
+ -- Couldn't match type ‘VSettings (E.Rule r a) a’ with ‘forall r1. VSettings_ r1 a0’
+-- de'serve :: (Show a) => (forall r. VPlugin_ r a) -> IO ()
+ -- Couldn't match type ‘VSettings (E.Rule r0 a) a’ with ‘forall r. VSettings_ r a0’
+-- de'serve plugin = de'Settings plugin >>= serveNatlink
+
+de'serve :: (Show a) => (forall r. VPlugin_ r a) -> IO ()
+-- de'serve plugin = unsafePerformIO(de'Settings plugin) & serveNatlink
+de'serve plugin = serveNatlink $ unsafePerformIO(de'Settings plugin)
+
+rootPlugin :: VPlugin_ r Root
+rootPlugin = VPlugin rootCommand
+
+-- de'Settings :: forall r a. VPlugin_ r a -> IO (VSettings_ r a)
+de'Settings :: forall r a. VPlugin_ r a -> IO (VSettings_ r a)
+de'Settings plugin = do
+ settings <- (defSettings runActions de'UpdateConfig plugin)
+ return$ settings
+  { vSetup = setupCopyGrammar
+  }
+
+-- de'Settings :: forall r. VPlugin (E.Rule r Root) Root -> IO (VSettings (E.Rule r Root) Root)
+-- de'Settings plugin = do
+--  settings :: (VSettings (E.Rule r Root) Root) <- (defSettings runActions de'UpdateConfig plugin)
+--  return$ settings
+--   { vSetup = setupCopyGrammar :: (VSettings (E.Rule r Root) Root -> IO (Either VError ()))
+--   }
+
+-- de'UpdateConfig :: VPlugin (E.Rule r Root) Root -> IO (VConfig (E.Rule r Root) Root)
+de'UpdateConfig :: VPlugin_ r a -> IO (VConfig_ r a)
+de'UpdateConfig settings = do
+ (eProd, vGrammar) <- de'deriveObservedSharing (settings&vCommand&_cRHS)
+ let vParser = EarleyParser eProd (settings&vCommand&_cBest)
+ let vDesugar = (settings&vCommand&_cDesugar)
+ return VConfig{..}
+
+-- setupCopyGrammar :: VSettings_ r Root -> IO (Either VError ())
+setupCopyGrammar :: VSettings_ r a -> IO (Either VError ())
+setupCopyGrammar settings = do
+
+ let address = Address (Host "localhost") (Port (settings&vPort))
+
+ shimSerialize address (settings&vConfig&vGrammar) & \case
+  Left e -> do
+   return$ Left(VError (show e))
+  Right (PythonFile shim) -> do
+   putStrLn "" -- TODO logging
+   T.putStrLn$ displayAddress address
+   putStrLn ""
+   T.putStrLn$ shim
+   putStrLn ""
+   (settings&vExecuteActions)$ setClipboard (T.unpack shim)
+   return$ Right()
+

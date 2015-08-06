@@ -1,10 +1,15 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, DeriveGeneric               #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleContexts, LambdaCase #-}
-{-# LANGUAGE RankNTypes, TemplateHaskell                             #-}
-module Commands.Etc where
-import           Commands.Instances           ()
+{-# LANGUAGE AutoDeriveTypeable, ConstraintKinds, DataKinds, DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts     #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators                                 #-}
+module Commands.Etc
+ ( module Commands.Etc
+ , module Commands.Instances
+ ) where
+import           Commands.Instances
 
-import           Control.Lens                 (Lens', Prism', lens, prism')
+import           Control.Lens                 (Lens', Prism', lens, makeLenses,
+                                               makePrisms, prism')
 import           Control.Monad.Catch          (MonadThrow, throwM)
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
@@ -13,6 +18,7 @@ import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.Hashable
 import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Text.Lazy               (Text)
+import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
@@ -48,24 +54,6 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 --
 type Possibly a = forall m. (MonadThrow m) => m a
 
--- | the superclass constraints on 'Exception'. uses @ConstraintKinds@.
---
--- when you see
---
--- @
--- myHandler :: (Exceptional a) => a -> ...
--- @
---
--- it implies the provenance of those constraints is something like:
---
--- @
--- data MyError a = ...
--- instance ('Typeable' a, 'Show' a) => 'Exception' (MyError a)
--- @
---
--- this helps with reading/refactoring heavily-constrained types.
-type Exceptional a = (Typeable a, Show a)
-
 failed :: String -> Possibly a
 failed = throwM . userError
 
@@ -89,12 +77,23 @@ failure :: Name -> Possibly a
 failure = throwM . userError . showName
 
 showName :: Name -> String
-showName = either show showGUI . fromName
+showName = either show showGUI . fromGlobalName
+
+-- | could have fourth field: @Version@.
+data GUI = GUI
+ { _guiPackage    :: !Package
+ , _guiModule     :: !Module
+ , _guiIdentifier :: !Identifier
+ } deriving (Show,Eq,Ord,Generic,Hashable)
+
+newtype Package    = Package    String deriving (Show,Eq,Ord,Generic,Hashable)
+newtype Module     = Module     String deriving (Show,Eq,Ord,Generic,Hashable)
+newtype Identifier = Identifier String deriving (Show,Eq,Ord,Generic,Hashable)
 
 -- | only 'NameG' is global, i.e. is unique modulo package and module.
-fromName :: Name -> Possibly GUI
-fromName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
-fromName (Name (OccName occ) _) = failed occ
+fromGlobalName :: Name -> Possibly GUI
+fromGlobalName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
+fromGlobalName (Name (OccName occ) _) = failed occ
 
 -- | >>> showGUI (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
 -- "package-Module.SubModule.identifier"
@@ -121,16 +120,8 @@ constructors = enumFrom (toEnum 0)
 enumDefault :: (Enum a) => a
 enumDefault = toEnum 0
 
-newtype Package    = Package    String deriving (Show, Eq, Ord, Generic); instance Hashable Package
-newtype Module     = Module     String deriving (Show, Eq, Ord, Generic); instance Hashable Module
-newtype Identifier = Identifier String deriving (Show, Eq, Ord, Generic); instance Hashable Identifier
-
--- | could have fourth field: @Version@.
-data GUI = GUI !Package !Module !Identifier deriving (Show, Eq, Ord, Generic)
-instance Hashable GUI
-
-display :: Doc -> Text
-display = displayT . renderPretty 1.0 80
+displayDoc :: Doc -> Text
+displayDoc = displayT . renderPretty 1.0 80
 
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
 (-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
@@ -164,13 +155,13 @@ hashAlphanumeric = flip showHex "" . abs . hash
 
 -- | existentially-quantify any unary type-constructor
 --
--- >>> :t Any Nothing
--- Any Nothing :: Any Maybe
+-- >>> :t Exists Nothing
+-- Exists Nothing :: Exists Maybe
 --
--- >>> case Any [] of Any xs -> length xs
+-- >>> case Exists [] of Exists xs -> length xs
 -- 0
 --
-data Any f = forall x. Any (f x)
+data Exists f = Exists {unExists :: forall x. (f x)}
 
 
 nonemptyHead :: Lens' (NonEmpty a) a
@@ -254,3 +245,35 @@ sccs2cycles :: [SCC n] -> [[n]]
 sccs2cycles = mapMaybe $ \case
  AcyclicSCC _ -> Nothing
  CyclicSCC ns -> Just ns
+
+snoc :: [a] -> a -> [a]
+snoc xs x = xs <> [x]
+
+
+data Address = Address
+ { _host :: Host
+ , _port :: Port
+ } deriving (Show,Eq,Ord)
+newtype Host = Host String deriving (Show,Eq,Ord)
+newtype Port = Port Int deriving (Show,Eq,Ord)
+
+-- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
+-- "http://localhost:8000"
+displayAddress :: Address -> Text
+displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown) h p
+
+-- | a natural transformation
+type (:~>:) f g = forall x. f x -> g x
+
+
+-- ================================================================ --
+
+makeLenses ''GUI
+makePrisms ''Package
+makePrisms ''Module
+makePrisms ''Identifier
+
+makeLenses ''Address
+makePrisms ''Host
+makePrisms ''Port
+

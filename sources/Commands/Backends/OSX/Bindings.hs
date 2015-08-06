@@ -8,11 +8,9 @@ import Foreign.C.String                   (peekCString, withCString)
 
 
 currentApplication :: IO Application
-currentApplication = do
+currentApplication = do -- TODO munge, default to Global
  path <- currentApplicationPath
  return path
--- TODO munge, default to Global
-
 
 -- |
 -- TODO Applications whose name/paths have Unicode characters may or may not marshall correctly.
@@ -30,14 +28,14 @@ clickMouse = undefined
 -- clickMouse (MouseClick (encodeModifiers -> flags) (encodePositive -> n) (encodeButton -> button)) = objc_clickMouse
 
 -- |
-getClipboard :: IO ClipboardContents
+getClipboard :: IO ClipboardText
 getClipboard = objc_getClipboard >>= peekCString
 
 -- |
 --
 -- note: unlike the keyboard shortcuts of 'copy',
 -- contents don't show up in Alfred's clipboard history.
-setClipboard :: ClipboardContents -> IO ()
+setClipboard :: ClipboardText -> IO ()
 setClipboard s = withCString s objc_setClipboard
 
 -- |

@@ -1,23 +1,46 @@
-{-# LANGUAGE DataKinds, RankNTypes, TupleSections, TypeFamilies #-}
-{-# LANGUAGE TypeOperators                                      #-}
+{-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TupleSections #-}
+{-# LANGUAGE TypeFamilies                                           #-}
 module Commands.Servers.Servant.API where
-import Commands.Backends.OSX          hiding (Application, Command)
-import Commands.Core
-import Commands.Mixins.DNS13OSX9
-import Commands.Servers.Servant.Types
+import qualified Commands.Backends.OSX          as OSX
+import           Commands.Mixins.DNS13OSX9
+import           Commands.Servers.Servant.Types
+-- import           Commands.Core
 
-import Control.Lens
-import Control.Monad.Trans.Either     (EitherT)
-import Network.Wai                    (Application)
-import Network.Wai.Handler.Warp       (Port, run)
-import Servant
+import           Control.Lens
+import           Control.Monad.Trans.Either
+import qualified Data.ByteString.Lazy.Char8     as BSC
+import           Data.Text.Lazy                 (Text)
+import qualified Data.Text.Lazy                 as T
+import qualified Data.Text.Lazy.IO              as T
+import qualified Network.Wai                    as Wai
+import qualified Network.Wai.Handler.Warp       as Wai
+import           Servant
 
-import Control.Monad.IO.Class         (liftIO)
+import           Control.Monad.IO.Class         (liftIO)
 
+
+serveNatlink :: (Show a) => (forall r. VSettings_ r a) -> IO ()
+serveNatlink settings@VSettings{..} = do
+ vSetup settings >>= \case
+  Left e  -> do
+   print e
+  Right() -> do
+   Wai.run vPort $ natlinkApplication settings
 
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
+natlinkApplication :: (Show a) => (forall r. VSettings_ r a) -> Wai.Application
+natlinkApplication vSettings = serve natlinkAPI $ natlinkHandlers vSettings
+
+natlinkAPI :: Proxy NatlinkAPI
+natlinkAPI = Proxy
+
+natlinkHandlers :: (Show a) => (forall r. VSettings_ r a) -> Server NatlinkAPI
+natlinkHandlers = postRecognition
+
+postRecognition :: (Show a) => (forall r. VSettings_ r a) -> DGNRecognition -> Response ()
+postRecognition vSettings (DGNRecognition ws) = handleInterpret vSettings ws
 
 {- | this handler:
 
@@ -27,64 +50,22 @@ import Control.Monad.IO.Class         (liftIO)
 
 
 -}
-handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
-handleInterpret cm s = do
- liftIO $ putStrLn s
- let v = either (const $ (_modDefault cm) s) id $ ((_modCommand cm)^.comRule) `parses` s
- liftIO $ print v
- let as = ((_modCommand cm) `compiles` v) (_modContext cm)
- liftIO $ putStrLn $ showActions as
- liftIO $ runActions as
+handleInterpret :: (Show a) => (forall r. VSettings_ r a) -> [Text] -> Response ()
+handleInterpret vSettings = \ts -> do
+-- handleInterpret vSettings@VSettings{vConfig=VConfig{..},..} = \ts -> do
+-- handleInterpret :: (Show a) => VSettings z a -> (VConfig z a) -> [Text] -> Response ()
+-- handleInterpret VSettings{..} VConfig{..} = \ts -> do
+ context <- liftIO$ (vSettings&vExecuteActions) OSX.currentApplication
+
+ liftIO$ putStrLn "" >> putStrLn "" >> putStrLn ""
+ liftIO$ putStrLn ""
+ liftIO$ T.putStrLn$ T.intercalate (T.pack " ") ts
+ vals <- case e'ParseBest (vSettings&vConfig&vParser) ts of
+  Left  e -> left  err400{errBody = BSC.pack (show e)}
+  Right v -> right v
+ liftIO$ print vals
+ let acts = (vSettings&vConfig&vDesugar) context vals
+ liftIO$ putStrLn $ OSX.showActions acts
+ liftIO$ (vSettings&vExecuteActions) acts
  return ()
 
--- handleInterpret :: (Show a) => (forall z. CmdModel z a) -> String -> Response ()
--- handleInterpret (CmdModel command def context) text = do
---
--- can't bind the rank2 field to command:
---
--- Couldn't match type ‘z0’ with ‘z’
---       because type variable ‘z’ would escape its scope
---     This (rigid, skolem) type variable is bound by
---       a type expected by the context: R z a
---       at sources/Commands/Servers/Servant/API.hs:33:41-72
---     Expected type: C z ApplicationDesugarer Actions_ a
---       Actual type: C z0 ApplicationDesugarer Actions_ a
-
-type Response = EitherT (Int, String) IO
-
-{- | POST /recognition
-
-@
-$ export PORT=8666
-$ curl -d '["some","words"]' 'http://localhost:$PORT/recognition/'
-$ python -c 'import urllib2,json,sys; print json.loads(urllib2.urlopen("http://localhost:$PORT/recognition/", json.dumps(["some","words with spaces"])).readline())'
-@
-
-
--}
-type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post ()
--- type NatlinkAPI = "recognition" :> ReqBody DGNRecognition :> Post (DGNUpdate String)
-
-natlinkAPI :: Proxy NatlinkAPI
-natlinkAPI = Proxy
-
-natlinkHandlers :: (Show a) => (forall z. CmdModel z a) -> Server NatlinkAPI
-natlinkHandlers = postRecognition
-
-postRecognition :: (Show a) => (forall z. CmdModel z a) -> DGNRecognition -> Response ()
-postRecognition cm (DGNRecognition ws) = handleInterpret cm $ unwords ws
-
-natlinkApplication :: (Show a) => (forall z. CmdModel z a) -> Application
-natlinkApplication cm = serve natlinkAPI $ natlinkHandlers cm
-
-serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
-serveNatlink port cm = run port $ natlinkApplication cm
--- I think is relevant that ($) is specially typed
--- point-free doesn't work:
---
--- serveNatlink :: (Show a) => Port -> (forall z. CmdModel z a) -> IO ()
--- serveNatlink port = run port . natlinkApplication
-    -- Cannot instantiate unification variable ‘a0’
-    -- with a type involving foralls:
-    --   forall (z :: * -> * -> * -> *). CmdModel z a
-    --   Perhaps you want ImpredicativeTypes

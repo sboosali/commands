@@ -26,7 +26,7 @@ lhsOfType = LHS . guiOf
 -- |
 lhsFromName :: Name -> Possibly LHS
 lhsFromName name = do
- gui <- fromName name
+ gui <- fromGlobalName name
  return $ LHS gui
 
 -- | safe on obviously global 'Name's, like reifying a top-level binding:

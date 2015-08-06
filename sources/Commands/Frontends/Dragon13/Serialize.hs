@@ -12,7 +12,6 @@ import           Commands.Frontends.Dragon13.Shim
 import           Commands.Frontends.Dragon13.Lens
 
 import           Control.Monad.Catch               (SomeException (..))
-import           Data.Bifoldable
 import           Data.Bitraversable
 import           Data.Either.Validation            (validationToEither)
 import           Data.Foldable                     (toList)
@@ -63,18 +62,9 @@ let root = DNSProduction () (DNSRule "root") $ DNSAlternatives
 (this 'DNSGrammar' is complete/minimal: good for testing, bad at making sense).
 -}
 
-{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
 
-* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
-* the Python file doesn't parse (with 'newPythonFile')
 
->>> let Right{} = shimmySerialization "'localhost'" (serializeGrammar grammar)
-
-a Kleisli arrow (when partially applied).
-
--}
-shimmySerialization :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> Possibly PythonFile
-shimmySerialization diff = newPythonFile . display . getShim . from_SerializedGrammar_to_ShimR diff
+-- ================================================================ --
 
 {- | serializes an (escaped) grammar into a Python Docstring and a
 Python Dict.
@@ -113,7 +103,7 @@ as you can see, horizontally delimited 'Doc'uments are vertically aligned iff th
 
 
 -}
-serializeGrammar :: DNSGrammar i DNSName DNSText -> SerializedGrammar
+serializeGrammar :: DNSGrammar i DNSText DNSName -> SerializedGrammar
 serializeGrammar grammar = SerializedGrammar{..}
  where
  serializedLists  = serializeVocabularies (grammar^.dnsVocabularies)
@@ -154,7 +144,7 @@ not (as the 'DNSRule's are) defined as a @gramSpec@ String.
 
 -}
 serializeVocabularies
- :: [DNSVocabulary i DNSName DNSText] -> Doc
+ :: [DNSVocabulary i DNSText DNSName] -> Doc
 serializeVocabularies
  = enclosePythonic "{" "}" ","
  . mapMaybe serializeVocabulary
@@ -165,7 +155,7 @@ serializeVocabularies
 "list": ["one","two"]
 
 -}
-serializeVocabulary :: DNSVocabulary i DNSName DNSText -> Possibly Doc
+serializeVocabulary :: DNSVocabulary i DNSText DNSName -> Possibly Doc
 serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
  (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
 
@@ -174,7 +164,7 @@ serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
 --
 --
 --
-serializeProductions :: NonEmpty (DNSProduction i DNSName DNSText) -> Doc
+serializeProductions :: NonEmpty (DNSProduction i DNSText DNSName) -> Doc
 serializeProductions (export :| productions)
  = cat
  . punctuate "\n"
@@ -186,7 +176,7 @@ serializeProductions (export :| productions)
 -- >>> serializeExport $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
 -- <rule> exported  = "token";
 --
-serializeExport :: DNSProduction i DNSName DNSText -> Doc
+serializeExport :: DNSProduction i DNSText DNSName -> Doc
 serializeExport (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> "exported" <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
@@ -195,7 +185,7 @@ serializeExport (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
 -- >>> serializeProduction $ DNSProduction undefined (DNSRule (DNSName "rule")) (DNSTerminal (DNSToken (DNSText "token")))
 -- <rule>  = "token";
 --
-serializeProduction :: DNSProduction i DNSName DNSText -> Doc
+serializeProduction :: DNSProduction i DNSText DNSName -> Doc
 serializeProduction (DNSProduction _ l (asDNSAlternatives -> toList -> rs))
  = serializeLHS l <+> encloseSep " = " ";" " | " (fmap serializeRHS rs)
 
@@ -213,7 +203,7 @@ serializeRHS $ DNSAlternatives
 ("hello" "world" | [(<word>)+])
 
 -}
-serializeRHS :: DNSRHS DNSName DNSText -> Doc
+serializeRHS :: DNSRHS DNSText DNSName -> Doc
 serializeRHS (DNSTerminal t)                  = serializeToken t
 serializeRHS (DNSNonTerminal (SomeDNSLHS l))  = serializeLHS l
 serializeRHS (DNSOptional r)                  = "[" <> serializeRHS r <> "]"
@@ -299,50 +289,41 @@ enclosePythonic left right sep ds
 --
 -- a Kleisli arrow where @(m ~ Either [SomeException])@
 --
-escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSName DNSText)
-escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSName) (eitherToValidations . escapeDNSText)
+escapeDNSGrammar :: DNSGrammar i Text Text -> Either [SomeException] (DNSGrammar i DNSText DNSName)
+escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escapeDNSText) (eitherToValidations . escapeDNSName)
 
 
-data Address = Address Host Port
- -- TODO  deriving (Show,Eq,Ord)
-type Host = String -- TODO 
-type Port = String -- TODO 
 
-type ShimR_minus_SerializedGrammar = (Address, Address) -- TODO 
+-- ================================================================ --
 
--- | lol: @(x-y) + y = x@
-from_SerializedGrammar_to_ShimR :: ShimR_minus_SerializedGrammar -> SerializedGrammar -> ShimR Doc
+{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
+
+* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
+* the Python file doesn't parse (with 'newPythonFile')
+
+>>> let Right{} = shimSerialize "'localhost'" (serializeGrammar grammar)
+
+a Kleisli arrow (when partially applied).
+
+-}
+shimSerialize :: Address -> SerializedGrammar -> Possibly PythonFile
+shimSerialize address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
+
+{- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
+
+@SerializedGrammar = ShimR - Address@
+-}
+from_SerializedGrammar_to_ShimR :: Address -> SerializedGrammar -> ShimR Doc
 from_SerializedGrammar_to_ShimR
- ( Address (T.pack -> text -> serverHost) (T.pack -> text -> serverPort)
- , Address (T.pack -> text -> clientHost) (T.pack -> text -> clientPort))
+ (Address (Host (        T.pack -> text -> squotes -> serverHost))
+          (Port (show -> T.pack -> text -> squotes -> serverPort))
+ )
  SerializedGrammar{..}
- = ShimR serializedRules serializedLists serializedExport serverHost serverPort clientHost clientPort -- TODO 
+ =
+ ShimR serializedRules serializedLists serializedExport serverHost serverPort
 
+-- | (for debugging)
+displaySerializedGrammar :: SerializedGrammar -> Text
+displaySerializedGrammar SerializedGrammar{..} =
+ displayDoc $ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
 
-{- | get all the names in the left-hand sides of the grammar, without duplicates. 
-Works on different levels of the grammar.
-
-e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
-
->>> map unDNSName $ getNames grammar
-["root","command","subcommand","flag"]
-
-@getNames = 'getLefts'@
-
--}
-getNames :: (Eq n, Bifoldable p) => p n t -> [n]
-getNames = getLefts
-
-{- | get all the words in the terminals of the grammar, without duplicates. 
-Works on different levels of the grammar.
-
-e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
-
->>> map unDNSText $ getWords grammar
-["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
-
-@getWords = 'getRights'@
-
--}
-getWords :: (Eq t, Bifoldable p) => p n t -> [t]
-getWords = getRights

@@ -13,25 +13,25 @@ import Control.Lens          (view)
 -- infixl 3 <|>
 -- infixl 4 <$>
 -- infixl 4 <*>
+infixl 4 <#>
 infixl 4 # -- TODO   `(#) = review` or something in lens
-infixl 4 & -- TODO   `(&) = flip ($)` in base in 7.10
 
 
 -- | like '<$' or '<$>', given the type (see the 'AppRHS' instances in this module).
 --
--- e.g. inference for @True # "true"@ (__without__ @OverloadedStrings@):
+-- e.g. inference for @True <#> "true"@ (__without__ @OverloadedStrings@):
 --
 -- @
--- (#) :: (AppRHS p r l i a) => LeftR a b -> a -> RHS b
+-- (<#>) :: (AppRHS p r l i a) => LeftR a b -> a -> RHS b
 -- -- given string literal ("true" :: String)
 -- a ~ String
--- (#) :: (AppRHS String) => LeftR String b -> String -> RHS b
+-- (<#>) :: (AppRHS String) => LeftR String b -> String -> RHS b
 -- -- accept constraint 'AppRHS' and expand type family 'LeftR'
--- (#) :: b -> String -> RHS b
+-- (<#>) :: b -> String -> RHS b
 -- @
 --
-(#) :: (Functor (p i), AppRHS p r l i a) => LeftR a b -> a -> RHS p r l i b
-f # x = pure f `appR` x
+(<#>) :: (Functor (p i), AppRHS p r l i a) => LeftR a b -> a -> RHS p r l i b
+f <#> x = pure f `appR` x
 
 -- | like '<*' or '<*>', given the type (see the 'AppRHS' instances in this
 -- module).
@@ -39,8 +39,8 @@ f # x = pure f `appR` x
 -- e.g. inference for @TODO@ (__without__ @OverloadedStrings@):
 --
 -- @
-(&) :: (Functor (p i), AppRHS p r l i a) => RHS p r l i (LeftR a b) -> a -> RHS p r l i b
-(&) = appR
+(#) :: (Functor (p i), AppRHS p r l i a) => RHS p r l i (LeftR a b) -> a -> RHS p r l i b
+(#) = appR
 
 -- | specialized 'appR' has types:
 --

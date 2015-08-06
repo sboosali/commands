@@ -14,7 +14,7 @@ import qualified Test.QuickCheck.Property          as Q
 
 -- | if the grammar has already been escaped, its serialization into the shim must be valid Python.
 prop_DNSGrammar :: DNSGrammar () DNSText DNSName -> Q.Result
-prop_DNSGrammar grammar = case shimmySerialization address (serializeGrammar grammar) of
+prop_DNSGrammar grammar = case shimSerialize address (serializeGrammar grammar) of
  Left  {} -> Q.failed
  Right {} -> Q.succeeded
 -- rejected = result { ok = Nothing }  i.e.  Discard  i.e.  as if precondition were False

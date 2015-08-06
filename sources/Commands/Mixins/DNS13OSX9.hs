@@ -1,5 +1,5 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor     #-}
-{-# LANGUAGE ExistentialQuantification           #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, DeriveAnyClass     #-}
+{-# LANGUAGE ExistentialQuantification              #-}
 {-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase              #-}
 {-# LANGUAGE PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, EmptyCase         #-}
@@ -33,7 +33,7 @@ import Control.Lens hiding (snoc, (#))
 import Control.Monad.Catch (MonadThrow (..))
 
 import           Data.Char
-import Control.Exception (SomeException (..))
+import Control.Exception (Exception (..), SomeException (..))
 import Data.Monoid              ((<>))
 import           Control.Arrow                   ((>>>))
 import           Control.Monad.ST
@@ -207,6 +207,13 @@ renameRHSST u = unsafeIOToST$ do
 
 -- ================================================================ --
 
+type EarleyParser_ a = (forall r. EarleyParser (E.Rule r a) a)
+
+data EarleyParser z a = EarleyParser
+ { pProd :: E.Prod z String Text a
+ , pBest :: NonEmpty a -> a 
+ }
+
 data EarleyName z n t (f :: * -> *) a = EarleyName
  { unEarleyName :: E.Prod z n t a -> E.Prod z n t a
  }
@@ -218,7 +225,15 @@ data EarleyName z n t (f :: * -> *) a = EarleyName
 --          -> ST s (RHS (EarleyName (E.Rule s r) n) t f a)
 --          )
 -- renameRHSToEarley = renameRHSST $ \_ (ConstName n) _ -> do
-renameRHSToEarley :: ST s (RHS (ConstName (_, n)) t (DNSEarleyFunc z (ConstName (_, n)) t) a -> ST s (RHS (EarleyName (E.Rule s r) n) t (DNSEarleyFunc z (EarleyName (E.Rule s r) n) t) a))
+-- renameRHSToEarley :: ST s (RHS (ConstName (_, n)) t (DNSEarleyFunc z (ConstName (_, n)) t) a -> ST s (RHS (EarleyName (E.Rule s r) n) t (DNSEarleyFunc z (EarleyName (E.Rule s r) n) t) a))
+renameRHSToEarley
+ :: ST s (        DNSEarleyRHS (E.Rule s r) a
+         -> ST s (RHS (EarleyName (E.Rule s r) String)
+                      Text
+                      (DNSEarleyFunc (E.Rule s r)
+                      (EarleyName (E.Rule s r) String) Text)
+                      a)
+         )
 renameRHSToEarley = renameDNSEarleyRHSST $ \_ (ConstName (_, n)) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
@@ -248,22 +263,33 @@ buildEarley p ts = do
   E.parse [s] [] [] (return ()) [] 0 ts
 
 runEarley
- :: (Eq t)
- => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) t) a)
- -> [t]
- -> ST s (E.Result s String [t] a)
+ :: (forall r. RHS (ConstName (_,String)) Text (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) Text) a)
+ -> [Text]
+ -> ST s (E.Result s String [Text] a)
+-- runEarley
+--  :: (Eq t)
+--  => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) t) a)
+--  -> [t]
+--  -> ST s (E.Result s String [t] a)
 runEarley r1 ts = do
  r2 <- renameRHSToEarley >>= ($ r1)
  buildEarley (induceEarley r2) ts
 
 parseRaw
- :: (Eq t)
- => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc r (ConstName (_,String)) t) a)
- -> [t]
- -> ([a], E.Report String [t])
+ :: (forall r. RHS (ConstName (_,String)) Text (DNSEarleyFunc r (ConstName (_,String)) Text) a)
+ -> [Text]
+ -> ([a], E.Report String [Text])
 parseRaw r ts = E.fullParses$ runEarley r ts
 
 type EarleyEither e t = Either (E.Report e [t])
+
+e'ParseBest :: EarleyParser_ a -> [Text] -> EarleyEither String Text a
+e'ParseBest p ts = do
+ parses <- toEarleyEither (E.fullParses (buildEarley (p&pProd) ts))
+ return$ (p&pBest) parses
+ where
+ -- report = E.fullParses result
+ -- result = buildEarley (p&pProd) ts
 
 -- | may 'throwM' a @('E.Report' String Text)@
 parseThrow
@@ -275,10 +301,9 @@ parseThrow r = parseEither r >>> \case
  Right xs -> return xs
 
 parseEither
- :: (Eq t)
- => (forall r. RHS (ConstName (_,String)) t (DNSEarleyFunc r (ConstName (_,String)) t) a)
- -> [t]
- -> EarleyEither String t (NonEmpty a)
+ :: (forall r. RHS (ConstName (_,String)) Text (DNSEarleyFunc r (ConstName (_,String)) Text) a)
+ -> [Text]
+ -> EarleyEither String Text (NonEmpty a)
 parseEither r
  = toEarleyEither
  . parseRaw r
@@ -304,9 +329,7 @@ parseBest
  -> (forall r. DNSEarleyRHS r a)
  -> [Text]
  -> EarleyEither String Text a --TODO use Possibly?
-parseBest best r
- = second best
- . parseText r
+parseBest best r = second best . parseText r
 
 parseList :: (forall r. DNSEarleyRHS r a) -> [Text] -> [a]
 parseList r ts = as
@@ -409,7 +432,8 @@ formatRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName Str
 formatRHS r = do
  renamer <- renameRHSToDNS
  let serializeRHS = (induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar')
- renamer r >>= (serializeRHS >>> return)
+ eG <- renamer r >>= (serializeRHS >>> return)
+ return$ eG
 
 showRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO Text
 showRHS r = do
@@ -673,4 +697,36 @@ transformedCon f x = x <$ (word . f . show $ x)
 -- | @= 'optionRHS' 'enumDefault' ...@
 optionalEnum :: (Enum a) => DNSEarleyRHS z a -> DNSEarleyRHS z a
 optionalEnum = optionRHS enumDefault
+
+
+
+-- ================================================================ --
+
+{- | derive a parser and a grammar from a DNSEarleyRHS, by observing sharing. 
+
+("d" for DNS, "e" for Earley).
+
+TODO safe with 'unsafePerformIO'?
+-}
+de'deriveObservedSharing :: DNSEarleyRHS (E.Rule s a) a -> IO (E.Prod (E.Rule s a) String Text a, SerializedGrammar)
+de'deriveObservedSharing r = do
+ p <- unsafeSTToIO$ de'deriveParserObservedSharing r
+ g <- de'deriveGrammarObservedSharing r
+ return (p,g)
+
+de'deriveParserObservedSharing :: DNSEarleyRHS (E.Rule s a) a -> ST s (E.Prod (E.Rule s a) String Text a)
+de'deriveParserObservedSharing r1 = do
+ r2 <- renameRHSToEarley >>= ($ r1)
+ return$ induceEarley r2
+
+de'deriveGrammarObservedSharing :: DNSEarleyRHS z a -> IO SerializedGrammar
+de'deriveGrammarObservedSharing rhs = do --TODO may throw exception 
+ g <- formatRHS rhs >>= \case
+  Right g  -> return g
+  Left  es -> throwM$ DNSGrammarException es
+ return g
+
+newtype DNSGrammarException = DNSGrammarException [SomeException]
+ deriving (Show)
+deriving instance Exception DNSGrammarException
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, ConstraintKinds, DataKinds, DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts     #-}
 {-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
-{-# LANGUAGE TemplateHaskell                                                #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators                                 #-}
 module Commands.Etc
  ( module Commands.Etc
  , module Commands.Instances
@@ -261,6 +261,9 @@ newtype Port = Port Int deriving (Show,Eq,Ord)
 -- "http://localhost:8000"
 displayAddress :: Address -> Text
 displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown) h p
+
+-- | a natural transformation
+type (:~>:) f g = forall x. f x -> g x
 
 
 -- ================================================================ --

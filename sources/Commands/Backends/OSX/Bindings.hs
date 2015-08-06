@@ -8,11 +8,9 @@ import Foreign.C.String                   (peekCString, withCString)
 
 
 currentApplication :: IO Application
-currentApplication = do
+currentApplication = do -- TODO munge, default to Global
  path <- currentApplicationPath
  return path
--- TODO munge, default to Global
-
 
 -- |
 -- TODO Applications whose name/paths have Unicode characters may or may not marshall correctly.

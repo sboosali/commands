@@ -1,22 +1,25 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveGeneric, LambdaCase #-}
-{-# LANGUAGE RankNTypes, TypeOperators                            #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DeriveGeneric #-}
+{-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TypeOperators  #-}
 module Commands.Servers.Servant.Types where
-import Commands.Backends.OSX.Types (Application)
-import Commands.Mixins.DNS13OSX9   (DNSEarleyCommand)
+import qualified Commands.Backends.OSX                 as OSX
+import           Commands.Etc
+import qualified Commands.Frontends.Dragon13.Serialize as DNS
+import           Commands.Mixins.DNS13OSX9             (DNSEarleyCommand,
+                                                        EarleyParser)
 
-import Control.Monad.Trans.Either  (EitherT)
-import Data.Aeson
-import Data.Text.Lazy              (Text)
-import Servant
+import           Control.Monad.Trans.Either            (EitherT)
+import           Data.Aeson
+import           Data.Text.Lazy                        (Text)
+import qualified Network.Wai.Handler.Warp              as Wai
+import           Servant
+import qualified Text.Earley.Internal                  as E
 -- import Data.Aeson.Types
 
-import GHC.Generics                (Generic)
+import           GHC.Generics                          (Generic)
 -- import Data.Map         (Map)
 
 
 type Response = EitherT ServantErr IO
-
-type CmdModel_ a = forall z. CmdModel z a
 
 {- |
 
@@ -40,18 +43,83 @@ type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON
 -}
 newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Generic,FromJSON)
 
-{- | the Commands Model.
+type VSettings_ r a = VSettings (E.Rule r a) a  --TODO can we make it polymorphic?
+type VConfig_ r a = VConfig (E.Rule r a) a
+type VPlugin_ r a = VPlugin (E.Rule r a) a
 
-State that configures the server's handlers, and may be updated by clients.
+-- type VSettings_ a = forall r. VSettings (E.Rule r a) a  --TODO can we make it polymorphic?
+-- type VConfig_ a = forall r. VConfig (E.Rule r a) a
+-- type VPlugin_ a = forall r. VPlugin (E.Rule r a) a
 
-'_modContext' can be updated by clients and used by the '_modCommand', concurrently.
+{- | read-only.
+"static" configuration
+-}
+data VSettings z a = VSettings
+ { vPort           :: Wai.Port
+ , vSetup          :: VSettings z a -> IO (Either VError ())
+ , vTeardown       :: VSettings z a -> IO (Either VError ())
+ , vExecuteActions :: (OSX.Actions :~>: IO)
+ , vUpdateConfig   :: VPlugin z a -> IO (VConfig z a)
+ -- , vUpdateConfig :: (forall x. VPlugin z x -> IO (VConfig z x))
+ , vConfig         :: VConfig z a
+ }
+
+
+{- |
+-}
+data VError = VError String
+ deriving (Show,Eq,Ord)
+
+{- | read-only.
+"dynamic" configuration
+-}
+data VConfig z a = VConfig
+ { vGrammar :: DNS.SerializedGrammar
+ , vParser  :: EarleyParser z a
+ , vDesugar :: OSX.Application -> a -> OSX.Actions_
+ }
+
+
+{- |
+can rebuild a 'VPlugin' with 'vReloadPlugin'.
+-}
+data VPlugin z a = VPlugin
+ { vCommand :: DNSEarleyCommand z a
+ }
+
+
+{- | read-write.
+
+state for the server's handlers, and may be updated by clients.
 
 -}
-data CmdModel z a = CmdModel
- { _modCommand :: DNSEarleyCommand z a
- , _modContext :: Application   -- ^ the current context (e.g. the current application).
- -- , _mod ::
+data VState = VState
+ { vApplication :: OSX.Application
+ -- , vContext :: c
  }
+
+
+{- | the default settings:
+
+* port 1337
+* no setup or teardown
+* needs a 'vUpdateConfig', a 'vExecuteActions', a 'vPlugin'
+
+-}
+defSettings
+ :: (OSX.Actions :~>: IO)
+ -> (VPlugin z a -> IO (VConfig z a))
+ -- -> (forall x. VPlugin z x -> IO (VConfig z x))
+ -> (VPlugin z a)
+ -> IO (VSettings z a)
+defSettings vExecuteActions vUpdateConfig vPlugin = do
+ vConfig <- vUpdateConfig vPlugin
+ return VSettings{..}
+ where
+ vPort = 1337
+ vSetup    _ = return$ Right()
+ vTeardown _ = return$ Right()
+
 
 {- |
 

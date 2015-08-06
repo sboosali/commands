@@ -301,13 +301,13 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 * the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
 * the Python file doesn't parse (with 'newPythonFile')
 
->>> let Right{} = shimmySerialization "'localhost'" (serializeGrammar grammar)
+>>> let Right{} = shimSerialize "'localhost'" (serializeGrammar grammar)
 
 a Kleisli arrow (when partially applied).
 
 -}
-shimmySerialization :: Address -> SerializedGrammar -> Possibly PythonFile
-shimmySerialization address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
+shimSerialize :: Address -> SerializedGrammar -> Possibly PythonFile
+shimSerialize address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
 
 {- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
 

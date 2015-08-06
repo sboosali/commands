@@ -1,6 +1,7 @@
-{-# LANGUAGE RankNTypes, TupleSections, TypeFamilies #-}
+{-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TupleSections #-}
+{-# LANGUAGE TypeFamilies                                           #-}
 module Commands.Servers.Servant.API where
-import           Commands.Backends.OSX          hiding (Application, Command)
+import qualified Commands.Backends.OSX          as OSX
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Servers.Servant.Types
 -- import           Commands.Core
@@ -18,32 +19,28 @@ import           Servant
 import           Control.Monad.IO.Class         (liftIO)
 
 
-serveNatlink :: (Show a) => Wai.Port -> CmdModel_ a -> IO ()
-serveNatlink port cm = Wai.run port $ natlinkApplication cm
--- I think is relevant that ($) is specially typed
--- point-free doesn't work:
---
--- serveNatlink :: (Show a) => Port -> CmdModel_ a -> IO ()
--- serveNatlink port = run port . natlinkApplication
-    -- Cannot instantiate unification variable ‘a0’
-    -- with a type involving foralls:
-    --   forall (z :: * -> * -> * -> *). CmdModel z a
-    --   Perhaps you want ImpredicativeTypes
+serveNatlink :: (Show a) => (forall r. VSettings_ r a) -> IO ()
+serveNatlink settings@VSettings{..} = do
+ vSetup settings >>= \case
+  Left e  -> do
+   print e
+  Right() -> do
+   Wai.run vPort $ natlinkApplication settings
 
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
-natlinkApplication :: (Show a) => CmdModel_ a -> Wai.Application
-natlinkApplication cm = serve natlinkAPI $ natlinkHandlers cm
+natlinkApplication :: (Show a) => (forall r. VSettings_ r a) -> Wai.Application
+natlinkApplication vSettings = serve natlinkAPI $ natlinkHandlers vSettings
 
 natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
-natlinkHandlers :: (Show a) => CmdModel_ a -> Server NatlinkAPI
+natlinkHandlers :: (Show a) => (forall r. VSettings_ r a) -> Server NatlinkAPI
 natlinkHandlers = postRecognition
 
-postRecognition :: (Show a) => CmdModel_ a -> DGNRecognition -> Response ()
-postRecognition cm (DGNRecognition ws) = handleInterpret cm ws
+postRecognition :: (Show a) => (forall r. VSettings_ r a) -> DGNRecognition -> Response ()
+postRecognition vSettings (DGNRecognition ws) = handleInterpret vSettings ws
 
 {- | this handler:
 
@@ -53,32 +50,22 @@ postRecognition cm (DGNRecognition ws) = handleInterpret cm ws
 
 
 -}
-handleInterpret :: (Show a) => CmdModel_ a -> [Text] -> Response ()
-handleInterpret cm ts = do
+handleInterpret :: (Show a) => (forall r. VSettings_ r a) -> [Text] -> Response ()
+handleInterpret vSettings = \ts -> do
+-- handleInterpret vSettings@VSettings{vConfig=VConfig{..},..} = \ts -> do
+-- handleInterpret :: (Show a) => VSettings z a -> (VConfig z a) -> [Text] -> Response ()
+-- handleInterpret VSettings{..} VConfig{..} = \ts -> do
+ context <- liftIO$ (vSettings&vExecuteActions) OSX.currentApplication
+
  liftIO$ putStrLn "" >> putStrLn "" >> putStrLn ""
- dnsGrammar <- liftIO$ showRHS ((cm&_modCommand)^.cRHS)
- liftIO$ T.putStrLn dnsGrammar
  liftIO$ putStrLn ""
  liftIO$ T.putStrLn$ T.intercalate (T.pack " ") ts
- v <- case parseBest ((cm&_modCommand)^.cBest) ((cm&_modCommand)^.cRHS) ts of
+ vals <- case e'ParseBest (vSettings&vConfig&vParser) ts of
   Left  e -> left  err400{errBody = BSC.pack (show e)}
   Right v -> right v
- liftIO$ print v
- let a = ((cm&_modCommand)^.cDesugar) (cm&_modContext) v
- liftIO$ putStrLn $ showActions a
- liftIO$ runActions a
+ liftIO$ print vals
+ let acts = (vSettings&vConfig&vDesugar) context vals
+ liftIO$ putStrLn $ OSX.showActions acts
+ liftIO$ (vSettings&vExecuteActions) acts
  return ()
 
-
--- handleInterpret :: (Show a) => CmdModel_ a -> String -> Response ()
--- handleInterpret (CmdModel command def context) text = do
---
--- can't bind the rank2 field to command:
---
--- Couldn't match type ‘z0’ with ‘z’
---       because type variable ‘z’ would escape its scope
---     This (rigid, skolem) type variable is bound by
---       a type expected by the context: R z a
---       at sources/Commands/Servers/Servant/API.hs:33:41-72
---     Expected type: C z ApplicationDesugarer Actions_ a
---       Actual type: C z0 ApplicationDesugarer Actions_ a

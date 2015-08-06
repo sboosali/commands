@@ -1,16 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ExtendedDefaultRules  #-}
-{-# LANGUAGE ImplicitParams, LambdaCase, NamedFieldPuns               #-}
-{-# LANGUAGE PartialTypeSignatures, PatternSynonyms, PostfixOperators #-}
-{-# LANGUAGE RankNTypes, RecordWildCards, ScopedTypeVariables         #-}
-{-# LANGUAGE TemplateHaskell, TupleSections                           #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-type-defaults -fno-warn-partial-type-signatures #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, ImplicitParams, LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns, PartialTypeSignatures, PatternSynonyms        #-}
+{-# LANGUAGE PostfixOperators, RankNTypes, RecordWildCards                 #-}
+{-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections           #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example where
-import           Commands.Backends.OSX            hiding (Command)
-import qualified Commands.Backends.OSX            as OSX
+import           Commands.Backends.OSX                 hiding (Command)
+import qualified Commands.Backends.OSX                 as OSX
 import           Commands.Etc
 -- import           Commands.Core
 import           Commands.Frontends.Dragon13
+import           Commands.Frontends.Dragon13.Serialize
 -- import           Commands.LHS
 import           Commands.Mixins.DNS13OSX9
 -- import           Commands.Parsers.Earley
@@ -23,41 +23,43 @@ import           Commands.Sugar.Press
 
 import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
-import           Control.Lens                     hiding (from, ( # ))
-import           Control.Monad.Catch              (SomeException, catches)
-import qualified Data.Aeson                       as J
-import           Data.Bifunctor                   (second)
+import           Control.Lens                          hiding (from, ( # ))
+import           Control.Monad.Catch                   (SomeException, catches)
+import qualified Data.Aeson                            as J
+import           Data.Bifunctor                        (second)
 import           Data.Bitraversable
-import qualified Data.ByteString.Lazy.Char8       as B
+import qualified Data.ByteString.Lazy.Char8            as B
 import           Data.IORef
-import           Data.List.NonEmpty               (NonEmpty (..), fromList)
-import qualified Data.List.NonEmpty               as NonEmpty
-import qualified Data.Text.Lazy                   as T
-import qualified Data.Text.Lazy.IO                as T
+import           Data.List.NonEmpty                    (NonEmpty (..), fromList)
+import qualified Data.List.NonEmpty                    as NonEmpty
+import qualified Data.Text.Lazy                        as T
+import qualified Data.Text.Lazy.IO                     as T
 import           Data.Typeable
-import           Language.Python.Version2.Parser  (parseModule)
-import           Numeric.Natural                  ()
-import qualified Text.Parsec                      as Parsec
-import           Text.PrettyPrint.Leijen.Text     hiding (brackets, empty, int,
-                                                   (<$>), (<>))
+import           Language.Python.Version2.Parser       (parseModule)
+import           Numeric.Natural                       ()
+import qualified Text.Earley.Internal                  as E
+import qualified Text.Parsec                           as Parsec
+import           Text.PrettyPrint.Leijen.Text          hiding (brackets, empty,
+                                                        int, (<$>), (<>))
 
-import           Control.Applicative              hiding (many, optional)
-import           Control.Arrow                    ((>>>))
+import           Control.Applicative                   hiding (many, optional)
+import           Control.Arrow                         ((>>>))
 import           Control.Concurrent
-import           Control.Monad                    (replicateM_, void, (<=<),
-                                                   (>=>))
-import           Control.Monad.Reader             (asks)
+import           Control.Monad                         (replicateM_, void,
+                                                        (<=<), (>=>))
+import           Control.Monad.Reader                  (asks)
 import           Control.Parallel
-import           Data.Char                        (toUpper)
-import           Data.Either                      (either)
-import           Data.Foldable                    (Foldable (..), asum,
-                                                   traverse_)
-import qualified Data.List                        as List
-import qualified Data.Map                         as Map
+import           Data.Char                             (toUpper)
+import           Data.Either                           (either)
+import           Data.Foldable                         (Foldable (..), asum,
+                                                        traverse_)
+import qualified Data.List                             as List
+import qualified Data.Map                              as Map
 import           Data.Monoid
 import           Data.Unique
-import           Prelude                          hiding (foldl, foldr1)
-import           System.Timeout                   (timeout)
+import           Prelude                               hiding (foldl, foldr1)
+import           System.IO.Unsafe
+import           System.Timeout                        (timeout)
 
 
 data Root
@@ -597,7 +599,7 @@ editEmacs = \case
 -- it seems to be synchronous, even with threaded I guess?
 attemptAsynchronously :: Int -> IO () -> IO ()
 attemptAsynchronously seconds action = do
- (timeout (seconds * round 1e6) action) `withAsync` (waitCatch >=> \case
+ (timeout (seconds * round (1e6::Double)) action) `withAsync` (waitCatch >=> \case
    Left error     -> print error
    Right Nothing  -> putStrLn "..."
    Right (Just _) -> return ()
@@ -693,7 +695,7 @@ printSerializedGrammar SerializedGrammar{..} = do
 -- attemptPython g = do
 --  let Right sg = serialized g
 --  let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
---  PythonFile pf <- shimmySerialization addresses sg
+--  PythonFile pf <- shimSerialization addresses sg
 --  runActions $ setClipboard (T.unpack pf)
 --  T.putStrLn $ pf
 --  -- TODO why does the unary Test fail? Optimization?
@@ -808,4 +810,64 @@ realMain = do
 
 main = do
  realMain
+
+
+
+-- ================================================================ --
+
+rootServe = de'serve rootPlugin
+
+-- de'serve :: (Show a) => (VPlugin_ r a) -> IO ()
+ -- Couldn't match type ‘VSettings (E.Rule r a) a’ with ‘forall r1. VSettings_ r1 a0’
+-- de'serve :: (Show a) => (forall r. VPlugin_ r a) -> IO ()
+ -- Couldn't match type ‘VSettings (E.Rule r0 a) a’ with ‘forall r. VSettings_ r a0’
+-- de'serve plugin = de'Settings plugin >>= serveNatlink
+
+de'serve :: (Show a) => (forall r. VPlugin_ r a) -> IO ()
+-- de'serve plugin = unsafePerformIO(de'Settings plugin) & serveNatlink
+de'serve plugin = serveNatlink $ unsafePerformIO(de'Settings plugin)
+
+rootPlugin :: VPlugin_ r Root
+rootPlugin = VPlugin rootCommand
+
+-- de'Settings :: forall r a. VPlugin_ r a -> IO (VSettings_ r a)
+de'Settings :: forall r a. VPlugin_ r a -> IO (VSettings_ r a)
+de'Settings plugin = do
+ settings <- (defSettings runActions de'UpdateConfig plugin)
+ return$ settings
+  { vSetup = setupCopyGrammar
+  }
+
+-- de'Settings :: forall r. VPlugin (E.Rule r Root) Root -> IO (VSettings (E.Rule r Root) Root)
+-- de'Settings plugin = do
+--  settings :: (VSettings (E.Rule r Root) Root) <- (defSettings runActions de'UpdateConfig plugin)
+--  return$ settings
+--   { vSetup = setupCopyGrammar :: (VSettings (E.Rule r Root) Root -> IO (Either VError ()))
+--   }
+
+-- de'UpdateConfig :: VPlugin (E.Rule r Root) Root -> IO (VConfig (E.Rule r Root) Root)
+de'UpdateConfig :: VPlugin_ r a -> IO (VConfig_ r a)
+de'UpdateConfig settings = do
+ (eProd, vGrammar) <- de'deriveObservedSharing (settings&vCommand&_cRHS)
+ let vParser = EarleyParser eProd (settings&vCommand&_cBest)
+ let vDesugar = (settings&vCommand&_cDesugar)
+ return VConfig{..}
+
+-- setupCopyGrammar :: VSettings_ r Root -> IO (Either VError ())
+setupCopyGrammar :: VSettings_ r a -> IO (Either VError ())
+setupCopyGrammar settings = do
+
+ let address = Address (Host "localhost") (Port (settings&vPort))
+
+ shimSerialize address (settings&vConfig&vGrammar) & \case
+  Left e -> do
+   return$ Left(VError (show e))
+  Right (PythonFile shim) -> do
+   putStrLn "" -- TODO logging
+   T.putStrLn$ displayAddress address
+   putStrLn ""
+   T.putStrLn$ shim
+   putStrLn ""
+   (settings&vExecuteActions)$ setClipboard (T.unpack shim)
+   return$ Right()
 

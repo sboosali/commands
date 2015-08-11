@@ -5,6 +5,7 @@
 module Commands.Etc
  ( module Commands.Etc
  , module Commands.Instances
+ , module Control.Arrow
  ) where
 import           Commands.Instances
 
@@ -22,6 +23,7 @@ import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
+import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches)
 import           Data.Graph

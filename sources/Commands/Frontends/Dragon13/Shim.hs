@@ -70,7 +70,6 @@ inside the 'qc', "what you see is what you get", besides:
 getShim :: (IsString t, Monoid t) => ShimR t -> t
 getShim ShimR{..} = [qc|
 
-
 # _commands.py
 
 # natlink13 library
@@ -183,56 +182,6 @@ class NarcissisticGrammar(GrammarBase):
         self.activateSet(exports, exclusive=1)
 
 
-
-# API
-
-def handleDGNUpdate(self, response):
-    pass
-#    if not response: # had timed out
-#        return
-#    if response.getcode() != 200:
-#        return
-#
-#    j = response.readline()
-#    o = DGNUpdate.fromJSON(j)
-#
-#    # TODO does order matter? Before/after loading?
-#    if o is not None:
-#        if o.dgnRules is not None and o.dgnExports is not None:
-#            self.set_rules(o.dgnRules, o.dgnExport)
-#        if o.dgnLists is not None:
-#            self.set_lists(o.dgnLists)
-#        if o.dgnRules is None and o.dgnExports is not None: # just switch context
-#            self.set_exports(o.dgnExports)
-#
-#class DGNUpdate(object):
-#
-#    @classmethod
-#    def fromJSON(cls, j):
-#        try:
-#            d = json.loads(j)
-#            dgnUpdateRules = d["dgnUpdateRules"]
-#            dgnUpdateExports = d["dgnUpdateExports"]
-#            dgnUpdateLists = d["dgnUpdateLists"]
-#            o = cls(dgnUpdateRules, dgnUpdateExports, dgnUpdateLists)
-#            return o
-#        except Exception as e:
-#            print e
-#
-#    # TODO something dynamic using __dict__ and *args or something:
-#    # generated code is less readable/debuggable, but the generating code is simpler
-#    def __init__(self, dgnUpdateRules, dgnUpdateExports, dgnUpdateLists):
-#        self.dgnUpdateRules = dgnUpdateRules
-#        self.dgnUpdateExports = dgnUpdateExports
-#        self.dgnUpdateLists = dgnUpdateLists
-#
-#    def __repr__(self):
-#        return "%s(%r,%r,%r)" % (self.__class__.__name__, self.dgnUpdateRules, self.dgnUpdateExports, self.dgnUpdateLists)
-#
-#    # def toJSON(self):
-
-
-
 # helpers
 
 # current time in milliseconds
@@ -286,10 +235,3 @@ def unload():
 load()
 |]
 
- -- , __clientHost__ :: t  -- ^ a Python String
- -- , __clientPort__ :: t  -- ^ a Python Int
-
--- while the Python client runs at @('__clientHost__', '__clientPort__')@ on the guest.
-
--- # H_CLIENT_HOST = {__clientHost__}
--- # H_CLIENT_PORT = {__clientPort__}

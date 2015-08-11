@@ -207,7 +207,7 @@ renameRHSST u = unsafeIOToST$ do
 
 -- ================================================================ --
 
-type EarleyParser_ a = (forall r. EarleyParser (E.Rule r a) a)
+type EarleyParser_ a = forall r. RULED EarleyParser r a
 
 data EarleyParser z a = EarleyParser
  { pProd :: E.Prod z String Text a
@@ -702,23 +702,22 @@ optionalEnum = optionRHS enumDefault
 
 -- ================================================================ --
 
-{- | derive a parser and a grammar from a DNSEarleyRHS, by observing sharing. 
+{- | derive a parser from a DNSEarleyRHS, by observing sharing. 
 
 ("d" for DNS, "e" for Earley).
 
 TODO safe with 'unsafePerformIO'?
 -}
-de'deriveObservedSharing :: DNSEarleyRHS (E.Rule s a) a -> IO (E.Prod (E.Rule s a) String Text a, SerializedGrammar)
-de'deriveObservedSharing r = do
- p <- unsafeSTToIO$ de'deriveParserObservedSharing r
- g <- de'deriveGrammarObservedSharing r
- return (p,g)
-
 de'deriveParserObservedSharing :: DNSEarleyRHS (E.Rule s a) a -> ST s (E.Prod (E.Rule s a) String Text a)
 de'deriveParserObservedSharing r1 = do
  r2 <- renameRHSToEarley >>= ($ r1)
  return$ induceEarley r2
 
+{- | derive a grammar from a DNSEarleyRHS, by observing sharing. 
+
+("d" for DNS, "e" for Earley).
+
+-}
 de'deriveGrammarObservedSharing :: DNSEarleyRHS z a -> IO SerializedGrammar
 de'deriveGrammarObservedSharing rhs = do --TODO may throw exception 
  g <- formatRHS rhs >>= \case
@@ -729,4 +728,12 @@ de'deriveGrammarObservedSharing rhs = do --TODO may throw exception
 newtype DNSGrammarException = DNSGrammarException [SomeException]
  deriving (Show)
 deriving instance Exception DNSGrammarException
+
+
+
+-- ================================================================ --
+
+-- | the Earley parse function takes a Rank2 type (forall r. E.Prod r ...) that it instantiates to (forall s. (E.Rule s a)); then runST takes a Rank2 type (forall s. ...s...). this package exposes the internals of Earley, but of course not of ST. this type synonym is for convenience.
+type RULED f s a = f (E.Rule s a) a
+-- needs LiberalTypeSynonyms when f is a type synonym, I think.
 

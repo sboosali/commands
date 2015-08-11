@@ -64,7 +64,7 @@ data Root
  | ReplaceWith Phrase' Phrase'
  | Click_ Click
  | Move_ Move
- | KeyboardShortcut KeyRiff
+ | KeyRiff_ KeyRiff
  | Undo
  | Phrase_ Phrase'
  -- Roots [Root]
@@ -84,9 +84,9 @@ root = 'root <=> empty
  <|> Click_      <#> click
  <|> Edit_       <#> edit
  <|> Move_       <#> move
- <|> KeyboardShortcut <$> keyriff
- <|> KeyboardShortcut <$> myShortcuts
- -- <|> KeyboardShortcut <$> (keyriff <|> myShortcuts)
+ <|> KeyRiff_ <$> keyriff
+ <|> KeyRiff_ <$> myShortcuts
+ -- <|> KeyRiff_ <$> (keyriff <|> myShortcuts)
  <|> (Phrase_ . (:[])) <#> phraseC -- has "say" prefix
  <|> Phrase_     <#> phrase_  -- must be last, phrase falls back to wildcard.
  -- <|> Roots       <#> (multipleC root)
@@ -305,27 +305,27 @@ rankRoot = \case                --TODO fold over every field of every case, norm
  ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
  Click_ _ -> 1
  Move_ _ -> 1
- KeyboardShortcut _ -> 1
+ KeyRiff_ _ -> 1
  Phrase_ p -> rankPhrase p
 
 runRoot = \case
 
  "emacs" -> \case
    ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
-   Edit_ a -> editEmacs a
-   Move_ a -> moveEmacs a
-   x -> runRoot_ x
+   Edit_ a' -> editEmacs a'
+   Move_ a' -> moveEmacs a'
+   x' -> runRoot_ x'
 
  "Intellij" -> \case
    ReplaceWith this that -> do
      press M r
      (munge this >>= insert) >> press tab
      munge that >>= slot
-   x -> runRoot_ x
+   x' -> runRoot_ x'
 
  context -> \case
-   Repeat n c -> replicateM_ (getPositive n) $ runRoot context c
-   x -> runRoot_ x
+   Repeat n' c' -> replicateM_ (getPositive n') $ runRoot context c'
+   x' -> runRoot_ x'
 
  where
  -- unconditional runRoot (i.e. any context / global context)
@@ -333,8 +333,10 @@ runRoot = \case
 
   Undo -> press met z
 
-  Phrase_ p -> do
-   insert =<< munge p
+  Phrase_ p' -> do
+   insert =<< munge p'
+
+  KeyRiff_ kr -> runKeyRiff kr
 
   _ -> nothing
 

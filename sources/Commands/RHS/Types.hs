@@ -113,6 +113,9 @@ instance IsList (RHS n t f a) where
  fromList = Alter             -- the constructor (rather than a method like "asum") avoids the (Functor f) constraint
  toList = toRHSList
 
+terminal :: t -> RHS n t f t
+terminal = Terminal id
+
 -- | @(-?) = 'optionalRHS'@
 (-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
 (-?) = optionalRHS

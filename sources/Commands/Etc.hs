@@ -78,8 +78,8 @@ failed = throwM . userError
 failure :: Name -> Possibly a
 failure = throwM . userError . showName
 
-bug :: SomeException -> a
-bug = error . show
+__BUG__ :: SomeException -> a
+__BUG__ = error . show
 
 showName :: Name -> String
 showName = either show showGUI . fromGlobalName
@@ -272,6 +272,21 @@ type (:~>:) f g = forall x. f x -> g x
 ($>) :: (Functor f) => f a -> b -> f b
 ($>) = flip (<$)
 
+{- | @(-:) = (,)@
+
+fake dictionary literal syntax:
+
+@
+ [ "a"-: 1
+ , "b"-: 2
+ , "c"-: 1+2
+ ]
+@
+
+-}
+(-:) :: a -> b -> (a,b)
+(-:) = (,)
+infix 1 -:
 
 -- ================================================================ --
 

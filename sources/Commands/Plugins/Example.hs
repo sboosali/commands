@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase, LiberalTypeSynonyms, RankNTypes, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables                                          #-}
 module Commands.Plugins.Example where
-import           Commands.Backends.OSX         hiding (Command)
 import qualified Commands.Backends.OSX         as OSX
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
@@ -81,7 +80,7 @@ spirosSetup settings = do
    putStrLn$ T.unpack shim
    putStrLn ""
 
-   OSX.runActions$ setClipboard (T.unpack shim)
+   OSX.runActions$ OSX.setClipboard (T.unpack shim)
 
    T.putStrLn$ displayAddress address
    putStrLn ""

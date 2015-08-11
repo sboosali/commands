@@ -25,9 +25,9 @@ testDSL :: Actions ClipboardText
 testDSL = do
 
  -- delay 30
- sendKeyPress [Command, Shift] BKey
+ sendKeyPress [CommandMod, Shift] BKey
  delay 1000
- sendKeyPress [Command] DownArrowKey
+ sendKeyPress [CommandMod] DownArrowKey
 
  app <- currentApplication
  s <- getClipboard

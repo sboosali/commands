@@ -113,6 +113,7 @@ library
   Commands.Plugins.Example.Emacs
   Commands.Plugins.Example.Phrase
   Commands.Plugins.Example.Spacing
+  Commands.Plugins.Example.Press
 
   Data.RefCache
   Data.RefCache.Internal

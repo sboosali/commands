@@ -8,7 +8,7 @@ import Data.BitVector
 --
 --
 mask :: Modifier -> BitVector
-mask Command  = 0x00100000
+mask CommandMod  = 0x00100000
 mask Control  = 0x00040000
 mask Shift    = 0x00020000
 mask Option   = 0x00080000

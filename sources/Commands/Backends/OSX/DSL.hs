@@ -31,13 +31,13 @@ insert = sendText
 
 copy :: Actions String
 copy = do
- sendKeyPress [Command] CKey
+ sendKeyPress [CommandMod] CKey
  delay 25 -- TODO does it need to wait? how long? delay $ milliseconds 25
  getClipboard
 
 paste :: Actions ()
 paste = do
- sendKeyPress [Command] VKey
+ sendKeyPress [CommandMod] VKey
 
 google :: String -> Actions ()
 google (BS.pack -> query) = openURL (BS.unpack $ "https://www.google.com/search" <> renderQuery True [("q", Just query)])

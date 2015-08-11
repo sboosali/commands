@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, RankNTypes, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell #-}
 module Commands.Backends.OSX.Types where
 import Commands.Etc
 
@@ -102,6 +102,7 @@ newtype Positive = Positive { getPositive :: Int }
 --  deriving (Show,Eq,Ord)
 
 type KeyPress = ([Modifier], Key)
+pattern KeyPress mods k = (mods, k)
 
 {- | modifier keys are keys that can be "held".
 
@@ -111,8 +112,10 @@ the escape key is "pressed", not "held", it seems.
 @alt@ is 'Option'.
 
 -}
-data Modifier = Control | Command | Shift | Option | Function
+data Modifier = Control | CommandMod | Shift | Option | Function
+ -- Command is qualified to not conflict with Commands.Command.Types
  deriving (Show,Eq,Ord,Enum)
+-- data Modifier = ControlMod | CommandMod | ShiftMod | OptionMod | FunctionMod
 
 {- | all the keys on a standard keyboard.
 
@@ -219,7 +222,7 @@ data Key
 
 
 -}
-int2keypress :: Integer -> [([Modifier], Key)]
+int2keypress :: Integer -> [KeyPress]
 int2keypress = concatMap char2keypress . show
 
 

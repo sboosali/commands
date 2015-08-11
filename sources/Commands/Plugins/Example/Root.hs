@@ -5,19 +5,15 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Root where
-import           Commands.Backends.OSX                 hiding (Command)
-import qualified Commands.Backends.OSX                 as OSX
+import           Commands.Backends.OSX
 import           Commands.Etc
--- import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Frontends.Dragon13.Serialize
--- import           Commands.LHS
 import           Commands.Mixins.DNS13OSX9
--- import           Commands.Parsers.Earley
 import           Commands.Plugins.Example.Phrase
-import           Commands.Servers.Servant
--- import           Commands.Symbol.Types
+import           Commands.Plugins.Example.Press
 import           Commands.Plugins.Example.Spacing
+import           Commands.Servers.Servant
 import           Commands.Sugar.Alias
 import           Commands.Sugar.Press
 
@@ -65,18 +61,20 @@ import           System.Timeout                        (timeout)
 data Root
  = Repeat Positive Root
  | Edit_ Edit
- | Undo
  | ReplaceWith Phrase' Phrase'
  | Click_ Click
  | Move_ Move
+ | KeyboardShortcut KeyRiff
+ | Undo
  | Phrase_ Phrase'
  -- Roots [Root]
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
--- TODO currently throws "grammar too complex" :-(
+
 
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
+root :: R z Root
 root = 'root <=> empty
  -- <|> Repeat      <#> positive # root-- TODO no recursion for now
  <|> ReplaceWith <#> "replace" # phrase_ # "with" # phrase_ -- TODO
@@ -86,6 +84,9 @@ root = 'root <=> empty
  <|> Click_      <#> click
  <|> Edit_       <#> edit
  <|> Move_       <#> move
+ <|> KeyboardShortcut <$> keyriff
+ <|> KeyboardShortcut <$> myShortcuts
+ -- <|> KeyboardShortcut <$> (keyriff <|> myShortcuts)
  <|> (Phrase_ . (:[])) <#> phraseC -- has "say" prefix
  <|> Phrase_     <#> phrase_  -- must be last, phrase falls back to wildcard.
  -- <|> Roots       <#> (multipleC root)
@@ -236,15 +237,6 @@ region = 'region
  <|> Structure  <#> "struct"
 
 
--- | 'Key's and 'Char'acters are "incomparable sets":
---
--- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
--- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
---
--- so we can't embed the one into the other, but we'll just keep things simple with duplication.
---
-key = 'key <=> empty
-
 data Click = Click Times Button deriving (Show,Eq)
 click = 'click <=>
  Click <#> optionalEnum times # optionalEnum button # "click"
@@ -303,6 +295,7 @@ positive = 'positive
 
 -- ================================================================ --
 
+rootCommand :: C z Root
 rootCommand = Command root (argmax rankRoot) runRoot
 
 rankRoot = \case                --TODO fold over every field of every case, normalizing each case
@@ -312,6 +305,7 @@ rankRoot = \case                --TODO fold over every field of every case, norm
  ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
  Click_ _ -> 1
  Move_ _ -> 1
+ KeyboardShortcut _ -> 1
  Phrase_ p -> rankPhrase p
 
 runRoot = \case
@@ -810,5 +804,4 @@ realMain = do
 
 main = do
  realMain
-
 

@@ -120,7 +120,7 @@ instance (PressArg a, PressFun f) => PressFun (a -> f)  where
 data ModifierSynonym = M | C | S | O | F
 
 pattern :: ModifierSynonym -> Modifier
-pattern M = Command
+pattern M = CommandMod
 pattern C = Control
 pattern S = Shift
 pattern O = Option

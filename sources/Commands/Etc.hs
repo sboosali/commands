@@ -78,6 +78,9 @@ failed = throwM . userError
 failure :: Name -> Possibly a
 failure = throwM . userError . showName
 
+bug :: SomeException -> a
+bug = error . show
+
 showName :: Name -> String
 showName = either show showGUI . fromGlobalName
 
@@ -165,7 +168,6 @@ hashAlphanumeric = flip showHex "" . abs . hash
 --
 data Exists f = Exists {unExists :: forall x. (f x)}
 
-
 nonemptyHead :: Lens' (NonEmpty a) a
 nonemptyHead = lens
  (\(x :| _)    -> x)
@@ -251,7 +253,6 @@ sccs2cycles = mapMaybe $ \case
 snoc :: [a] -> a -> [a]
 snoc xs x = xs <> [x]
 
-
 data Address = Address
  { _host :: Host
  , _port :: Port
@@ -266,6 +267,10 @@ displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown)
 
 -- | a natural transformation
 type (:~>:) f g = forall x. f x -> g x
+
+-- | @($>) = flip ('<$')@
+($>) :: (Functor f) => f a -> b -> f b
+($>) = flip (<$)
 
 
 -- ================================================================ --

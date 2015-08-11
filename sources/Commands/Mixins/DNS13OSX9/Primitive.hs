@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, NamedFieldPuns, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell                                            #-}
 module Commands.Mixins.DNS13OSX9.Primitive where
-import           Commands.Backends.OSX.Types     hiding (Command)
+import           Commands.Backends.OSX.Types
 import           Commands.Core
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9.Types

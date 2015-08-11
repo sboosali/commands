@@ -16,7 +16,7 @@ module Commands.Sugar.Alias where
 import Commands.Backends.OSX.Types
 
 
-met = Command
+met = CommandMod
 ctrl = Control
 shift = Shift
 alt = Option

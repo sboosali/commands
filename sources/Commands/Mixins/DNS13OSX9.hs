@@ -35,7 +35,6 @@ import Control.Monad.Catch (MonadThrow (..))
 import           Data.Char
 import Control.Exception (Exception (..), SomeException (..))
 import Data.Monoid              ((<>))
-import           Control.Arrow                   ((>>>))
 import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
 import           Data.Foldable
@@ -737,3 +736,10 @@ deriving instance Exception DNSGrammarException
 type RULED f s a = f (E.Rule s a) a
 -- needs LiberalTypeSynonyms when f is a type synonym, I think.
 
+type R z a = DNSEarleyRHS z a
+
+type R_ a = forall z. DNSEarleyRHS z a
+
+type C z a = DNSEarleyCommand z a
+
+type C_ a = forall z. DNSEarleyCommand z a

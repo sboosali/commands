@@ -200,6 +200,14 @@ foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
  go :: forall x. RHS n t f x -> b
  go = foldRHS fromN fromT fromF unit mul add opt_ many_ some_
 
+{- | unwraps a 'NonTerminal', otherwise preserves the input.
+when NonTerminals are interpreted as tagging a right-hand side with a left-hand side for "sharing", this function should "unshare" its input from other right-hand side expressions with the same "name".
+-}
+inlineRHS :: RHS n t f a -> RHS n t f a
+inlineRHS = \case
+ NonTerminal _ r -> r
+ r -> r
+
 -- a Traversal?
 renameRHS'
  :: forall m n1 n2 t f a. (Applicative m)

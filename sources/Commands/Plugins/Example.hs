@@ -71,7 +71,7 @@ spirosSetup settings = do
 
  let address = Address (Host "192.168.56.1") (Port (settings&vPort))
 
- shimSerialize address (settings&vConfig&vGrammar) & \case
+ applyShim getShim address (settings&vConfig&vGrammar) & \case
   Left e -> do
    return$ Left(VError (show e))
   Right (PythonFile shim) -> do

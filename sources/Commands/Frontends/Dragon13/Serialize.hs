@@ -296,18 +296,16 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 
 -- ================================================================ --
 
-{- | serialize a grammar (with 'serializeGrammar') into a Python file, unless:
+{- | interpolate a serialized grammar into a Python file template, unless:
 
-* the grammars terminals/non-terminals don't "lex" (with 'escapeDNSGrammar')
 * the Python file doesn't parse (with 'newPythonFile')
 
->>> let Right{} = shimSerialize "'localhost'" (serializeGrammar grammar)
-
-a Kleisli arrow (when partially applied).
+>>> import qualified Commands.Frontends.Dragon13.Shim
+>>> let Right{} = applyShim 'Commands.Frontends.Dragon13.Shim.getShim' "\'localhost\'" ('serializeGrammar' grammar)
 
 -}
-shimSerialize :: Address -> SerializedGrammar -> Possibly PythonFile
-shimSerialize address = newPythonFile . displayDoc . getShim . from_SerializedGrammar_to_ShimR address
+applyShim :: (ShimR Doc -> Doc) -> Address -> SerializedGrammar -> Possibly PythonFile
+applyShim getShim_ address = newPythonFile . displayDoc . getShim_ . from_SerializedGrammar_to_ShimR address
 
 {- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
 

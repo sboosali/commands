@@ -2,6 +2,7 @@
 {-# LANGUAGE LiberalTypeSynonyms, NamedFieldPuns, PartialTypeSignatures     #-}
 {-# LANGUAGE PatternSynonyms, PostfixOperators, RankNTypes, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections            #-}
+{-# LANGUAGE ViewPatterns                                                   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Root where
@@ -12,6 +13,7 @@ import           Commands.Frontends.Dragon13.Serialize
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Phrase
 import           Commands.Plugins.Example.Press
+import           Commands.Plugins.Example.Shortcut
 import           Commands.Plugins.Example.Spacing
 import           Commands.Servers.Servant
 import           Commands.Sugar.Alias
@@ -33,6 +35,7 @@ import qualified Data.Text.Lazy.IO                     as T
 import           Data.Typeable
 import           Language.Python.Version2.Parser       (parseModule)
 import           Numeric.Natural                       ()
+import qualified System.FilePath.Posix                 as FilePath
 import qualified Text.Earley.Internal                  as E
 import qualified Text.Parsec                           as Parsec
 import           Text.PrettyPrint.Leijen.Text          hiding (brackets, empty,
@@ -72,11 +75,13 @@ data Root
  deriving (Show,Eq)
 
 
+roots = 'roots
+ <=> Repeat <$> positive <*> root --TODO no recursion for now
+ <|> root
 
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root :: R z Root
 root = 'root <=> empty
- -- <|> Repeat      <#> positive # root-- TODO no recursion for now
  <|> ReplaceWith <#> "replace" # phrase_ # "with" # phrase_ -- TODO
  -- TODO <|> ReplaceWith <#> "replace" # phrase # "with" # (phrase <|>? "blank")
  <|> Undo        <#> "no"         -- order matters..
@@ -254,6 +259,17 @@ button = qualifiedGrammar
 
 positive = 'positive
  <=> Positive <$> (asum . fmap int) [1..9]
+ -- <|> Positive 0 <#> "zero"
+ -- <|> Positive 1 <#> "one"
+ <|> Positive 2 <#> "two"
+ <|> Positive 3 <#> "three"
+ <|> Positive 4 <#> "four"
+ <|> Positive 5 <#> "five"
+ <|> Positive 6 <#> "six"
+ <|> Positive 7 <#> "seven"
+ <|> Positive 8 <#> "eight"
+ <|> Positive 9 <#> "nine"
+ <|> Positive 10 <#> "ten"
 
 
 {-
@@ -296,7 +312,7 @@ positive = 'positive
 -- ================================================================ --
 
 rootCommand :: C z Root
-rootCommand = Command root (argmax rankRoot) runRoot
+rootCommand = Command roots (argmax rankRoot) runRoot
 
 rankRoot = \case                --TODO fold over every field of every case, normalizing each case
  Repeat _ r -> rankRoot r
@@ -310,13 +326,15 @@ rankRoot = \case                --TODO fold over every field of every case, norm
 
 runRoot = \case
 
- "emacs" -> \case
+ (isEmacs -> Just x') -> \case
+   Repeat n' c' -> replicateM_ (getPositive n') $ runRoot x' c' --TODO avoid duplication.
    ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
    Edit_ a' -> editEmacs a'
    Move_ a' -> moveEmacs a'
-   x' -> runRoot_ x'
+   a' -> runRoot_ a'
 
- "Intellij" -> \case
+ x'@"Intellij" -> \case --TODO passed down context better
+   Repeat n' c' -> replicateM_ (getPositive n') $ runRoot x' c'
    ReplaceWith this that -> do
      press M r
      (munge this >>= insert) >> press tab
@@ -324,8 +342,8 @@ runRoot = \case
    x' -> runRoot_ x'
 
  context -> \case
-   Repeat n' c' -> replicateM_ (getPositive n') $ runRoot context c'
-   x' -> runRoot_ x'
+   Repeat n' c' -> replicateM_ (getPositive n') $ runRoot context c' --TODO action grouping: insert nullop between each, for logging
+   x'           -> runRoot_ x'
 
  where
  -- unconditional runRoot (i.e. any context / global context)
@@ -338,7 +356,7 @@ runRoot = \case
 
   KeyRiff_ kr -> runKeyRiff kr
 
-  _ -> nothing
+  _ -> do nothing
 
 -- TODO Frozen r -> \case
 --    _ -> pretty print the tree of commands, both as a tree and as the flat recognition,
@@ -346,6 +364,11 @@ runRoot = \case
 
 type ElispSexp = String
 -- -- type ElispSexp = Sexp String String
+
+
+isEmacs x = if FilePath.takeBaseName x `elem` ["Emacs","Work","Notes","Diary","Obs"]
+ then Just x
+ else Nothing
 
 nothing = return ()
 

@@ -1,46 +1,30 @@
-{-# LANGUAGE  TemplateHaskell, OverloadedStrings, PostfixOperators, RankNTypes, RecursiveDo, LambdaCase       #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, PostfixOperators, RankNTypes #-}
+{-# LANGUAGE RecursiveDo, TemplateHaskell                                #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Press where
-import Commands.Etc
-import Commands.Backends.OSX
-import Commands.Mixins.DNS13OSX9
-import Commands.Plugins.Example.Phrase (character)
+import           Commands.Backends.OSX
+import           Commands.Etc
+import           Commands.Mixins.DNS13OSX9
+import           Commands.Plugins.Example.Phrase (character)
 
-import qualified Text.Earley                  as E
-import qualified Data.List.NonEmpty as NonEmpty
-import           Data.Text.Lazy                 (Text)
+import qualified Data.List.NonEmpty              as NonEmpty
+import qualified Text.Earley                     as E
 
-import Control.Applicative
-import Data.Foldable (traverse_)
-import Data.Char (isAlphaNum)
-import           GHC.Exts                        (IsString (..))
+import           Control.Applicative
+import           Data.Char                       (isAlphaNum)
+import           Data.Foldable                   (traverse_)
 
 
 type KeyRiff  = [KeyChord]
 type KeyChord = KeyPress
--- pattern = KeyPress [] PatternSynonyms
-
--- TODO global context (e.g. all Apps) should be overridden by a local context (e.g. some App)
-myShortcuts = 'myShortcuts <=> shortcuts
- [ "undo"-: "M-z"
- -- , ""-: ""
- , "salt"-: "M-a"
- ]
- -- <|> "copy" $> [KeyPress [CommandMod] CKey]
- -- <|> "copy" $> keys"M-c"
-
-shortcuts :: (Functor'RHS n Text f) => [(String,String)] -> RHS n Text f KeyRiff
-shortcuts = foldMap $ \case
- ("","") -> empty               -- for convenience
- (s, k) -> keys k <$ fromString s
 
 -- | a riff is some chords?
 keyriff :: R z KeyRiff
 keyriff = 'keyriff
  <=> "press" *> (keychord-++)
 
--- | the terminals in key and modifier are disjoint; otherwise, there is ambiguity. 
+-- | the terminals in key and modifier are disjoint; otherwise, there is ambiguity.
 keychord :: R z KeyChord
 keychord = 'keychord
  <=> moveShift <$> (modifier-*) <*> key
@@ -54,15 +38,16 @@ modifier = 'modifier
  <|> "alt"   $> Option
  <|> "fun"   $> Function
 
--- | a non-modifier key
---
--- 'Key's and 'Char'acters are "incomparable sets":
---
--- * many modifiers are keys that aren't characters (e.g. 'CommandKey')
--- * many nonprintable characters are not keys (e.g. @\'\\0\'@)
---
--- so we can't embed the one into the other, but we'll just keep things simple with duplication.
---
+{- | a non-modifier key
+
+'Key's and 'Char'acters are "incomparable sets":
+
+* many modifiers are keys that aren't characters (e.g. 'CommandKey')
+* many nonprintable characters are not keys (e.g. @\'\\0\'@)
+
+so we can't embed the one into the other, but we'll just keep things simple with duplication.
+
+-}
 key :: R z KeyPress
 key = 'key
  <=> ((either __BUG__ id) . char2keypress) <$> (inlineRHS(character))
@@ -76,28 +61,49 @@ key = 'key
  <|> "del" $> KeyPress [] DeleteKey
  <|> "cape" $> KeyPress [] EscapeKey
 --  <|> functionKey
-
 -- functionKey = empty
- <|> "eff one" $> KeyPress [] F1Key  -- can DNS vocabularies handle strings with multiple tokens
- <|> "eff two" $> KeyPress [] F2Key
- <|> "eff three" $> KeyPress [] F3Key
- <|> "eff four" $> KeyPress [] F4Key
- <|> "eff five" $> KeyPress [] F5Key
- <|> "eff six" $> KeyPress [] F6Key
- <|> "eff seven" $> KeyPress [] F7Key
- <|> "eff eight" $> KeyPress [] F8Key
- <|> "eff nine" $> KeyPress [] F9Key
- <|> "eff ten" $> KeyPress [] F10Key
- <|> "eff eleven" $> KeyPress [] F11Key
- <|> "eff twelve" $> KeyPress [] F12Key
- <|> "eff thirteen" $> KeyPress [] F13Key
- <|> "eff fourteen" $> KeyPress [] F14Key
- <|> "eff fifteen" $> KeyPress [] F15Key
- <|> "eff sixteen" $> KeyPress [] F16Key
- <|> "eff seventeen" $> KeyPress [] F17Key
- <|> "eff eighteen" $> KeyPress [] F18Key
- <|> "eff nineteen" $> KeyPress [] F19Key
- <|> "eff twenty" $> KeyPress [] F20Key
+ <|> "F1" $> KeyPress [] F1Key
+ <|> "F2" $> KeyPress [] F2Key
+ <|> "F3" $> KeyPress [] F3Key
+ <|> "F4" $> KeyPress [] F4Key
+ <|> "F5" $> KeyPress [] F5Key
+ <|> "F6" $> KeyPress [] F6Key
+ <|> "F7" $> KeyPress [] F7Key
+ <|> "F8" $> KeyPress [] F8Key
+ <|> "F9" $> KeyPress [] F9Key
+ <|> "F10" $> KeyPress [] F10Key
+ <|> "F11" $> KeyPress [] F11Key
+ <|> "F12" $> KeyPress [] F12Key
+ <|> "F13" $> KeyPress [] F13Key
+ <|> "F14" $> KeyPress [] F14Key
+ <|> "F15" $> KeyPress [] F15Key
+ <|> "F16" $> KeyPress [] F16Key
+ <|> "F17" $> KeyPress [] F17Key
+ <|> "F18" $> KeyPress [] F18Key
+ <|> "F19" $> KeyPress [] F19Key
+ <|> "F20" $> KeyPress [] F20Key
+
+-- -- functionKey = empty
+--  <|> "eff one" $> KeyPress [] F1Key  -- can DNS vocabularies handle strings with multiple tokens?
+--  <|> "eff two" $> KeyPress [] F2Key
+--  <|> "eff three" $> KeyPress [] F3Key
+--  <|> "eff four" $> KeyPress [] F4Key
+--  <|> "eff five" $> KeyPress [] F5Key
+--  <|> "eff six" $> KeyPress [] F6Key
+--  <|> "eff seven" $> KeyPress [] F7Key
+--  <|> "eff eight" $> KeyPress [] F8Key
+--  <|> "eff nine" $> KeyPress [] F9Key
+--  <|> "eff ten" $> KeyPress [] F10Key
+--  <|> "eff eleven" $> KeyPress [] F11Key
+--  <|> "eff twelve" $> KeyPress [] F12Key
+--  <|> "eff thirteen" $> KeyPress [] F13Key
+--  <|> "eff fourteen" $> KeyPress [] F14Key
+--  <|> "eff fifteen" $> KeyPress [] F15Key
+--  <|> "eff sixteen" $> KeyPress [] F16Key
+--  <|> "eff seventeen" $> KeyPress [] F17Key
+--  <|> "eff eighteen" $> KeyPress [] F18Key
+--  <|> "eff nineteen" $> KeyPress [] F19Key
+--  <|> "eff twenty" $> KeyPress [] F20Key
 
 -- | an ordinal numeral
 ordinal = 'ordinal
@@ -133,9 +139,29 @@ ordinal = 'ordinal
 runKeyRiff :: KeyRiff -> Actions_
 runKeyRiff = traverse_ (\(KeyPress mods k) -> sendKeyPress mods k)
 
+{- | parser for Emacs-like keybindings syntax.
+
+partial function.
+
+>>> keys"a"
+[([],AKey)]
+
+>>> keys"C-M-b"
+[([Control,CommandMod],BKey)]
+
+>>> keys"M-S-a"
+[([CommandMod, Shift],AKey)]
+
+>>> keys"M-A"
+[([CommandMod, Shift],AKey)]
+
+>>> keys"C-x o C-x b"
+[([Control],XKey),([],OKey),([Control],XKey),([],BKey)]
+
+-}
 keys :: [Char] -> KeyRiff
 keys cs = either (error.show) NonEmpty.head . toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
--- bimapEither toException . 
+-- bimapEither toException .
  where
  strip :: String -> String
  strip = rstrip . lstrip

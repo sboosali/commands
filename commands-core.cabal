@@ -114,6 +114,9 @@ library
   Commands.Plugins.Example.Phrase
   Commands.Plugins.Example.Spacing
   Commands.Plugins.Example.Press
+  Commands.Plugins.Example.Shortcut
+
+
 
   Data.RefCache
   Data.RefCache.Internal
@@ -122,6 +125,7 @@ library
   Data.RefCache.Etc
 
   Data.Sexp
+
 
  c-sources:        cbits/objc_actor.m
  include-dirs:     cbits
@@ -142,8 +146,8 @@ library
 -- https://downloads.haskell.org/~ghc/7.10.1/docs/html/users_guide/release-7-10-1.html
   , transformers              ==0.4.2.*
   , ghc-prim  ==0.4.0.0
-  , base-prelude ==0.1.*
 
+  , filepath ==1.4.*
   , vinyl  ==0.5.*
   , exceptions                ==0.6.*
   , lens                      ==4.9.*

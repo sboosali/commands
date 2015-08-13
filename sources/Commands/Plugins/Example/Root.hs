@@ -3,61 +3,37 @@
 {-# LANGUAGE PatternSynonyms, PostfixOperators, RankNTypes, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, TemplateHaskell, TupleSections            #-}
 {-# LANGUAGE ViewPatterns                                                   #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-unused-do-bind -fno-warn-orphans -fno-warn-unused-imports -fno-warn-partial-type-signatures #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures #-}  -- fewer type signatures (i.e. more type inference) makes the file more "config-like"
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Root where
 import           Commands.Backends.OSX
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
-import           Commands.Frontends.Dragon13.Serialize
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Phrase
 import           Commands.Plugins.Example.Press
 import           Commands.Plugins.Example.Shortcut
 import           Commands.Plugins.Example.Spacing
-import           Commands.Servers.Servant
 import           Commands.Sugar.Alias
 import           Commands.Sugar.Press
 
-import           Control.Applicative.Permutation
 import           Control.Concurrent.Async
 import           Control.Lens                          hiding (from, ( # ))
-import           Control.Monad.Catch                   (SomeException, catches)
-import qualified Data.Aeson                            as J
-import           Data.Bifunctor                        (second)
-import           Data.Bitraversable
-import qualified Data.ByteString.Lazy.Char8            as B
-import           Data.IORef
-import           Data.List.NonEmpty                    (NonEmpty (..), fromList)
-import qualified Data.List.NonEmpty                    as NonEmpty
+import           Data.List.NonEmpty                    (NonEmpty (..))
 import qualified Data.Text.Lazy                        as T
 import qualified Data.Text.Lazy.IO                     as T
 import           Data.Typeable
-import           Language.Python.Version2.Parser       (parseModule)
 import           Numeric.Natural                       ()
 import qualified System.FilePath.Posix                 as FilePath
-import qualified Text.Earley.Internal                  as E
-import qualified Text.Parsec                           as Parsec
-import           Text.PrettyPrint.Leijen.Text          hiding (brackets, empty,
-                                                        int, (<$>), (<>))
 
 import           Control.Applicative                   hiding (many, optional)
-import           Control.Arrow                         ((>>>))
-import           Control.Concurrent
-import           Control.Monad                         (replicateM_, void,
-                                                        (<=<), (>=>))
-import           Control.Monad.Reader                  (asks)
-import           Control.Parallel
-import           Data.Char                             (toUpper)
-import           Data.Either                           (either)
+import           Control.Monad                         (replicateM_, (>=>))
+-- import           Control.Parallel
 import           Data.Foldable                         (Foldable (..), asum,
                                                         traverse_)
 import qualified Data.List                             as List
-import qualified Data.Map                              as Map
 import           Data.Monoid
-import           Data.Unique
 import           Prelude                               hiding (foldl, foldr1)
-import           System.IO.Unsafe
 import           System.Timeout                        (timeout)
 
 
@@ -626,14 +602,6 @@ attemptAsynchronously seconds action = do
 
 attempt = attemptAsynchronously 1
 
--- runRuleParser
---  :: (forall z. Rule (EarleyProduction z l) r l t a)
---  -> [t]
---  -> Possibly (NonEmpty a)
--- runRuleParser rule ts = case toEarleyError $ runEarleyProduction (rule^.ruleParser) ts of
---  Left  e  -> throwM e
---  Right xs -> return xs
-
 attemptMunge :: String -> IO ()
 attemptMunge s = do
  putStrLn ""
@@ -681,7 +649,6 @@ attemptParse rule s = do
  attempt $ parseThrow rule ((T.words . T.pack) s) >>= \case
   x :| _ -> print x
 
--- TODO remove the [{emptyList}]
 attemptSerialize rhs = attemptAsynchronously 3 $ do
  serialized <- formatRHS rhs
  either print printSerializedGrammar serialized
@@ -692,35 +659,6 @@ printSerializedGrammar SerializedGrammar{..} = do
  putStrLn ""
  T.putStrLn $ displayDoc serializedLists
 
--- failingParse grammar s = do
---  putStrLn ""
---  attempt $ case grammar `parses` s of
---   Left e  -> do
---    putStrLn "should fail, and it did:"
---    putStrLn $ "error = " <> show e
---   Right a -> do
---    putStrLn "should fail, but succeeded:"
---    putStrLn $ "input  = " <> show s
---    putStrLn $ "output = " <> show a
-
--- attemptCompile c x s = case r `parses` s of
---   Left  e -> print e
---   Right a -> do
---    putStrLn ""
---    print a
---    putStrLn $ showActions $ (c `compiles` a) x
---  where r = c ^. comRule
-
--- attemptPython g = do
---  let Right sg = serialized g
---  let addresses = (Address ("'192.168.56.1'") ("8080"), Address ("'192.168.56.101'") ("8080"))
---  PythonFile pf <- shimSerialization addresses sg
---  runActions $ setClipboard (T.unpack pf)
---  T.putStrLn $ pf
---  -- TODO why does the unary Test fail? Optimization?
-
--- attemptInterpret = ()
-
 
 
 realMain = do
@@ -728,104 +666,8 @@ realMain = do
  putStrLn ""
  let rootG = root
  attemptSerialize rootG
- -- attemptSerialize phrase
-
- -- putStrLn ""
- -- attemptParse phraseC "say 638 Pine St., Redwood City 94063"
-
---  putStrLn ""
---  -- Error (line 1, column 1): unexpected 's'
---  -- expecting positive__Commands.Plugins.Example__commands-core-0.0.0, "replace", "no", "no way", click__Commands.Plugins.Example__commands-core-0.0.0, edit__Commands.Plugins.Example__commands-core-0.0.0 or end of input
---  attemptParse rootG "say 638 Pine St., Redwood City 94063"
---  -- when we remove the alternatives which are listed in the error above:
---  -- Phrase_ (List [List [Atom (Right (PWord "638")),Atom (Right (PWord "Pine")),Atom (Right (PWord "St.,")),Atom (Right (PWord "Redwood")),Atom (Right (PWord "City")),Atom (Right (PWord "94063"))]])
-
---  -- prefix succeeds, but the whole should fail
---  -- should it fail? If it backtracks sufficiently, the wildcard (dictation in phrase, a later alternative) can match it
---  -- Otherwise, any prefix must be escaped (e.g. by "lit")
---  failingParse rootG "no bad"
---  -- when we remove the alternatives which are listed in the error above:
---  -- should fail, but succeeded:
---  -- "input  = \"no BAD\""
---  -- "output = Phrase_ (List [List [Atom (Right (PWord \"no\"))],Atom (Right (PAcronym \"BAD\"))])"
-
---  attemptParse (multipleG rootG) "no no 1 replace this and that with that and this"
---  attemptParse click "click"
---  -- attemptParse directions "directions from Redwood City to San Francisco by public transit"
---  print $ getWords (rootG ^. gramGrammar)
-
-
---  putStrLn ""
---  traverse_ (attemptParse $ root^.comGrammar)
---   [ "no"
---   , "replace this and that with that and this"  -- "this and that" -> "that and this"
---   , "replace paste with blank"                  --  ~ delete the clipboard between here and the end of the buffer
---   , "replace par round grave camel lit with async break break action with blank"  -- "(`withAsync` action)" -> ""
---   ]
-
---  putStrLn ""
---  attemptCompile root "emacs" "replace clipboard contents with paste"
-
---  attemptParse move  "back word"
---  attemptParse move  "up line"
---  attemptParse rootG "back word"
---  attemptParse rootG "up line"
-
---  -- the keys are in the right order, and multiple modifiers applied to each
---  putStrLn $ showActions $ press C M tab ZKey 'O' "abc" 1 (-123)
---  putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
---  -- runActions $ google "some words" -- it works
-
---  putStrLn $ showActions $ editEmacs (Edit Google Whole Line)
---  putStrLn $ showActions $ editEmacs (Edit Cut Backwards Word_)
-
---  attemptParse edit "cop"
---  attemptParse edit "word"
-
---  attemptParse rootG "kill for line" --
---  attemptParse edit "kill for line" --
---  attemptParse edit "kill"
-
-
-
-
-
-
---  putStrLn ""
---  traverse_ attemptMunge_
---   [ "coal server space tick local"  -- :server 'local --
--- -- "curly eah I was I had fun a I didn't care about the delays them happy to talk I felt like you wanted toto your thingspaced coal server tick local coal key value"  -- {:server 'local :key value}
---  -- where {spaced} means {| all isAlphaNum l && all isAlphaNum r -> " "} i.e. space out words always
---   , "camel quote double great equals unquote space eek ace par great great eek"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
---   -- , "camel quote double greater equal unquote spaced equals par double greater equal"  -- doubleGreaterEquals = (>>=) -- "doubleGreaterSpacedEqualEquals(doublegreaterequal)" -- "\"Double>ErEqualUnquote   d equals (double>erequal)"
---   , "class unit test spell M T A"  -- UnitTestMTA
---   , "camel M T A bid optimization"  -- mtaBidOptimization -- "mTABidOptimization"
---   , "class spell M T A bid optimization"  -- MTABidOptimization
---   , "spell M T A class bid optimization"  -- MTABidOptimization -- "mta BidOptimization"
---   , "class M T A bid optimization"  -- MTABidOptimization
---   , "class spell M TA bid optimization"  -- MTABidOptimization
---   , "lit say camel say some words"  -- say someWords
---   , "upper paste"
---   , "camel paste" -- "clipboard contents"
---   , "class paste" -- "clipboard contents"
---   , "lore grave camel with async grave space action roar"  -- (`withAsync` action) -- "lore grave withAsyncGraveSpaceActionRoar"
---   , "par round grave camel with async break break action"  -- (`withAsync`action) -- "(`withAsync`action)"
---   , "par round grave camel with async break space action"  -- (`withAsync` action) -- "(`withAsync`action)"
---   ]  -- TODO "spaced" only modifies the one token to the right, unlike the other joiners which modify all tokens to the right
-
-
-
- -- attemptParse edit "kill"          -- Edit Cut    Forwards Line
- -- attemptParse edit "kill for line" -- Edit Cut    Forwards Line
- -- attemptParse edit "del"           -- Edit Delete Whole    That
-
- -- putStrLn ""
- -- attemptMungeAll "coal server space tick local"
 
  attemptMunge "par round grave camel lit with async break break action"
-
- -- attemptParse (root^.comRule) "replace par round grave camel lit with async break break action with blank"
- -- Earley is too slow without sharing, even with phraseW
 
 main = do
  realMain

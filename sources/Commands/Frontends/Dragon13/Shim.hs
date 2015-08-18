@@ -64,12 +64,12 @@ getShim :: ShimR Doc    -> Doc
 inside the 'qc', "what you see is what you get", besides:
 
 * escaping backslashes (e.g. @r'\\\\'@ renders as r'\\')
-* interpolating between braces (e.g. @{...}@ is not a dict). the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with the quasiquoter's interpolation syntax.
-
+* interpolating between braces (e.g. @{...}@ is not a dict). the quasiquote must use @dict(a=1)@ rather than @{'a':1}@ to not conflict with the quasiquoter's interpolation syntax, or escape the first curly brace (e.g. @\{...}@).
+ hello are some words detect Unicode thing speak detect Unicode
 -}
 getShim :: (IsString t, Monoid t) => ShimR t -> t
 getShim ShimR{..} = [qc|
-
+#-*- coding: utf-8 -*-
 # _commands.py
 
 # natlink13 library
@@ -79,17 +79,23 @@ from natlinkutils import (GrammarBase)
 # standard library
 import time
 import json
-from urllib2 import urlopen
-
+import urllib2
+import traceback
 
 # interpolated from "H"askell
 
 H_RULES  = {__rules__}
 H_LISTS  = {__lists__}
 H_EXPORT = {__export__}
-
 H_SERVER_HOST = {__serverHost__}
 H_SERVER_PORT = {__serverPort__}
+
+# e.g.
+# H_RULES  = '''<test> exported = \{test};'''
+# H_LISTS  = \{'test', ['upcase region']}
+# H_EXPORT = 'test'
+# H_SERVER_HOST = "192.168.56.1"
+# H_SERVER_PORT = '8666'
 
 server_address = "http://%s:%s/" % (H_SERVER_HOST, H_SERVER_PORT)
 
@@ -103,7 +109,7 @@ class NarcissisticGrammar(GrammarBase):
     * load(.., hypothesis=1)     means: every hypothesis, before the recognition, triggers gotHypothesis
     * activate(.., exclusive=1)  means: deactivate every other non-exclusive rule
 
-    (when both flags are set, NarcissisticGrammar.gotResultsObject is called on
+    (when both flags are set on load, NarcissisticGrammar.gotResultsObject is called on
     every recognition of every exclusive rule, including this class's rules
     of course, though I only expect this class to be active).
 
@@ -119,44 +125,52 @@ class NarcissisticGrammar(GrammarBase):
     # called when speech is detected before recognition begins.
     def gotBegin(self, moduleInfo):
         # handleDGNContextResponse(timeit("/context", urlopen, ("%s/context" % server_address), timeout=0.1))
-        # TODO parameterize " Context"
+        # TODO parameterize "context" API
 
         print
         print
         print "-  -  -  -  gotBegin  -  -  -  -"
         # moduleInfo is just the current window in Windows
-        # print moduleInfo
 
     def gotHypothesis(self, words):
         print
-        print "-  -  -  -  gotHypothesis  -  -  -  -"
+        print "---------- gotHypothesis -------------"
         print words
 
     def gotResultsObject(self, recognitionType, resultsObject):
+        print "---------- gotResultsObject ----------"
         words = next(get_results(resultsObject), [])
         data  = munge_recognition(words)
-        url   = "%s/recognition/" % (server_address,)        # TODO parameterize "recognition"
+        url   = "%s/recognition/" % (server_address,)        # TODO parameterize "recognition" API
+
+        # print 'resultsObject =',resultsObject
+        print 'words =', words
+        print 'url =', url
+        print 'data =', json.dumps(data)
 
         try:
-            response = timeit(url, urlopen, url=url, data=json.dumps(data), timeout=0.1)
-            handleDGNUpdate(self, response)
+            request  = urllib2.Request(url, json.dumps(data), \{"Content-Type": "application/json"})
+            response = urllib2.urlopen(request)
+            pass
         except Exception as e:
             print
+            print "---------- error ------------------"
             print "sending the request and/or handling the response threw:"
             print e
+            print traceback.format_exc()
 
         # don't print until the request is sent the response is handled
         try:
             print
-            print "---------- gotResultsObject ----------"
-            print "words  =", words
             print "status =", response.getcode()
             print "body   =", response
         except NameError:
             print
         except Exception as e:
             print
+            print "---------- error ------------------"
             print e
+            print traceback.format_exc()
 
     # for debugging only, shows whether specific rules (rather than the generic dgndictation) are matching the recognition
     # not called when (self.doOnlyGotResultsObject=True)
@@ -176,10 +190,17 @@ class NarcissisticGrammar(GrammarBase):
     def set_lists(self, lists):
         for (lhs, rhs) in lists.items():
             self.setList(lhs, rhs)
-
+'
     # activateSet is idempotent, unlike activate
     def set_exports(self, exports):
         self.activateSet(exports, exclusive=1)
+
+
+# API
+
+# TODO             handleDGNUpdate(self, response)
+def handleDGNUpdate(self, response):
+    pass
 
 
 # helpers
@@ -234,4 +255,3 @@ def unload():
 
 load()
 |]
-

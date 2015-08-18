@@ -15,5 +15,5 @@ main = mainWith =<< getArgs
 mainWith = \case
  ["serve"] -> do
   Example.spirosServer
- -- _ -> Example.main
+ -- _ -> Example.mainExample
  _ -> Press.mainPress

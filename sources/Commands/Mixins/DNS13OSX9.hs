@@ -1,6 +1,6 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, DeriveAnyClass     #-}
 {-# LANGUAGE ExistentialQuantification              #-}
-{-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase              #-}
+{-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase, LiberalTypeSynonyms              #-}
 {-# LANGUAGE PartialTypeSignatures, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, EmptyCase         #-}
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies #-}
@@ -38,12 +38,12 @@ import Data.Monoid              ((<>))
 import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
 import           Data.Foldable
-import           Data.Function                   (on)
 import           Data.IORef
 import           Data.Proxy
 import           Data.Typeable
 import           Data.STRef
 import           Data.Unique
+import           Data.Function                   (on)
 import Control.Monad.Trans.State
 import Control.Comonad.Cofree
 import qualified Data.List as List
@@ -282,11 +282,12 @@ parseRaw r ts = E.fullParses$ runEarley r ts
 
 type EarleyEither e t = Either (E.Report e [t])
 
-e'ParseBest :: EarleyParser_ a -> [Text] -> EarleyEither String Text a
-e'ParseBest p ts = do
- parses <- toEarleyEither (E.fullParses (buildEarley (p&pProd) ts))
- return$ (p&pBest) parses
- where
+e'ParseBest :: (forall r. RULED EarleyParser r a) -> [Text] -> EarleyEither String Text a
+e'ParseBest p ts = (p&pBest) <$> e'ParseAll (p&pProd) ts
+
+e'ParseAll :: (forall r. RULED EarleyProd r a) -> [Text] -> EarleyEither String Text (NonEmpty a)
+e'ParseAll p ts = toEarleyEither (E.fullParses (buildEarley p ts))
+ -- where
  -- report = E.fullParses result
  -- result = buildEarley (p&pProd) ts
 
@@ -336,12 +337,6 @@ parseList r ts = as
 
 parseString :: (forall r. DNSEarleyRHS r a) -> String -> [a]
 parseString r = parseList r . (T.words . T.pack)
-
-argmax :: Ord b => (a -> b) -> (NonEmpty a -> a)
-argmax f = maximumBy (compare `on` f)
--- argmax :: (a -> Int) -> (a -> a -> Ordering)
--- argmax f = maximumBy (comparing `on` f)
--- argmax f = maximumBy (\x y -> f x `compare` f y)
 
 
 
@@ -660,7 +655,7 @@ tidyGrammar = transformedGrammar (overCamelCase (filter (/= fmap toLower occ)) .
 --
 --
 vocabularyGrammar :: [String] -> DNSEarleyRHS z Text
-vocabularyGrammar = vocabulary
+vocabularyGrammar = tokens
 
 -- | the empty grammar. See 'UnitDNSRHS' (always matches, recognizing nothing) and 'unitEarleyParser' (always succeeds, parsing nothing).
 epsilon :: DNSEarleyRHS z ()
@@ -669,17 +664,20 @@ epsilon = simpleGrammar 'epsilon unitEarleyParser UnitDNSRHS
 
 --TODO generalize these introducers to any RHS, and use Text
 
-word :: (IsString t, Show t) => String -> RHS n t f t
-word = fromString
+token :: (IsString t, Show t) => String -> RHS n t f t
+token = fromString
 
 str :: String -> DNSEarleyRHS z Text
-str = word
+str = token
 
-vocabulary :: (IsString t, Show t, Functor'RHS n t f) => [String] -> RHS n t f t
-vocabulary = asum . fmap word
+vocab :: (IsString t, Show t, Functor'RHS n t f) => [(String, a)] -> RHS n t f a
+vocab = foldMap (\(s,x) -> x <$ token s)
+
+tokens :: (IsString t, Show t, Functor'RHS n t f) => [String] -> RHS n t f t
+tokens = foldMap token
 
 chr :: Char -> DNSEarleyRHS z Char
-chr c = c <$ word [c]
+chr c = c <$ token [c]
 
 -- | a specialization, @int = 'con'@, because integer literals are 'Num'-constrained polymorphic types.
 -- in the context we will be using it, we need a concrete type for type inference.
@@ -691,7 +689,7 @@ con = transformedCon (List.intercalate " " . unCamelCase)
 
 -- | make a 'Terminal' from the @transformed@ 'Show'n constructor, returning the constructor.
 transformedCon :: (Show a) => (String -> String) -> a -> DNSEarleyRHS z a
-transformedCon f x = x <$ (word . f . show $ x)
+transformedCon f x = x <$ (token . f . show $ x)
 
 -- | @= 'optionRHS' 'enumDefault' ...@
 optionalEnum :: (Enum a) => DNSEarleyRHS z a -> DNSEarleyRHS z a
@@ -707,7 +705,8 @@ optionalEnum = optionRHS enumDefault
 
 TODO safe with 'unsafePerformIO'?
 -}
-de'deriveParserObservedSharing :: DNSEarleyRHS (E.Rule s a) a -> ST s (E.Prod (E.Rule s a) String Text a)
+-- de'deriveParserObservedSharing :: RULED DNSEarleyRHS s a -> ST s (E.Prod (E.Rule s a) String Text a)
+de'deriveParserObservedSharing :: RULED DNSEarleyRHS s a -> ST s (RULED EarleyProd s a)
 de'deriveParserObservedSharing r1 = do
  r2 <- renameRHSToEarley >>= ($ r1)
  return$ induceEarley r2
@@ -735,6 +734,8 @@ deriving instance Exception DNSGrammarException
 -- | the Earley parse function takes a Rank2 type (forall r. E.Prod r ...) that it instantiates to (forall s. (E.Rule s a)); then runST takes a Rank2 type (forall s. ...s...). this package exposes the internals of Earley, but of course not of ST. this type synonym is for convenience.
 type RULED f s a = f (E.Rule s a) a
 -- needs LiberalTypeSynonyms when f is a type synonym, I think.
+
+type EarleyProd r = E.Prod r String Text
 
 type R z a = DNSEarleyRHS z a
 

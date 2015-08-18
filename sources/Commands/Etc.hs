@@ -23,6 +23,7 @@ import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
+import           Control.Applicative
 import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches)
@@ -30,6 +31,7 @@ import           Data.Graph
 import           Data.List                    (nub)
 import           Data.Maybe
 import           Data.Monoid                  ((<>))
+import           Data.Ord
 import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                tyConPackage, typeRep,
                                                typeRepTyCon)
@@ -287,6 +289,36 @@ fake dictionary literal syntax:
 (-:) :: a -> b -> (a,b)
 (-:) = (,)
 infix 1 -:
+
+{- | left-biased maximum.
+
+>>> 'maximumBy' ('comparing' 'snd') [('a',0),('b',0),('c',0)]
+('c',0)
+>>> maximumByL (comparing snd) [('a',0),('b',0),('c',0)]
+('a',0)
+
+-}
+maximumByL :: Foldable t => (a -> a -> Ordering) -> t a -> a
+maximumByL f = foldl1 pick
+ where
+ pick x y = case f x y of
+  GT -> x
+  EQ -> x
+  LT -> y
+
+{- |
+
+>>> argmax length ["0","abc",""]
+"abc"
+
+-}
+argmax :: Ord b => (a -> b) -> (NonEmpty a -> a)
+argmax f = maximumByL (comparing f)
+
+{- | interleave the effects of @g@ between the effects of @f@, collecting the results of @f@.
+-}
+interleaving :: (Alternative f) => f a -> f x -> f (NonEmpty a)
+interleaving f g = (:|) <$> f <*> many (g *> f)
 
 
 -- ================================================================ --

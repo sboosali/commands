@@ -18,27 +18,31 @@ import           Commands.Sugar.Alias
 import           Commands.Sugar.Press
 
 import           Control.Concurrent.Async
-import           Control.Lens                          hiding (from, ( # ))
-import           Data.List.NonEmpty                    (NonEmpty (..))
-import qualified Data.Text.Lazy                        as T
-import qualified Data.Text.Lazy.IO                     as T
+import           Control.Lens                      hiding (from, ( # ))
+import           Data.List.NonEmpty                (NonEmpty (..))
+import qualified Data.Text.Lazy                    as T
+import qualified Data.Text.Lazy.IO                 as T
 import           Data.Typeable
-import           Numeric.Natural                       ()
-import qualified System.FilePath.Posix                 as FilePath
+import           Numeric.Natural                   ()
+import qualified System.FilePath.Posix             as FilePath
 
-import           Control.Applicative                   hiding (many, optional)
-import           Control.Monad                         (replicateM_, (>=>))
+import           Control.Applicative               hiding (many, optional)
+import           Control.Monad                     (replicateM_, (>=>))
 -- import           Control.Parallel
-import           Data.Foldable                         (Foldable (..), asum,
-                                                        traverse_)
-import qualified Data.List                             as List
+import           Data.Foldable                     (Foldable (..), asum,
+                                                    traverse_)
+import qualified Data.List                         as List
 import           Data.Monoid
-import           Prelude                               hiding (foldl, foldr1)
-import           System.Timeout                        (timeout)
+import           Prelude                           hiding (foldl, foldr1)
+import           System.Timeout                    (timeout)
+-- import Control.Monad.ST
+import           Control.Monad.ST.Unsafe
+import           System.IO.Unsafe
 
 
 data Root
  = Repeat Positive Root
+ | Roots (NonEmpty Root)
  | Edit_ Edit
  | ReplaceWith Phrase' Phrase'
  | Click_ Click
@@ -50,10 +54,11 @@ data Root
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
-
+roots :: R z Root
 roots = 'roots
- <=> Repeat <$> positive <*> root --TODO no recursion for now
- <|> root
+ <=> Roots <$> root `interleaving` (token"then")
+ <|> Repeat <$> positive <*> root --TODO no recursion for now
+ <|> root --TODO redundant with the Roots case
 
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root :: R z Root
@@ -288,10 +293,20 @@ positive = 'positive
 -- ================================================================ --
 
 rootCommand :: C z Root
-rootCommand = Command roots (argmax rankRoot) runRoot
+rootCommand = Command roots bestRoot runRoot
+
+rootParser :: RULED EarleyParser s Root
+rootParser = EarleyParser rootProd bestRoot
+
+rootProd :: RULED EarleyProd s Root
+-- rootProd = runST $ de'deriveParserObservedSharing roots
+rootProd = unsafePerformIO$ unsafeSTToIO$ de'deriveParserObservedSharing roots
+
+bestRoot = argmax rankRoot
 
 rankRoot = \case                --TODO fold over every field of every case, normalizing each case
  Repeat _ r -> rankRoot r
+ Roots rs -> sum $ fmap rankRoot rs
  Edit_ _ -> 1
  Undo -> 1
  ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
@@ -303,6 +318,7 @@ rankRoot = \case                --TODO fold over every field of every case, norm
 runRoot = \case
 
  (isEmacs -> Just x') -> \case
+   Roots rs -> traverse_ (runRoot x') rs
    Repeat n' c' -> replicateM_ (getPositive n') $ runRoot x' c' --TODO avoid duplication.
    ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
    Edit_ a' -> editEmacs a'
@@ -310,6 +326,7 @@ runRoot = \case
    a' -> runRoot_ a'
 
  x'@"Intellij" -> \case --TODO passed down context better
+   Roots rs -> traverse_ (runRoot x') rs
    Repeat n' c' -> replicateM_ (getPositive n') $ runRoot x' c'
    ReplaceWith this that -> do
      press M r

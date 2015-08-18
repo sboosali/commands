@@ -190,7 +190,7 @@ class NarcissisticGrammar(GrammarBase):
     def set_lists(self, lists):
         for (lhs, rhs) in lists.items():
             self.setList(lhs, rhs)
-'
+
     # activateSet is idempotent, unlike activate
     def set_exports(self, exports):
         self.activateSet(exports, exclusive=1)

@@ -81,3 +81,4 @@ instance Arbitrary DNSName where
   n <- choose (1,3)
   let s = T.pack <$> resize n arbitrary
   DNSName <$> (s `suchThat` isDNSName)
+

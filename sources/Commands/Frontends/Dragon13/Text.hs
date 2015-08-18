@@ -80,8 +80,8 @@ isDNSName s = T.all isAscii s && case T.uncons s of
 
 -- | Its output should be:
 --
--- * safe to interpolate into any Python string (double-quoted or
--- single-quoted, docstring or not)
+-- * safe to interpolate into any (double-quoted) Python string
+-- (docstring or not)
 -- * the only whitespace are spaces
 -- * nonempty
 --
@@ -94,8 +94,6 @@ isDNSName s = T.all isAscii s && case T.uncons s of
 -- *** Exception: user error (escapeDNSText "some\nwords")
 -- >>> escapeDNSText "α"
 -- *** Exception: user error (escapeDNSText "\945")
--- >>> escapeDNSText "'"
--- *** Exception: user error (escapeDNSText "'")
 -- >>> escapeDNSText "\""
 -- *** Exception: user error (escapeDNSText "\"")
 -- >>> escapeDNSText ""
@@ -113,6 +111,5 @@ isDNSText s
   && T.all isAscii s
   && T.all isPrint s
   && T.all (isSpace --> (==' ')) s
-  && not ("'" `T.isInfixOf` s)
   && not ("\"" `T.isInfixOf` s)
   && not ("\\" `T.isInfixOf` s)

@@ -231,7 +231,7 @@ serializeLHS (DNSBuiltinList b)    = "{" <> text s <> "}"
 
 -- | wraps tokens containing whitespace with 'dquotes'.
 --
--- ignores the "written" field of 'DNSPronounced', only serializing
+-- for now, ignores the "written" field of 'DNSPronounced', only serializing
 -- the "pronounced" field.
 --
 -- >>> serializeToken (DNSToken (DNSText "text with spaces"))

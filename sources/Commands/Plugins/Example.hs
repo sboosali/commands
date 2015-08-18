@@ -11,6 +11,7 @@ import           Commands.Servers.Servant
 import           Control.Lens                  hiding (from, ( # ))
 import           Control.Monad.Trans.Either
 import qualified Data.ByteString.Lazy.Char8    as BSC
+import           Data.List.NonEmpty            (NonEmpty (..))
 import qualified Data.Text.Lazy                as T
 import qualified Data.Text.Lazy.IO             as T
 import           Servant
@@ -117,3 +118,6 @@ spirosInterpret vSettings = \ws -> do
  liftIO$ putStrLn$ OSX.showActions actions
  return()
 
+mainExample :: IO ()
+mainExample = do
+ T.putStrLn$ displaySerializedGrammar $ serializeGrammar DNSGrammar{_dnsProductions = DNSProduction {_dnsProductionInfo = (), _dnsProductionLHS = DNSRule (DNSName {unDNSName = T.pack "c"}), _dnsProductionRHS = DNSSequence (DNSTerminal (DNSPronounced (DNSText {unDNSText = T.pack "[;"}) (DNSText {unDNSText = T.pack "E"})) :| [])} :| [], _dnsVocabularies = [], _dnsImports = []}

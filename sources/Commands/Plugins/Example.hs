@@ -121,3 +121,8 @@ spirosInterpret vSettings = \ws -> do
 mainExample :: IO ()
 mainExample = do
  T.putStrLn$ displaySerializedGrammar $ serializeGrammar DNSGrammar{_dnsProductions = DNSProduction {_dnsProductionInfo = (), _dnsProductionLHS = DNSRule (DNSName {unDNSName = T.pack "c"}), _dnsProductionRHS = DNSSequence (DNSTerminal (DNSPronounced (DNSText {unDNSText = T.pack "[;"}) (DNSText {unDNSText = T.pack "E"})) :| [])} :| [], _dnsVocabularies = [], _dnsImports = []}
+
+ OSX.runActions $ do
+  OSX.openApplication "/Applications/Google Chrome.app" -- "Google Chrome"
+  OSX.delay 500
+  OSX.openApplication "/Applications/Work.app" -- "Work"

@@ -22,11 +22,13 @@ int main(int argc, char** argv)
     // strcpy(url, site);
     // strcat(url, query);
     // openURL(url);
-  openURL("https://www.google.com/search?q=somewords");
 
-     // bringApplication("Notes");  // works, sometimes
+ // openURL("https://www.google.com/search?q=somewords");
+
+     openApplication("Notes");  // works, sometimes
      // when launched from another Emacs like Work, Notes inherits its environment variables
- // bringApplication("Google Chrome");  // works, no more weirdness
+ [NSThread sleepForTimeInterval:0.5f];
+ openApplication("Google Chrome");  // works, no more weirdness
 
 
 //   // printApplications ();

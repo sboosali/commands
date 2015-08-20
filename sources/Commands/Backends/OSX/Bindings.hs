@@ -44,5 +44,5 @@ openURL s = withCString s objc_openURL
 
 -- |
 openApplication :: Application -> IO ()
-openApplication _ = return ()
+openApplication s = withCString s objc_openApplication
 

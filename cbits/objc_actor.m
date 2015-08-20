@@ -111,7 +111,7 @@ const char* currentApplicationPath() {
 }
 
 // can be full path (e.g. "/Applications/Work.app"), or just the name (e.g. "Work")
-void bringApplication(const char* s) {
+void openApplication(const char* s) {
   [[NSWorkspace sharedWorkspace] launchApplication:fromUTF8(s)];
 }
 

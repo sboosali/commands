@@ -33,3 +33,8 @@ foreign import ccall safe "objc_actor.h setClipboard"           objc_setClipboar
 foreign import ccall safe "objc_actor.h openURL"                objc_openURL
  :: CString
  -> IO ()
+
+foreign import ccall safe "objc_actor.h openApplication"        objc_openApplication
+ :: CString
+ -> IO ()
+

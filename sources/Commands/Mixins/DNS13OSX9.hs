@@ -1,7 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, DeriveAnyClass     #-}
 {-# LANGUAGE ExistentialQuantification              #-}
-{-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase, LiberalTypeSynonyms              #-}
-{-# LANGUAGE PartialTypeSignatures, PatternSynonyms #-}
+{-# LANGUAGE FlexibleContexts, KindSignatures, LambdaCase, TypeOperators              #-}
+{-# LANGUAGE PartialTypeSignatures, PatternSynonyms, LiberalTypeSynonyms #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, EmptyCase         #-}
 {-# LANGUAGE StandaloneDeriving, TupleSections, TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances, TemplateHaskell #-}

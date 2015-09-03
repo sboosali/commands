@@ -12,7 +12,6 @@ import           Commands.Servers.Servant
 import           Control.Lens                  hiding (from, ( # ))
 import           Control.Monad.Trans.Either
 import qualified Data.ByteString.Lazy.Char8    as BSC
-import           Data.List.NonEmpty            (NonEmpty (..))
 import qualified Data.Text.Lazy                as T
 import qualified Data.Text.Lazy.IO             as T
 import           Servant

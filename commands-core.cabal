@@ -183,6 +183,7 @@ library
   , wai  ==3.0.*
   , warp  ==3.0.*
   , either  ==4.3.*
+  , time ==1.5.*
 
   , async                     ==2.0.*
   , parallel                  ==3.2.*

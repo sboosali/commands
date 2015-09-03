@@ -14,6 +14,10 @@ mask Shift    = 0x00020000
 mask Option   = 0x00080000
 mask Function = 0x00800000
 
+-- yes: #define NX_CONTROLMASK 0x00040000
+-- no: #define NX_DEVICELCTLKEYMASK 0x00000001
+-- no: #define NX_DEVICERCTLKEYMASK 0x00002000
+
 -- | line 196 of </System/Library/Frameworks/Carbon.framework/Versions/A/Frameworks/HIToolbox.framework/Versions/A/Headers/Events.h>
 --
 keycode :: Key -> BitVector

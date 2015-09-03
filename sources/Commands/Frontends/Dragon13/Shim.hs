@@ -75,6 +75,9 @@ getShim ShimR{..} = [qc|
 # natlink13 library
 from natlinkmain import (setCheckForGrammarChanges)
 from natlinkutils import (GrammarBase)
+import natlink  # a DLL
+# import natlinkmain
+# import natlinkutils
 
 # standard library
 import time
@@ -87,10 +90,10 @@ import traceback
 H_RULES  = {__rules__}
 H_LISTS  = {__lists__}
 H_EXPORT = {__export__}
-H_SERVER_HOST = {__serverHost__}
+H_SERVER_HOST = {__serverHost__}  
 H_SERVER_PORT = {__serverPort__}
 
-# e.g.
+# e.g. for debugging
 # H_RULES  = '''<test> exported = \{test};'''
 # H_LISTS  = \{'test', ['upcase region']}
 # H_EXPORT = 'test'
@@ -98,6 +101,10 @@ H_SERVER_PORT = {__serverPort__}
 # H_SERVER_PORT = '8666'
 
 server_address = "http://%s:%s/" % (H_SERVER_HOST, H_SERVER_PORT)
+
+microphone_rule = '''<microphone> exported = mike on | mike off | mike dead ;'''
+microphone_export = "microphone"
+
 
 
 # the grammar
@@ -115,10 +122,10 @@ class NarcissisticGrammar(GrammarBase):
 
     '''
 
-    gramSpec = H_RULES
+    gramSpec = microphone_rule + H_RULES
 
     def initialize(self):
-        self.set_rules(H_RULES, [H_EXPORT])
+        self.set_rules(self.gramSpec, [microphone_export, H_EXPORT])
         self.set_lists(H_LISTS)
         self.doOnlyGotResultsObject = True # aborts all processing after calling gotResultsObject
 
@@ -137,20 +144,24 @@ class NarcissisticGrammar(GrammarBase):
         print "---------- gotHypothesis -------------"
         print words
 
+    # recognitionType = self | reject | other 
     def gotResultsObject(self, recognitionType, resultsObject):
         print "---------- gotResultsObject ----------"
+        print "recognitionType =", recognitionType
+        if not recognitionType: return
         words = next(get_results(resultsObject), [])
         data  = munge_recognition(words)
         url   = "%s/recognition/" % (server_address,)        # TODO parameterize "recognition" API
 
         # print 'resultsObject =',resultsObject
         print 'words =', words
-        print 'url =', url
-        print 'data =', json.dumps(data)
+        print 'url   =', url
 
         try:
-            request  = urllib2.Request(url, json.dumps(data), \{"Content-Type": "application/json"})
-            response = urllib2.urlopen(request)
+            if should_request(self,data):
+                print 'data  =', json.dumps(data)
+                request  = urllib2.Request(url, json.dumps(data), \{"Content-Type": "application/json"})
+                response = urllib2.urlopen(request)
             pass
         except Exception as e:
             print
@@ -198,9 +209,48 @@ class NarcissisticGrammar(GrammarBase):
 
 # API
 
-# TODO             handleDGNUpdate(self, response)
-def handleDGNUpdate(self, response):
-    pass
+# TODO             handleDGNUpdate(grammar, response)
+def handleDGNUpdate(grammar, response):
+    pass 
+
+def should_request(grammar,data):
+    b = data and not handle_microphone(grammar,data) and isUnicode(data) and not isNoise(data)
+    print "should_request=", b
+    return b
+
+# returns true if it matched the recognition (and executed the magic action).
+# in which case, don't send a request to the server to execute any non-magic actions.
+# "mike off" deactivates all grammars besides the microphone grammer, "putting the microphone to sleep".
+def handle_microphone(grammar,data):
+    raw = " ".join(data)
+
+    if   raw == "mike on": 
+        # grammar.setMicState("on") 
+        grammar.activateSet([microphone_export, H_EXPORT], exclusive=1)
+        return True
+    elif raw == "mike off":
+        # grammar.setMicState("sleeping")
+        grammar.activateSet([microphone_export],exclusive=1)
+        return True
+    elif raw == "mike dead":
+        # the natlink.setMicState("off") # can't even be manually turned back on via the GUI
+        return True
+    else:
+        return False
+
+def isUnicode(data):
+    try:
+        for word in data:
+            word.decode('utf8')
+        return True
+    except UnicodeDecodeError as e:
+        print e
+        print traceback.format_exc()
+        return False
+
+def isNoise(data):
+    return data in [["the"],["if"],["him"],["A"],["that"]] #TODO hack, noise tends to be recognized as these short single words
+
 
 
 # helpers
@@ -222,10 +272,10 @@ def get_results(resultsObject):
 
 def munge_recognition(words):
     '''
-    >>> munge_recognition(['spell', r'a\\\\spelling-letter\\\\A', r',\\\\comma\\\\comma', r'a\\\\determiner', 'letter'])
+    >>> munge_recognition(['spell', 'a\\\\spelling-letter\\\\A', ',\\\\comma\\\\comma', 'a\\\\determiner', 'letter'])
     ["spell", "A", ",", "a", "letter"]
     '''
-    return [word.split(r'\\\\')[0] for word in words]
+    return [word.split('\\\\')[0] for word in words]
 
 # http://stackoverflow.com/questions/1685221/accurately-measure-time-python-function-takes
 def timeit(message, callback, *args, **kwargs):
@@ -254,4 +304,4 @@ def unload():
     GRAMMAR = None
 
 load()
-|]
+# |] -- trailing comment is hack

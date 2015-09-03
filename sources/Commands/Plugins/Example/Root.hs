@@ -6,36 +6,37 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures #-}  -- fewer type signatures (i.e. more type inference) makes the file more "config-like"
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Example.Root where
+import           Commands.Plugins.Example.Shortcut
+import           Commands.Plugins.Example.Phrase
+import           Commands.Plugins.Example.Press
+import           Commands.Plugins.Example.Spacing
+
+import Commands.Munging
 import           Commands.Backends.OSX
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
-import           Commands.Plugins.Example.Phrase
-import           Commands.Plugins.Example.Press
-import           Commands.Plugins.Example.Shortcut
-import           Commands.Plugins.Example.Spacing
 import           Commands.Sugar.Alias
 import           Commands.Sugar.Press
 
 import           Control.Concurrent.Async
-import           Control.Lens                      hiding (from, ( # ))
-import           Data.List.NonEmpty                (NonEmpty (..))
-import qualified Data.Text.Lazy                    as T
-import qualified Data.Text.Lazy.IO                 as T
+import           Control.Lens                          hiding (from, ( # ))
+import           Data.List.NonEmpty                    (NonEmpty (..))
+import qualified Data.Text.Lazy                        as T
+import qualified Data.Text.Lazy.IO                     as T
 import           Data.Typeable
-import           Numeric.Natural                   ()
-import qualified System.FilePath.Posix             as FilePath
+import           Numeric.Natural                       ()
+import qualified System.FilePath.Posix                 as FilePath
 
-import           Control.Applicative               hiding (many, optional)
-import           Control.Monad                     (replicateM_, (>=>))
+import           Control.Applicative                   hiding (many, optional)
+import           Control.Monad                         (replicateM_, (>=>))
 -- import           Control.Parallel
-import           Data.Foldable                     (Foldable (..), asum,
-                                                    traverse_)
-import qualified Data.List                         as List
+import           Data.Foldable                         (Foldable (..), asum,
+                                                        traverse_)
+import qualified Data.List                             as List
 import           Data.Monoid
 import           Prelude                           hiding (foldl, foldr1)
 import           System.Timeout                    (timeout)
--- import Control.Monad.ST
 import           Control.Monad.ST.Unsafe
 import           System.IO.Unsafe
 
@@ -47,6 +48,7 @@ data Root
  | ReplaceWith Phrase' Phrase'
  | Click_ Click
  | Move_ Move
+ | Emacs_ Emacs
  | KeyRiff_ KeyRiff
  | Undo
  | Phrase_ Phrase'
@@ -54,15 +56,20 @@ data Root
 -- TODO | Frozen freeze
  deriving (Show,Eq)
 
+rootses :: R z Root
+rootses = 'rootses
+ <=> Roots <$> roots `interleaving` (token"then")
+
 roots :: R z Root
 roots = 'roots
- <=> Roots <$> root `interleaving` (token"then")
- <|> Repeat <$> positive <*> root --TODO no recursion for now
+ <=> Repeat <$> positive <*> root --TODO no recursion for now
  <|> root --TODO redundant with the Roots case
 
 -- root = set (comRule.ruleExpand) 1 $ 'root <=> empty
 root :: R z Root
 root = 'root <=> empty
+ <|> KeyRiff_ <$> keyriff
+ <|> KeyRiff_ <$> myShortcuts
  <|> ReplaceWith <#> "replace" # phrase_ # "with" # phrase_ -- TODO
  -- TODO <|> ReplaceWith <#> "replace" # phrase # "with" # (phrase <|>? "blank")
  <|> Undo        <#> "no"         -- order matters..
@@ -70,13 +77,22 @@ root = 'root <=> empty
  <|> Click_      <#> click
  <|> Edit_       <#> edit
  <|> Move_       <#> move
- <|> KeyRiff_ <$> keyriff
- <|> KeyRiff_ <$> myShortcuts
+ <|> Emacs_ <#> emacs
+
  -- <|> KeyRiff_ <$> (keyriff <|> myShortcuts)
  <|> (Phrase_ . (:[])) <#> phraseC -- has "say" prefix
  <|> Phrase_     <#> phrase_  -- must be last, phrase falls back to wildcard.
  -- <|> Roots       <#> (multipleC root)
 -- TODO <|> Frozen <#> "freeze" # root
+
+data Emacs
+ = EmacsFunction (Maybe Dictation)
+ | EmacsExpression (Maybe Dictation)
+ deriving (Show,Eq)
+
+emacs = 'emacs <=> empty
+ <|> EmacsFunction      <#> "run" # (dictation-?)
+ <|> EmacsExpression    <#> "eval" # (dictation-?)
 
 data Move
  = Move Direction Region
@@ -307,13 +323,14 @@ bestRoot = argmax rankRoot
 rankRoot = \case                --TODO fold over every field of every case, normalizing each case
  Repeat _ r -> rankRoot r
  Roots rs -> sum $ fmap rankRoot rs
- Edit_ _ -> 1
- Undo -> 1
- ReplaceWith p1 p2 -> rankPhrase (p1<>p2)
- Click_ _ -> 1
- Move_ _ -> 1
- KeyRiff_ _ -> 1
+ Edit_ _ -> 100
+ Undo -> 100
+ ReplaceWith p1 p2 -> 100 + rankPhrase (p1<>p2)
+ Click_ _ -> 100
+ Move_ _ -> 100
+ KeyRiff_ _ -> 1000
  Phrase_ p -> rankPhrase p
+ _ -> 100
 
 runRoot = \case
 
@@ -323,6 +340,7 @@ runRoot = \case
    ReplaceWith this that -> runEmacsWithP "replace-regexp" [this, that]
    Edit_ a' -> editEmacs a'
    Move_ a' -> moveEmacs a'
+   Emacs_ a' -> runEmacs_ a'
    a' -> runRoot_ a'
 
  x'@"Intellij" -> \case --TODO passed down context better
@@ -346,7 +364,7 @@ runRoot = \case
 
   Phrase_ p' -> do
    insert =<< munge p'
-
+   insert " "
   KeyRiff_ kr -> runKeyRiff kr
 
   _ -> do nothing
@@ -359,7 +377,7 @@ type ElispSexp = String
 -- -- type ElispSexp = Sexp String String
 
 
-isEmacs x = if FilePath.takeBaseName x `elem` ["Emacs","Work","Notes","Diary","Obs"]
+isEmacs x = if FilePath.takeBaseName x `elem` ["Emacs","Work","Notes","Diary","Obs","Commands"]
  then Just x
  else Nothing
 
@@ -375,19 +393,25 @@ slot s = do
  sendText s
  sendKeyPress [] ReturnKey
 
-always = const
-
 when :: [Application] -> Actions () -> (Application -> Actions ())
 when theseContexts thisAction = \theContext -> do
  if theContext `List.elem` theseContexts
  then thisAction
  else nothing
 
-onlyWhen = when . (:[])
 
-whenEmacs = onlyWhen "emacs"
 
-execute_extended_command = press C w --TODO non-standard: make this configurable? ImplicitParams?
+
+
+
+
+runEmacs_ = \case 
+ EmacsFunction   Nothing               -> execute_extended_command
+ EmacsFunction   (Just (Dictation x')) -> runEmacs (dashCase x')
+ EmacsExpression Nothing               -> eval_expression
+ EmacsExpression (Just (Dictation x')) -> evalEmacs (dashCase x')
+
+execute_extended_command = press C w --TODO non-standard: make this configurable? ImplicitParams? this is the configuration! just put in separate module. or define this as a keypress, and explicitly turn it into an action at  use site.
 
 eval_expression = press M ':'
 
@@ -462,21 +486,28 @@ moveEmacs = \case
 
  Move Left_ Character  -> press C b
  Move Right_ Character -> press C f
+
  Move Left_ Word_      -> press M b
  Move Right_ Word_     -> press M f
+
  Move Left_ Group      -> press C M b
  Move Right_ Group     -> press C M f
+
  Move Up_ Line         -> press C p
  Move Down_ Line       -> press C n
+
  Move Up_ Block        -> press C up
  Move Down_ Block      -> press C down
+
  Move Up_ Screen       -> runEmacs "scroll-up-command"
  Move Down_ Screen     -> press C v
+
  Move Up_ Page         -> runEmacs "backward-page"
  Move Down_ Page       -> runEmacs "forward-page"
 
  MoveTo Beginning Line       -> press C a
  MoveTo Ending  Line       -> press C e
+
  MoveTo Beginning Everything -> press M up
  MoveTo Ending Everything  -> press M down
 
@@ -499,11 +530,19 @@ selected s r = do
  copy
 
 select :: Region -> Slice -> Actions ()
-select That = \_ -> nothing     -- (should be) already selected
+select That = \case
+ _ -> nothing     -- (should be) already selected
+-- select Character = \case
+--  _ -> nothing
 select r = \case
  Whole     -> beg_of r >> mark >> end_of r
  Backwards -> mark >> beg_of r
  Forwards  -> mark >> end_of r
+
+activate_mark = replicateM_ 2 exchange_point_and_mark
+
+exchange_point_and_mark = press C x >> press C x
+-- exchange_point_and_mark = runEmacs "exchange-point-and-mark"
 
 {-
 
@@ -558,16 +597,14 @@ editEmacs = \case
  Edit Select _ Character -> do -- special behavior
   mark
   press right
- Edit Select s r -> select r s  -- generic behavior
+ Edit Select s r -> do
+  select r s  -- generic behavior
+  activate_mark
  -- some Regions need a { press right } for idempotency of their beg_of/end_of
 
  Edit Google s r -> do
   google =<< selected s r
 
- Edit Delete s Word_ -> do
-  select Word_ s
-  press right                   -- doesn't work for camel case. only single-character-delimited. maybe Token, not Word?
-  press del
  Edit Delete s r -> do
   select r s
   press del

@@ -2,13 +2,13 @@
 {-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
--- import           Commands.Core
+import           Commands.Plugins.Example.Spacing
+
 import qualified Commands.Backends.OSX            as OSX
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Munging
-import           Commands.Plugins.Example.Spacing
 import           Data.Sexp
 
 import           Control.Lens                     hiding (from, snoc, ( # ))
@@ -121,8 +121,11 @@ type PItem = (Maybe PFunc, [Phrase])
 
 phrase_ :: DNSEarleyRHS z Phrase'
 phrase_ = complexGrammar 'phrase_
- (snoc <$> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
- (snoc <$> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
+-- (snoc     <$>             ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (conssnoc <$> (phraseA <|> phraseB) <*> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (conssnoc <$> (phraseA <|> phraseB) <*> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ where
+ conssnoc x ys z = [x] <> ys <> [z]
 
 -- | a sub-phrase where a phrase to the right is certain.
 --
@@ -138,6 +141,7 @@ phraseA = 'phraseA <=> empty
  -- <|> (Spelled_) <#> letter_
  -- <|> (Spelled_ . (:[])) <#> character
  <|> Spelled_    <#> "spell" # (character-++)
+ <|> Spelled_    <#> "lets" # letters -- (letter-++)
  <|> Separated_  <#> separator
  <|> Cased_      <#> casing
  <|> Joined_     <#> joiner
@@ -151,6 +155,8 @@ phraseB = 'phraseB <=> empty
  -- <$> alphabetRHS
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
  -- <|> Spelled_  <#> "spell" # letters -- only, not characters
+ <|> Pasted_     <#> "paste"
+ <|> Blank_      <#> "blank"
 
 -- | a sub-phrase where a phrase to the right is impossible.
 phraseC :: DNSEarleyRHS z Phrase_
@@ -179,7 +185,7 @@ joiner = 'joiner
  <|> Joiner "-" <#> "dash"
  <|> Joiner "/" <#> "file"
  <|> Joiner ""  <#> "squeeze"
- <|> CamelJoiner <#> "camel"
+ <|> CamelJoiner <#> "cam"
  <|> ClassJoiner <#> "class"
 
 brackets = 'brackets
@@ -199,9 +205,9 @@ character = 'character <=> empty
  <|> punctuationRHS
  <|> englishNumericRHS
  <|> literalNumericRHS
- <|> shortAlphabetRHS
  <|> phoneticAlphabetRHS
- <|> literalAlphabetRHS
+-- <|> shortAlphabetRHS
+-- <|> literalAlphabetRHS
 
 punctuationRHS :: DNSEarleyRHS z Char
 punctuationRHS = vocab
@@ -346,7 +352,6 @@ phoneticAlphabetRHS = vocab
 
 -}
 literalAlphabetRHS :: DNSEarleyRHS z Char
--- literalAlphabetRHS :: Functor (p i) => RHS p r l String Char
 literalAlphabetRHS = foldMap (\c -> (c <$ token [c]) <|> (c <$ token [toUpper c])) ['a'..'z'] -- TODO What will we get back from Dragon anyway?
 
 dictation = dragonGrammar 'dictation
@@ -363,13 +368,13 @@ keyword = dragonGrammar 'keyword
  (DGNWords)
  -- <=> Keyword <$> word_
 
-letter = dragonGrammar 'letter
- (T.unpack <$> anyLetter)
- (DGNLetters)
+letters = simpleGrammar 'letters
+ ((T.unpack . fold) <$> some anyWord)
+ (DNSMultiple $ SomeDNSNonTerminal $ DNSBuiltinRule $ DGNLetters)
+
 -- newtype Letters = Letters [Char] deriving (Show,Eq,Ord)
 -- letters = (set dnsInline True defaultDNSInfo) $ 'letters <=>
 --  Letters <#> (letter-+)
- -- TODO greedy (many) versus non-greedy (manyUntil)
 
 
 
@@ -416,7 +421,7 @@ applyPFunc as = \case
   Surrounded g -> surroundWith g as
 
 caseWith :: Casing -> (PAtom -> PAtom)
-caseWith casing = mapPAtom (fromCasing casing)
+caseWith c = mapPAtom (fromCasing c)
 
 fromCasing :: Casing -> (String -> String)
 fromCasing = \case
@@ -534,17 +539,18 @@ bestPhrase = argmax rankPhrase
 -- the specificity ("probability") of the phrase parts. bigger is better.
 rankPhrase :: [Phrase_] -> Int
 rankPhrase = sum . fmap (\case
- Escaped_ _ -> 1
- Quoted_ _ -> 1
- Pasted_  -> 1
- Blank_  -> 1
- Spelled_ _ -> 1
- Capped_ _ -> 1
- Separated_ _ -> 1
- Cased_ _ -> 1
- Joined_ _ -> 1
- Surrounded_ _ -> 1
- Dictated_ _ -> 0)
+ Escaped_ _ -> 2000
+ Quoted_ _ -> 100
+ Pasted_ -> 100
+ Blank_ -> 100
+ Spelled_ _ -> 100
+ Capped_ _ -> 100
+ Separated_ _ -> 100
+ Cased_ _ -> 100
+ Joined_ _ -> 100
+ Surrounded_ _ -> 100
+ Dictated_ (Dictation ws) -> length ws - 1  -- [Dictated_ ["some","words"]] =1 is better than [Dictated_ ["some"], Dictated_ ["words"]] =0
+ )
 
 -- -- | convenience function for testing how phrase_ parses
 -- parsePhrase_ :: [Text] -> String
@@ -553,4 +559,3 @@ rankPhrase = sum . fmap (\case
 --  . argmax rankPhrase
 --  . NonEmpty.fromList --  TODO
 --  . parseList phrase_
-

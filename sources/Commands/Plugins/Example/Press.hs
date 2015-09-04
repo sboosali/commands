@@ -173,12 +173,19 @@ keys cs = either (error.show) NonEmpty.head . toEarleyEither $ E.fullParses (E.p
 gKeychords :: E.Grammar r String (E.Prod r String Char KeyRiff)
 gKeychords = mdo
  pKeychords <- E.rule$ (:) <$> pKeychord <*> many (some (E.symbol ' ') *> pKeychord)
- pKeychord  <- E.rule$ toKeychord <$> many (pModifier <* E.symbol '-') <*> pKey E.<?> "keychord"
- pKey       <- E.rule$ E.satisfy isAlphaNum E.<?> "key"
+               E.<?> "keychords"
+ pKeychord  <- E.rule$ toKeychord <$> many (pModifier <* E.symbol '-') <*> pKey
+               E.<?> "keychord"
+ pKey       <- E.rule$ E.satisfy isAlphaNum
+ -- pKey       <- E.rule$ empty
+ --  <|> (:[]) <$> E.satisfy isAlphaNum
+ --  <|> E.symbol "SPc" E.satisfy isAlphaNum
+ --  E.<?> "key"
  pModifier  <- E.rule$ empty
   <|> E.symbol 'M' $> CommandMod  -- generally, the meta-key
   <|> E.symbol 'C' $> Control
   <|> E.symbol 'S' $> Shift
+  <|> E.symbol 'A' $> Option
   E.<?> "modifier"
  return pKeychords
  where

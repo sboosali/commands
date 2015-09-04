@@ -22,9 +22,8 @@ pressKey :: [Modifier] -> Key -> IO ()
 pressKey (encodeModifiers -> flags) (encodeKey -> key) =
  objc_pressKey flags key
 
--- |
-clickMouse :: [Modifier] -> Positive -> MouseButton -> IO ()
-clickMouse = undefined
+-- TODO |
+-- clickMouse :: [Modifier] -> Positive -> MouseButton -> IO ()
 -- clickMouse (MouseClick (encodeModifiers -> flags) (encodePositive -> n) (encodeButton -> button)) = objc_clickMouse
 
 -- |

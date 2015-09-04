@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase          #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, TypeFamilies          #-}
 {-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
@@ -22,7 +22,7 @@ import           Data.Char
 import           Data.Foldable                    (Foldable (..))
 import qualified Data.List                        as List
 import           Data.Typeable                    (Typeable)
-import           GHC.Exts                         (IsString (..))
+import           GHC.Exts                         (IsString (..),IsList (..))
 import           Prelude                          hiding (foldr1, mapM)
 
 
@@ -57,6 +57,17 @@ data Brackets = Brackets String String deriving (Show,Eq,Ord)
 newtype Separator = Separator String  deriving (Show,Eq,Ord)
 type Keyword = String -- TODO
 newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+
+instance IsString Dictation where
+ fromString = Dictation . words               -- safe: words "" == []
+
+instance IsList Dictation where
+ type Item Dictation = String
+ fromList = Dictation
+ toList (Dictation ws) = ws
+
+word2phrase_ = Dictated_ . Dictation . (:[])
+
 
 -- not {JoinerFunction ([String] -> String)} to keep the {Eq} instance for caching
 -- fake equality? {JoinerFunction Name ([String] -> String)} so {JoinerFunction 'camelCase camelCase}
@@ -122,8 +133,8 @@ type PItem = (Maybe PFunc, [Phrase])
 phrase_ :: DNSEarleyRHS z Phrase'
 phrase_ = complexGrammar 'phrase_
 -- (snoc     <$>             ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
- (conssnoc <$> (phraseA <|> phraseB) <*> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
- (conssnoc <$> (phraseA <|> phraseB) <*> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (conssnoc <$> (phraseA) <*> ((phraseA <|> phraseB <|> phraseW)-*) <*> (phraseB <|> phraseC <|> phraseD))
+ (conssnoc <$> (phraseA) <*> ((phraseA <|> phraseB <|> phraseD)-*) <*> (phraseB <|> phraseC <|> phraseD))
  where
  conssnoc x ys z = [x] <> ys <> [z]
 
@@ -155,18 +166,14 @@ phraseB = 'phraseB <=> empty
  -- <$> alphabetRHS
  -- TODO letters grammar that consumes tokens with multiple capital letters, as well as tokens with single aliases
  -- <|> Spelled_  <#> "spell" # letters -- only, not characters
- <|> Pasted_     <#> "paste"
- <|> Blank_      <#> "blank"
 
 -- | a sub-phrase where a phrase to the right is impossible.
 phraseC :: DNSEarleyRHS z Phrase_
-phraseC = 'phraseC <=>
- Dictated_ <#> "say" # dictation
+phraseC = 'phraseC <=> Dictated_ <#> "say" # dictation
 
 -- | injects word_ into phrase_
 phraseW :: DNSEarleyRHS z Phrase_
-phraseW = 'phraseW <=>
- (Dictated_ . Dictation . (:[])) <#> word_
+phraseW = 'phraseW <=> word2phrase_ <#> word_
 
 -- | injects dictation into phrase_
 phraseD :: DNSEarleyRHS z Phrase_
@@ -681,3 +688,4 @@ rankPhrase = sum . fmap (\case
 --  . argmax rankPhrase
 --  . NonEmpty.fromList --  TODO
 --  . parseList phrase_
+

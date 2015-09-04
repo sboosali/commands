@@ -21,7 +21,7 @@ runActions = iterM $ \case
  SendText        s k              -> runActions (sendTextAsKeypresses s) >> k
  -- terminates because sendTextAsKeypresses is exclusively a sequence of SendKeyPress'es
 
- SendMouseClick  flags n button k -> ObjC.clickMouse flags n button >> k
+ -- TODO SendMouseClick  flags n button k -> ObjC.clickMouse flags n button >> k
 
  GetClipboard    f                -> ObjC.getClipboard >>= f
  SetClipboard    s k              -> ObjC.setClipboard s >> k
@@ -87,7 +87,7 @@ showActions as = "do\n" <> evalState (showActions_ as) 1
  showAction_ :: (Show x) => ActionF (Actions x) -> State Gensym String
  showAction_ = \case
   SendKeyPress    flags key k -> ((" sendKeyPress "    <> showArgs [show flags, show key]) <>)       <$> showActions_ k
-  SendMouseClick  flags n b k -> ((" sendMouseClick "  <> showArgs [show flags, show n, show b]) <>) <$> showActions_ k
+  -- TODO SendMouseClick  flags n b k -> ((" sendMouseClick "  <> showArgs [show flags, show n, show b]) <>) <$> showActions_ k
   SendText        s k         -> ((" sendText "        <> showArgs [show s]) <>)                     <$> showActions_ k
 
   SetClipboard    s k         -> ((" setClipboard "    <> showArgs [show s]) <>)                     <$> showActions_ k

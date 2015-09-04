@@ -17,7 +17,7 @@ type Actions = Free ActionF
 data ActionF k
  = SendKeyPress    [Modifier] Key                   k
  | SendText        String                           k -- ^ a logical grouping for debugging and optimizing
- | SendMouseClick  [Modifier] Positive MouseButton  k
+ -- TODO | SendMouseClick  [Modifier] Positive MouseButton  k
 
  | GetClipboard                                     (ClipboardText -> k)
  | SetClipboard    ClipboardText                k
@@ -78,8 +78,8 @@ type CGEventFlags  = CULLong
 -- data MouseClick = MouseClick [Modifier] Positive MouseButton
 --  deriving (Show,Eq,Ord)
 
-data MouseButton = LeftButton | MiddleButton | RightButton
- deriving (Show,Eq,Ord,Enum)
+-- data MouseButton = LeftButton | MiddleButton | RightButton
+--  deriving (Show,Eq,Ord,Enum)
 
 -- | a (pseudo)-refinement type.
 newtype Positive = Positive { getPositive :: Int }

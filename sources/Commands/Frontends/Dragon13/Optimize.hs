@@ -257,7 +257,7 @@ partitionVocabularizables (e:|_ps) = (e:|ps, vs)
 
 -- |
 canVocabularize :: DNSProduction i t n -> Either (DNSProduction i t n) (DNSVocabulary i t n)
-canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getApp . onlyTokens) r of
+canVocabularize p@(DNSProduction i (DNSRule n) r) = case (getAp . onlyTokens) r of
  Nothing -> Left p
  Just ts -> Right $ DNSVocabulary i (DNSList n) ts  -- make sure this doesn't introduce a naming conflict with existing DNSList. might be best to just treat rules and lists as if they shared the same namespace.
 

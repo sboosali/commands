@@ -259,7 +259,7 @@ buildEarley
  -> ST s (E.Result s n [t] a)
 buildEarley p ts = do
   s <- E.initialState p
-  E.parse [s] [] [] (return ()) [] 0 ts
+  E.parse [s] (E.emptyParseEnv ts)
 
 runEarley
  :: (forall r. RHS (ConstName (_,String)) Text (DNSEarleyFunc (E.Rule s r) (ConstName (_,String)) Text) a)

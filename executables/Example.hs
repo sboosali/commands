@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 import qualified Commands.Plugins.Example       as Example
--- import qualified Commands.Plugins.Example.Press as Press
 
 import           System.Environment             (getArgs)
 

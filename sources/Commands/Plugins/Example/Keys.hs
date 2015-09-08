@@ -2,17 +2,18 @@
 {-# LANGUAGE RecursiveDo, TemplateHaskell                                #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
-module Commands.Plugins.Example.Press where
+module Commands.Plugins.Example.Keys where
 import           Commands.Backends.OSX
 import           Commands.Etc
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Phrase (character)
 
 import qualified Data.List.NonEmpty              as NonEmpty
+import Data.List.NonEmpty (NonEmpty)
 import qualified Text.Earley                     as E
 
 import           Control.Applicative
-import           Data.Char                       (isAlphaNum)
+import           Data.Char hiding(Control)
 import           Data.Foldable                   (traverse_)
 
 
@@ -152,15 +153,22 @@ partial function.
 >>> keys"M-S-a"
 [([CommandMod, Shift],AKey)]
 
->>> keys"M-A"
-[([CommandMod, Shift],AKey)]
+>>> keys"C-<tab>"
+[([CommandMod],TabKey)]
+
+>>> keys"A-\\"
+[([Option],BackslashKey)]
 
 >>> keys"C-x o C-x b"
 [([Control],XKey),([],OKey),([Control],XKey),([],BKey)]
 
+a partial function, wraps 'safeKeys'. 
 -}
 keys :: [Char] -> KeyRiff
-keys cs = either (error.show) NonEmpty.head . toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
+keys cs = either (error.(("(Commands.Plugins.Example.Keys.keys "++(show cs)++")") ++).show) NonEmpty.head (safeKeys cs)
+
+safeKeys :: [Char] -> EarleyEither String Char (NonEmpty KeyRiff)
+safeKeys cs = toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
 -- bimapEither toException .
  where
  strip :: String -> String
@@ -170,17 +178,52 @@ keys cs = either (error.show) NonEmpty.head . toEarleyEither $ E.fullParses (E.p
 
 -- EarleyEither String Char [KeyChord]
 
+-- | follows (a subset of) <http://emacswiki.org/emacs/EmacsKeyNotation Emacs keybinding syntax>. doesn't interpret uppercase non-modifier letters as shifted alphanumerics, for disambiguation. e.g. use @"M-S-a"@, not @"M-A"@. non-alphanumerics are in angle brackets. e.g. @"C-<tab>"@, not @"C-TAB"@. see source (of readable parser combinators) for other differences.
 gKeychords :: E.Grammar r String (E.Prod r String Char KeyRiff)
 gKeychords = mdo
  pKeychords <- E.rule$ (:) <$> pKeychord <*> many (some (E.symbol ' ') *> pKeychord)
                E.<?> "keychords"
  pKeychord  <- E.rule$ toKeychord <$> many (pModifier <* E.symbol '-') <*> pKey
                E.<?> "keychord"
- pKey       <- E.rule$ E.satisfy isAlphaNum
- -- pKey       <- E.rule$ empty
- --  <|> (:[]) <$> E.satisfy isAlphaNum
- --  <|> E.symbol "SPc" E.satisfy isAlphaNum
- --  E.<?> "key"
+ pKey       <- E.rule$ empty
+
+  <|> NoMod SpaceKey                             <$  E.word "<spc>"
+  <|> NoMod TabKey                               <$  E.word "<tab>"
+  <|> NoMod ReturnKey                            <$  E.word "<ret>"
+  <|> NoMod DeleteKey                            <$  E.word "<del>"
+  <|> NoMod EscapeKey                            <$  E.word "<esc>"
+
+  <|> NoMod UpArrowKey   <$ E.word  "<up>"
+  <|> NoMod DownArrowKey   <$ E.word  "<down>" 
+  <|> NoMod LeftArrowKey   <$ E.word  "<left>" 
+  <|> NoMod RightArrowKey   <$ E.word  "<right>" 
+
+  <|> NoMod F1Key <$ E.word  "<f1>"
+  <|> NoMod F2Key <$ E.word  "<f2>"
+  <|> NoMod F3Key <$ E.word  "<f3>"
+  <|> NoMod F4Key <$ E.word  "<f4>"
+  <|> NoMod F5Key <$ E.word  "<f5>"
+  <|> NoMod F6Key <$ E.word  "<f6>"
+  <|> NoMod F7Key <$ E.word  "<f7>"
+  <|> NoMod F8Key <$ E.word  "<f8>"
+  <|> NoMod F9Key <$ E.word  "<f9>"
+  <|> NoMod F10Key <$ E.word  "<f10>"
+  <|> NoMod F11Key <$ E.word  "<f11>"
+  <|> NoMod F12Key <$ E.word  "<f12>"
+  <|> NoMod F13Key <$ E.word  "<f13>"
+  <|> NoMod F14Key <$ E.word  "<f14>"
+  <|> NoMod F15Key <$ E.word  "<f15>"
+  <|> NoMod F16Key <$ E.word  "<f16>"
+  <|> NoMod F17Key <$ E.word  "<f17>"
+  <|> NoMod F18Key <$ E.word  "<f18>"
+  <|> NoMod F19Key <$ E.word  "<f19>"
+  <|> NoMod F20Key <$ E.word  "<f20>"
+
+  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> (not.isAlphaNum) <*> isAscii)   -- must be last 
+  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> isLower <*> isAscii)   -- must be last 
+
+  E.<?> "key"
+
  pModifier  <- E.rule$ empty
   <|> E.symbol 'M' $> CommandMod  -- generally, the meta-key
   <|> E.symbol 'C' $> Control
@@ -189,13 +232,7 @@ gKeychords = mdo
   E.<?> "modifier"
  return pKeychords
  where
- toKeychord ms c = lAppendModifiers ms ((either __BUG__ id) (char2keypress c))
+ toKeychord = lAppendModifiers
  lAppendModifiers ms (ms', k) = KeyPress (ms ++ ms') k
 
-mainPress = do
- -- print$ keys""
- print$ keys"a"
- print$ keys"C-M-b"
- print$ keys"M-S-a"
- print$ keys"M-A"
- print$ keys"C-x o C-x b"
+-- TODO a numerate all keybindings with one modifier and one non-modifier key, it's for documentation

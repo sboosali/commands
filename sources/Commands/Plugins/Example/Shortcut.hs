@@ -4,7 +4,7 @@
 module Commands.Plugins.Example.Shortcut where
 import Commands.Etc
 import Commands.Mixins.DNS13OSX9
-import Commands.Plugins.Example.Press
+import Commands.Plugins.Example.Keys
 
 import           Data.Text.Lazy                 (Text)
 

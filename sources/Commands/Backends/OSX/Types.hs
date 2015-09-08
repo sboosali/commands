@@ -103,6 +103,7 @@ newtype Positive = Positive { getPositive :: Int }
 
 type KeyPress = ([Modifier], Key)
 pattern KeyPress mods k = (mods, k)
+pattern NoMod         k = ([],   k)
 
 {- | modifier keys are keys that can be "held".
 

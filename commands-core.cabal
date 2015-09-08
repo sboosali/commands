@@ -79,7 +79,7 @@ library
         Commands.Plugins.Example.Emacs
         Commands.Plugins.Example.Phrase
         Commands.Plugins.Example.Spacing
-        Commands.Plugins.Example.Press
+        Commands.Plugins.Example.Keys
         Commands.Plugins.Example.Shortcut
         Data.RefCache
         Data.RefCache.Internal

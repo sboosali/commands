@@ -1,18 +1,14 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, GADTs #-}
 {-# LANGUAGE ScopedTypeVariables                                   #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unticked-promoted-constructors #-}
 module Commands.Test.Arbitrary where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Test.Etc
-import           Commands.Test.Types
-import           Control.Applicative
+
 import           Data.List.NonEmpty                (NonEmpty (..))
-import           Data.Text.Lazy                    (Text)
 import qualified Data.Text.Lazy                    as T
-import           Debug.Trace                       (traceShowId)
-import           GHC.Exts                          (IsList (..))
 import           Test.QuickCheck
 
 

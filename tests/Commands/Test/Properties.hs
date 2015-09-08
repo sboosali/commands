@@ -2,14 +2,8 @@
 module Commands.Test.Properties where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13
-import           Commands.Frontends.Dragon13.Shim
-import           Commands.Frontends.Dragon13.Text
-import           Commands.Frontends.Dragon13.Types
-import           Commands.Test.Arbitrary
-import           Commands.Test.Types
+import           Commands.Test.Arbitrary()
 
-import           Data.Bifunctor                    (bimap)
-import qualified Data.Text.Lazy                    as T
 import qualified Test.QuickCheck.Property          as Q
 
 

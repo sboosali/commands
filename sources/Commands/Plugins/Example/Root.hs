@@ -8,7 +8,7 @@
 module Commands.Plugins.Example.Root where
 import           Commands.Plugins.Example.Shortcut
 import           Commands.Plugins.Example.Phrase
-import           Commands.Plugins.Example.Press
+import           Commands.Plugins.Example.Keys
 import           Commands.Plugins.Example.Spacing
 
 import Commands.Munging

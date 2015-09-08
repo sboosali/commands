@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Main where
 import Commands.Test.Properties
 import Test.DocTest.Discover
@@ -7,7 +8,6 @@ import Test.DocTest
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
-import Data.Monoid              ((<>))
 import System.Exit              (exitFailure)
 
 

@@ -1,17 +1,36 @@
-{-# LANGUAGE DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell, ConstraintKinds, FlexibleContexts #-}
 module Commands.Backends.OSX.Types where
 import Commands.Etc
 
-import Control.Monad.Free (Free)
+import Control.Monad.Free (MonadFree, Free)
 
 import Data.Monoid        ((<>))
 import Foreign.C.Types
 
 
-type Actions_ = Actions ()
+-- | a monad constraint for "workflow effects", (just like @MonadState@ is a monad constraint for "state effects") can use in any monad transformer stack that handles them.
+type MonadAction = MonadFree ActionF
+
+{- | for convenience. 
+without loss of generality (I don't think) when declaring simple monadic effects (like Kleisli arrows). 
+
+e.g.
+
+@
+getClipboard :: 'AMonadAction'      String  -- generalized
+getClipboard :: ('MonadAction' m) => m String  -- generalized
+getClipboard :: Free 'ActionF'         String  -- specialized
+@
+
+-}
+type AMonadAction a = forall m. (MonadAction m) => m a
+
+type AMonadAction_ = forall m. (MonadAction m) => m ()
 
 -- | a platform-agnostic free monad, which can be executed by platform-specific bindings.
 type Actions = Free ActionF
+
+type Actions_ = Actions ()
 
 -- | the "Action Functor".
 data ActionF k

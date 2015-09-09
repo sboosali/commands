@@ -347,7 +347,7 @@ runRoot = \case
    Roots rs -> traverse_ (runRoot x') rs
    Repeat n' c' -> replicateM_ (getPositive n') $ runRoot x' c'
    ReplaceWith this that -> do
-     press M r
+     press M 'r'
      (munge this >>= insert) >> press tab
      munge that >>= slot
    x' -> runRoot_ x'
@@ -360,7 +360,7 @@ runRoot = \case
  -- unconditional runRoot (i.e. any context / global context)
  runRoot_ = \case
 
-  Undo -> press met z
+  Undo -> press met 'z'
 
   Phrase_ p' -> do
    insert =<< munge p'
@@ -411,7 +411,7 @@ runEmacs_ = \case
  EmacsExpression Nothing               -> eval_expression
  EmacsExpression (Just (Dictation x')) -> evalEmacs (dashCase x')
 
-execute_extended_command = press C w --TODO non-standard: make this configurable? ImplicitParams? this is the configuration! just put in separate module. or define this as a keypress, and explicitly turn it into an action at  use site.
+execute_extended_command = press C 'w' --TODO non-standard: make this configurable? ImplicitParams? this is the configuration! just put in separate module. or define this as a keypress, and explicitly turn it into an action at  use site.
 
 eval_expression = press M ':'
 
@@ -484,32 +484,32 @@ runEmacsWithP f ps = do
 moveEmacs :: Move -> Actions ()
 moveEmacs = \case
 
- Move Left_ Character  -> press C b
- Move Right_ Character -> press C f
+ Move Left_ Character  -> press C 'b'
+ Move Right_ Character -> press C 'f'
 
- Move Left_ Word_      -> press M b
- Move Right_ Word_     -> press M f
+ Move Left_ Word_      -> press M 'b'
+ Move Right_ Word_     -> press M 'f'
 
- Move Left_ Group      -> press C M b
- Move Right_ Group     -> press C M f
+ Move Left_ Group      -> press C M 'b'
+ Move Right_ Group     -> press C M 'f'
 
- Move Up_ Line         -> press C p
- Move Down_ Line       -> press C n
+ Move Up_ Line         -> press C 'p'
+ Move Down_ Line       -> press C 'n'
 
  Move Up_ Block        -> press C up
  Move Down_ Block      -> press C down
 
  Move Up_ Screen       -> runEmacs "scroll-up-command"
- Move Down_ Screen     -> press C v
+ Move Down_ Screen     -> press C 'v'
 
  Move Up_ Page         -> runEmacs "backward-page"
  Move Down_ Page       -> runEmacs "forward-page"
 
- MoveTo Beginning Line       -> press C a
- MoveTo Ending  Line       -> press C e
+ MoveTo Beginning Line       -> press C 'a'
+ MoveTo Ending    Line       -> press C 'e'
 
  MoveTo Beginning Everything -> press M up
- MoveTo Ending Everything  -> press M down
+ MoveTo Ending    Everything  -> press M down
 
  -- Move -> press
  -- MoveTo -> press
@@ -541,7 +541,7 @@ select r = \case
 
 activate_mark = replicateM_ 2 exchange_point_and_mark
 
-exchange_point_and_mark = press C x >> press C x
+exchange_point_and_mark = press C 'x' >> press C 'x'
 -- exchange_point_and_mark = runEmacs "exchange-point-and-mark"
 
 {-
@@ -564,7 +564,7 @@ beg_of = \case
  Character  -> nothing
  Word_      -> evalEmacs "(beginning-of-thing 'word)"
  Group      -> evalEmacs "(beginning-of-thing 'list)"
- Line       -> press C a
+ Line       -> press C 'a'
  Block      -> evalEmacs "(beginning-of-thing 'block)"
  Page       -> evalEmacs "(beginning-of-thing 'page)"
  Screen     -> evalEmacs "(goto-char (window-start))"
@@ -579,7 +579,7 @@ end_of = \case
  Character  -> nothing          -- [press C f] is not idempotent, but [nothing] fails on [beg_of r >> mark >> end_of r]
  Word_      -> evalEmacs "(end-of-thing 'word)"
  Group      -> evalEmacs "(end-of-thing 'list)"
- Line       -> press C e
+ Line       -> press C 'e'
  Block      -> evalEmacs "(end-of-thing 'block)" -- non-standard: expects forward-block
  Page       -> evalEmacs "(end-of-thing 'page)"
  Screen     -> evalEmacs "(goto-char (window-end))"
@@ -611,16 +611,16 @@ editEmacs = \case
 
  Edit Copy s r -> do
   select r s
-  press M c                     -- like Cua-mode for Mac
+  press M 'c'                     -- like Cua-mode for Mac
 
  Edit Cut s r -> do
   select r s
-  press M x                     -- like Cua-mode for Mac
+  press M 'x'                     -- like Cua-mode for Mac
 
- Edit Transpose _ Character -> press C t
- Edit Transpose _ Word_ -> press M t
- Edit Transpose _ Group -> press C M t
- Edit Transpose _ Line -> press C x t
+ Edit Transpose _ Character -> press C 't'
+ Edit Transpose _ Word_ -> press M 't'
+ Edit Transpose _ Group -> press C M 't'
+ Edit Transpose _ Line -> press C 'x' 't'
  Edit Transpose _ Block -> runEmacs "transpose-block" -- nonstandard
  -- Edit Transpose _ ->
 

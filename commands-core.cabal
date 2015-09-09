@@ -40,8 +40,7 @@ library
         Commands.RHS.Types
         Commands.Symbol
         Commands.Symbol.Types
-        Commands.Grammar
-        Commands.Parsers.Earley
+        -- Commands.Parsers.Earley
         Commands.Frontends.Dragon13
         Commands.Frontends.Dragon13.Types
         Commands.Frontends.Dragon13.Lens
@@ -49,7 +48,7 @@ library
         Commands.Frontends.Dragon13.Optimize
         Commands.Frontends.Dragon13.Shim
         Commands.Frontends.Dragon13.Serialize
-        Commands.Frontends.Dragon13.Induce
+        -- Commands.Frontends.Dragon13.Induce
         Commands.Backends.OSX
         Commands.Backends.OSX.Example
         Commands.Backends.OSX.Types
@@ -63,9 +62,6 @@ library
         Commands.Servers.Servant.Types
         Commands.Servers.Servant.API
         Commands.Mixins.DNS13OSX9
-        Commands.Mixins.DNS13OSX9.Types
-        Commands.Mixins.DNS13OSX9.Primitive
-        Commands.Mixins.DNS13OSX9.Combinator
         Commands.Sugar
         Commands.Sugar.Press
         Commands.Sugar.Alias

@@ -14,7 +14,6 @@ import qualified Data.Text.Lazy                    as T
 
 import           Data.Bifunctor                    (second)
 import           Data.Either                       (partitionEithers)
-import           Data.Graph
 import qualified Data.List                         as List
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
@@ -23,19 +22,16 @@ import           Numeric.Natural
 
 
 -- | a grammar can be normalized/optimized with its @i@ and @n@ type parameters.
-type DNSGrammarOptimizeable t n = DNSGrammar DNSInfo t (DNSExpandedName n)
+type DNSGrammarOptimizeable t n = DNSGrammar DNSInfo t n
 
 -- | see 'simplifyGrammar'.
-type DNSProductionOptimizeable t n = DNSProduction DNSInfo t (DNSExpandedName n)
+type DNSProductionOptimizeable t n = DNSProduction DNSInfo t n
 
 -- | see 'vocabularizeGrammar'
-type DNSVocabularyOptimizeable t n = DNSVocabulary DNSInfo t (DNSExpandedName n)
+type DNSVocabularyOptimizeable t n = DNSVocabulary DNSInfo t n
 
 -- | see ''. an edge in an adjacency graph.
-type DNSAdjacency t n = Adjacency (SomeDNSLHS (DNSExpandedName n)) (DNSProductionOptimizeable t n)
-
--- | see 'expandGrammar'
-type DNSExpanded n = [SomeDNSLHS (DNSExpandedName n)]
+type DNSAdjacency t n = Adjacency (SomeDNSLHS n) (DNSProductionOptimizeable t n)
 
 -- | see 'inlineGrammar'. quick access to the right-hand side of a production to be inlined.
 type DNSInlined t n = Map (SomeDNSLHS n) (DNSRHS t n)
@@ -56,11 +52,10 @@ type DNSVocabularized n = Map n (DNSLHS LHSList LHSDefined n)
 --
 -- TODO prop> introduces no naming collisions
 --
-optimizeGrammar' :: (Eq t) => DNSGrammar DNSInfo t (DNSExpandedName LHS) -> DNSGrammar DNSInfo t Text
+optimizeGrammar' :: (Eq t) => DNSGrammar DNSInfo t LHS -> DNSGrammar DNSInfo t Text
 optimizeGrammar'
- = second renderDNSExpandedName
- . tidyupGrammar
- . expandGrammar
+ = tidyupGrammar
+ -- . expandGrammar
  . vocabularizeGrammar
  . inlineGrammar
  . simplifyGrammar
@@ -75,97 +70,6 @@ optimizeAnyDNSGrammar :: (Eq t, Ord n) => DNSGrammar i t n -> DNSGrammar i t n
 optimizeAnyDNSGrammar
  = vocabularizeGrammar
  . simplifyGrammar
-
-
--- ================================================================ --
-
-{- |
-
-eliminates all cycles from the graph induced by 'dnsAdjacency':
-
-TODO prop> all (\case { AcyclicSCC{} -> True; _ -> False }) ('stronglyConnComp' . fmap 'dnsAdjacency' . toListOf dnsProductions . expandGrammar $ g)
-
-preserves the 'dnsExport':
-
-TODO prop> (g ^. dnsExport) `equalDNSProduction` (expandGrammar g ^. dnsExport)
-
--}
-expandGrammar :: (Eq n, Ord n) => DNSGrammarOptimizeable t n -> DNSGrammarOptimizeable t n
-expandGrammar (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
- where
- ([e], ps) = List.partition (`equalDNSProduction` _e) expanded -- TODO should pattern match fail, expansion has corrupted the grammar
- expanded = expandSCCs . stronglyConnComp . fmap dnsAdjacency $ (_e:_ps)
-
-{- | induces a graph on a 'DNSGrammar', where:
-
-* nodes are 'DNSProduction's
-* out-edges are when a 'DNSProduction's 'DNSRHS' holds a 'DNSProduction's 'DNSLHS' as a 'DNSNonTerminal'.
-
--}
-dnsAdjacency :: DNSProductionOptimizeable t n -> DNSAdjacency t n
-dnsAdjacency p = (p,l,ls)
- where
- l  = SomeDNSLHS (p^.dnsProductionLHS)
- ls = getNonTerminals p
-
--- |
---
-expandSCCs :: (Eq n) => [SCC (DNSProductionOptimizeable t n)] -> [DNSProductionOptimizeable t n]
-expandSCCs = concatMap $ \case
- AcyclicSCC p -> [p] -- acyclic productions don't need to be expanded
- CyclicSCC ps -> expandProductionCycle ps
-
-{- | expands each recursive 'DNSProduction' in the cycle (i.e. the input)
-to the depth 'dnsExpand'.
-
-the original name is preserved as the "root", to be consistent with
-references outside the cycle.
-
-
--- TODO nonempty
-
--- TODO? prop> length (expandProductionCycle c) == expandProductionCycle_measure c
-
--- TODO Arbitrary newtype should be biased towards mutually recursive productions, maybe by parameterising on @n@ a small enum.
-
--}
-expandProductionCycle :: (Eq n) => [DNSProductionOptimizeable t n] -> [DNSProductionOptimizeable t n]
-expandProductionCycle ps = expandProductionCycleTo ls (expandProductionMaxDepth ps) =<< ps
- where
- ls = SomeDNSLHS <$> (ps ^.. each.dnsProductionLHS)
-
--- |
---
--- guarantees that the 'DNSLHS' of the input 'DNSProduction', matches the 'DNSLHS' of the first output 'DNSProduction'.
---
--- something like prop> \e n p -> let (q:|_) = expandProductionCycleTo e n p in q `equalDNSProduction` p
---
--- TODO this guarantee then guarantees the success of the irrefutable pattern match in expandGrammar i.e. ([e], ps)
-expandProductionCycleTo
- :: (Eq n)
- => DNSExpanded n
- -> Natural
- -> DNSProductionOptimizeable t n
- -> [DNSProductionOptimizeable t n]
-expandProductionCycleTo ls d p@(DNSProduction i l r)
-  = [DNSProduction i l $ expandRHSAt ls d r]
- <> fmap (\k -> expandProductionAt ls k p) (reverse [1..d])
- <> [DNSProduction i (expandLHSAt 0 l) $ defaultDNSExpandedName `second` ZeroDNSRHS]
-
-expandProductionAt :: (Eq n) => DNSExpanded n -> Natural -> DNSProductionOptimizeable t n -> DNSProductionOptimizeable t n
-expandProductionAt ls d (DNSProduction i l r) = DNSProduction i (expandLHSAt d l) (expandRHSAt ls (d-1) r)
-
-expandLHSAt :: Natural -> DNSLHS l s (DNSExpandedName n) -> DNSLHS l s (DNSExpandedName n)
-expandLHSAt = set (dnsLHSName.dnsExpansion) . Just
-
-expandRHSAt :: (Eq n) => DNSExpanded n -> Natural -> DNSRHS t (DNSExpandedName n) -> DNSRHS t (DNSExpandedName n)
-expandRHSAt ls d = transform $ \case
- DNSNonTerminal (shouldExpand ls -> Just (SomeDNSLHS l)) -> DNSNonTerminal (SomeDNSLHS (expandLHSAt d l))
- r -> r
-
-shouldExpand :: (Eq n) => DNSExpanded n -> SomeDNSLHS (DNSExpandedName n) -> Maybe (SomeDNSLHS (DNSExpandedName n))
-shouldExpand ls l = List.find (==l) ls
-
 
 
 {- |
@@ -302,8 +206,8 @@ rules2lists ls = transformOn dnsProductionRHS $ \case
 -- ================================================================ --
 
 -- | Tidy up the grammar by contacting the left-hand sides, without collisions.
-tidyupGrammar :: (Functor f) => DNSGrammar i t (f LHS) -> DNSGrammar i t (f Text)
-tidyupGrammar = second (fmap (T.pack . showLHS . tidyupLHS))
+tidyupGrammar :: DNSGrammar i t LHS -> DNSGrammar i t Text
+tidyupGrammar = second (T.pack . showLHS . tidyupLHS)
 
 -- |
 tidyupLHS :: LHS -> LHS
@@ -311,11 +215,6 @@ tidyupLHS (LHS (GUI (Package _) (Module _) (Identifier occ))) = LHS (GUI (Packag
 tidyupLHS (l `LHSApp` ls) = tidyupLHS l `LHSApp` fmap tidyupLHS ls
 tidyupLHS l = l
 -- TODO safely tidyup i.e. unambiguously. compare each against all, with getNames. Build a Trie?
-
--- |
-renderDNSExpandedName :: DNSExpandedName Text -> Text
-renderDNSExpandedName (DNSExpandedName Nothing  n) = n
-renderDNSExpandedName (DNSExpandedName (Just k) n) = n <> T.pack "____" <> T.pack (show k)
 
 
 -- ================================================================ --

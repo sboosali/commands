@@ -9,9 +9,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse (ParseResult (..),
                                               parsePackageDescription)
 
-import Control.Arrow                         ((>>>))
 import Data.List                             (intercalate)
-import Data.Monoid                           ((<>))
 
 
 loadPackageDescription :: IO (Either PError GenericPackageDescription)

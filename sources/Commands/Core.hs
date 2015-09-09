@@ -18,8 +18,7 @@ module Commands.Core
  , module Commands.Grammar
  , module Commands.Munging
  , module Commands.LHS
- , module Commands.Parsers.Earley
- -- , module Control.Alternative.Free.
+ -- , module Commands.Parsers.Earley
  ) where
 
 import Commands.Etc
@@ -27,6 +26,5 @@ import Commands.Grammar
 import Commands.Instances      ()
 import Commands.LHS
 import Commands.Munging
-import Commands.Parsers.Earley
+-- import Commands.Parsers.Earley
 import Commands.Symbol.Types
--- TODO import Control.Alternative.Free.

@@ -4,8 +4,6 @@
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
 module Commands.Frontends.Dragon13.Types where
 import Commands.Etc
-import Commands.LHS
-import Commands.Symbol.Types (RHS, Rule)
 
 import Control.Lens.Plated   (Plated (..))
 import Data.Bifoldable
@@ -16,7 +14,6 @@ import Data.Semigroup
 
 import Data.Char             (toLower)
 import Data.Traversable
-import Data.Tree
 import GHC.Exts              (IsString (..))
 import Numeric.Natural
 
@@ -446,74 +443,6 @@ getWords = getRights
 
 
 -- ================================================================ --
-
--- | a right-hand side that can be reified. See 'Commands.Frontends.Dragon13.Induce.induceDNSReified'.
---
--- (simplifies refactoring)
-type DNSReifiableRHS  p = RHS  p DNSReifying DNSReifyingName DNSReifyingToken
-type DNSReifiableRule p = Rule p DNSReifying DNSReifyingName DNSReifyingToken
-
-{- | the type that will be reifying 'RHS'.
-
-each production is paired with its (transitive) dependencies. you can read:
-
-@
-DNSReifying ('Node' p ps)
-@
-
-as: "the production @p@ depends on the productions in @ps@".
-
-unlike a 'DNSGrammar':
-
-* the dependencies are direct references in the 'subForest',
-not indirect references keyed upon 'SomeDNSLHS'
-* the 'rootLabel' holds exactly one 'DNSProduction'
-
--}
-newtype DNSReifying l i = DNSReifying { _dnsReifyingDescendents :: (Tree (DNSReifyingProduction l i)) }
- deriving (Show,Eq)
--- TODO it's not really reification then, if your references are still direct
-
-defaultDNSReifying :: l -> DNSReifyingRHS l i -> DNSReifying l i
-defaultDNSReifying l r = DNSReifying $ Node (defaultDNSProduction l r) []
-
-type DNSReifyingProduction l i = DNSProduction DNSInfo i (DNSExpandedName l)
-
-defaultDNSProduction :: l -> DNSReifyingRHS l i -> DNSReifyingProduction l i
-defaultDNSProduction l r = DNSProduction defaultDNSInfo (DNSRule (defaultDNSExpandedName l)) r
-
-type DNSReifyingRHS l i = DNSRHS i (DNSExpandedName l)
-
-type DNSReifyingName = DNSExpandedName LHS
-
--- | not 'Text' because user-facing "config" modules (e.g.
--- "Reifyings.Plugins.Example") can only use *one* of:
---
--- * OverloadedStrings
--- * type class sugar
---
--- as we need to trigger a class @String@ instantiates.
--- TODO can we make this work with defaulting?
-type DNSReifyingToken = String
-
--- | a name, with the level of its expansion.
---
--- '_dnsExpansion' tracks which level a recursive 'DNSProduction' has been expanded to.
---
--- when the '_dnsExpansion' is @Nothing@, the 'DNSProduction' will not be expanded.
---
--- when the '_dnsExpansion' is @Just 0@, the 'DNSProduction' will only
--- hold base case 'DNSAlternative's, not the recursive 'DNSAlternative's.
---
-data DNSExpandedName n = DNSExpandedName
- { _dnsExpansion    :: Maybe Natural
- , _dnsExpandedName :: n
- }
- deriving (Show,Eq,Ord,Functor)
-
--- | yet un-expanded
-defaultDNSExpandedName :: n -> DNSExpandedName n
-defaultDNSExpandedName = DNSExpandedName Nothing
 
 -- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
 --

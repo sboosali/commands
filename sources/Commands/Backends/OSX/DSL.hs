@@ -45,3 +45,10 @@ google (BS.pack -> query) = openURL (BS.unpack $ "https://www.google.com/search"
 -- TODO
 -- instance convert KeyPress Actions
 -- instance convert MouseClick Actions
+
+-- doubleClick :: AMonadAction_
+-- doubleClick = clickMouse [] LeftButton 2
+
+-- rightClick :: AMonadAction_
+-- rightClick = clickMouse [] RightButton 1
+

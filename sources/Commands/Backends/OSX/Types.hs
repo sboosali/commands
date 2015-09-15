@@ -120,6 +120,9 @@ newtype Positive = Positive { getPositive :: Int }
 -- data KeyPress = KeyPress [Modifier] Key
 --  deriving (Show,Eq,Ord)
 
+type KeyRiff  = [KeyChord]
+type KeyChord = KeyPress
+
 type KeyPress = ([Modifier], Key)
 pattern KeyPress mods k = (mods, k)
 pattern NoMod         k = ([],   k)

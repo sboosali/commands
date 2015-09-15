@@ -65,6 +65,7 @@ library
         Commands.Sugar
         Commands.Sugar.Press
         Commands.Sugar.Alias
+        Commands.Sugar.Keys
         Commands.Etc
         Commands.Etc.Generics
         Commands.Instances

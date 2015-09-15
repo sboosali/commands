@@ -42,7 +42,7 @@ encodeModifiers
  . fromIntegral
  . uint
  . foldl (.|.) (zeros 64)
- . fmap mask
+ . fmap marshallMask
 
 {- | marshall the 'keycode'
 
@@ -58,5 +58,5 @@ encodeKey
  = CUShort
  . fromIntegral
  . uint
- . keycode
+ . marshallKeycode
 

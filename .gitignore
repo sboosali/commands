@@ -3,6 +3,8 @@ ignore/
 notes
 goals
 TODO
+cbits/main
+.projectile
 
 # Haskell
 dist

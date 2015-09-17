@@ -671,9 +671,9 @@ str :: String -> DNSEarleyRHS z Text
 str = token
 
 vocab :: (IsString t, Show t, Functor'RHS n t f) => [(String, a)] -> RHS n t f a
-vocab = foldMap$ \case
- ("",_) -> Empty -- for convenience
- (s ,x) -> x <$ token s
+vocab
+ = foldMap (\(s,x) -> x <$ token s)
+ . filterBlanks
 
 tokens :: (IsString t, Show t, Functor'RHS n t f) => [String] -> RHS n t f t
 tokens = foldMap token

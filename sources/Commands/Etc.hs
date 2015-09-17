@@ -41,6 +41,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                NameFlavour (NameG),
                                                OccName (OccName),
                                                PkgName (PkgName))
+import           GHC.Exts                          (IsString (..))
 
 
 -- | generalized 'Maybe':
@@ -274,22 +275,6 @@ type (:~>:) f g = forall x. f x -> g x
 ($>) :: (Functor f) => f a -> b -> f b
 ($>) = flip (<$)
 
-{- | @(-:) = (,)@
-
-fake dictionary literal syntax:
-
-@
- [ "a"-: 1
- , "b"-: 2
- , "c"-: 1+2
- ]
-@
-
--}
-(-:) :: a -> b -> (a,b)
-(-:) = (,)
-infix 1 -:
-
 {- | left-biased maximum.
 
 >>> 'maximumBy' ('comparing' 'snd') [('a',0),('b',0),('c',0)]
@@ -319,6 +304,68 @@ argmax f = maximumByL (comparing f)
 -}
 interleaving :: (Alternative f) => f a -> f x -> f (NonEmpty a)
 interleaving f g = (:|) <$> f <*> many (g *> f)
+
+{- | @(-:) = (,)@
+
+fake dictionary literal syntax:
+
+@
+ [ "a"-: 1
+ , "b"-: 2
+ , "c"-: 1+2
+ ]
+@
+
+-}
+(-:) :: a -> b -> (a,b)
+(-:) = (,)
+infix 1 -:
+
+{- | for convenience when writing string dicts, let's you make a value equal to its key.
+
+@
+ [ "a"-: "b"
+ , "b"-: "a"
+ , both "c"
+ ]
+@
+
+evaluates to:
+
+@
+ [ "a"-: "b"
+ , "b"-: "a"
+ , "c"-: "c"
+ ]
+@
+
+-}
+both :: a -> (a, a)
+both a = (a, a)
+
+{- | for convenience when writing string dicts, lets you leave keys/values blank
+
+@
+filterBlanks
+ [ "a"-: "b"
+ , "b"-: "a"
+ , ""-: "..."
+ ]
+@
+
+evaluates to:
+
+@
+ [ "a"-: "b"
+ , "b"-: "a"
+ ]
+@
+
+-}
+filterBlanks :: (IsString k, Eq k) => [(k, v)] -> [(k, v)]
+filterBlanks = filter $ \case
+ ("",_) -> False
+ (_, _) -> True
 
 
 -- ================================================================ --

@@ -8,6 +8,7 @@ import Data.Monoid        ((<>))
 import Foreign.C.Types
 
 
+
 -- | a monad constraint for "workflow effects", (just like @MonadState@ is a monad constraint for "state effects") can use in any monad transformer stack that handles them.
 type MonadAction = MonadFree ActionF
 
@@ -59,6 +60,8 @@ type URL = String
 
 type Time = Int
 -- units package
+
+-- class IsString TODO needs Free ActionF, which must be lifted, which isn't better than insert 
 
 
 -- | desugars the thing into Actions, given an Application.

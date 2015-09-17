@@ -40,6 +40,31 @@ sendTextAsKeypresses
  . concatMap char2keypress
  -- liftF :: ActionF () -> Free ActionF ()
 
+runActionsWithDelay :: Int -> Actions a -> IO a
+runActionsWithDelay t = iterM $ \case
+ -- iterM :: (Monad m, Functor f) => (f (m a) -> m a) -> Free f a -> m a
+
+ SendKeyPress    flags key k      -> threadDelay (t*1000) >> ObjC.pressKey flags key             >> k
+ SendText        s k              -> runActions (sendTextAsKeypressesWithDelay t s)              >> k
+
+ GetClipboard    f                -> threadDelay (t*1000) >> ObjC.getClipboard                   >>= f
+ SetClipboard    s k              -> threadDelay (t*1000) >> ObjC.setClipboard s                 >> k
+
+ CurrentApplication f             -> threadDelay (t*1000) >> ObjC.currentApplication             >>= f
+ OpenApplication app k            -> threadDelay (t*1000) >> ObjC.openApplication app            >> k
+ OpenURL         url k            -> threadDelay (t*1000) >> ObjC.openURL url                    >> k
+
+ Delay           t k              -> threadDelay (t*1000)                                        >> k
+ -- 1,000 µs is 1ms
+
+-- | returns a sequence of 'SendKeyPress'es.
+sendTextAsKeypressesWithDelay :: Int -> String -> Actions ()
+sendTextAsKeypressesWithDelay t
+ = traverse_ (\(modifiers, key) -> do
+    liftF $ Delay t                    ()
+    liftF $ SendKeyPress modifiers key ())
+ . concatMap char2keypress
+ -- liftF :: ActionF () -> Free ActionF ()
 
 {- | shows the "static" data flow of some 'Actions', by showing its primitive operations, in @do-notation@.
 

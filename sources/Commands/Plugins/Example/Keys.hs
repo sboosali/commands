@@ -7,10 +7,8 @@ import           Commands.Backends.OSX
 import           Commands.Etc
 import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Phrase (character)
-import           Commands.Sugar.Keys
 
 import           Control.Applicative
-import           Data.Char hiding(Control)
 import           Data.Foldable                   (traverse_)
 
 

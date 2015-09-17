@@ -144,6 +144,14 @@ someRHS = Some id
 (-++) = many1RHS
 many1RHS = Some NonEmpty.toList
 
+-- | @(-|-) = 'eitherRHS'@
+--
+-- a heterogeneous binary 'Alter'.
+(-|-), eitherRHS :: RHS n t f a -> RHS n t f b -> RHS n t f (Either a b)
+(-|-) = eitherRHS
+eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- constructors avoid Functor constraint 
+-- eitherRHS l r = (Left <$> l) <|> (Right <$> r)
+
 (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
 (-#-) k = traverse id . replicate k
 

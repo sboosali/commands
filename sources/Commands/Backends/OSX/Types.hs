@@ -130,6 +130,10 @@ type KeyPress = ([Modifier], Key)
 pattern KeyPress mods k = (mods, k)
 pattern NoMod         k = ([],   k)
 
+addMod :: Modifier -> KeyPress -> KeyPress
+addMod mod (mods, k) = KeyPress (mod:mods) k
+-- false positive nonexhaustive warning with the KeyPress pattern 
+
 {- | modifier keys are keys that can be "held".
 
 the escape key is "pressed", not "held", it seems.

@@ -91,6 +91,8 @@ gKeychords = mdo
   <|> NoMod F19Key <$ E.word  "<f19>"
   <|> NoMod F20Key <$ E.word  "<f20>"
 
+  <|> (either __BUG__ id . digit2keypress . read . (:[])) <$> E.satisfy ((&&) <$> isDigit <*> isAscii)
+      -- read and digit2keypress are safe because: isDigit returns number characters between zero and nine inclusive
   <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> (not.isAlphaNum) <*> isAscii)   -- must be last 
   <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> isLower <*> isAscii)   -- must be last 
 

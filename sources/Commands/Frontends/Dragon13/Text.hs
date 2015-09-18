@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, GeneralizedNewtypeDeriving, OverloadedStrings #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, GeneralizedNewtypeDeriving, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes                                  #-}
 module Commands.Frontends.Dragon13.Text
  ( DNSName (..)
@@ -26,10 +26,10 @@ import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as T
 
 
-newtype DNSName = DNSName { unDNSName :: Text } deriving (Show, Eq, Ord)
+newtype DNSName = DNSName { unDNSName :: Text } deriving (Show, Eq, Ord,Data)
 -- pattern DNSName s <- DNSName_ s
 
-newtype DNSText = DNSText { unDNSText :: Text } deriving (Show, Eq, Ord)
+newtype DNSText = DNSText { unDNSText :: Text } deriving (Show, Eq, Ord,Data)
 -- pattern DNSText s <- DNSText_ s
 
 unsafeDNSName :: Text -> DNSName

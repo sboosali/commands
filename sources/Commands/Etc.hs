@@ -6,6 +6,7 @@ module Commands.Etc
  ( module Commands.Etc
  , module Commands.Instances
  , module Control.Arrow
+ , module Data.Data
  ) where
 import           Commands.Instances
 
@@ -42,6 +43,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                OccName (OccName),
                                                PkgName (PkgName))
 import           GHC.Exts                          (IsString (..))
+import Data.Data (Data) 
 
 
 -- | generalized 'Maybe':
@@ -92,11 +94,11 @@ data GUI = GUI
  { _guiPackage    :: !Package
  , _guiModule     :: !Module
  , _guiIdentifier :: !Identifier
- } deriving (Show,Eq,Ord,Generic,Hashable)
+ } deriving (Show,Eq,Ord,Hashable,Generic,Data)
 
-newtype Package    = Package    String deriving (Show,Eq,Ord,Generic,Hashable)
-newtype Module     = Module     String deriving (Show,Eq,Ord,Generic,Hashable)
-newtype Identifier = Identifier String deriving (Show,Eq,Ord,Generic,Hashable)
+newtype Package    = Package    String deriving (Show,Eq,Ord,Generic,Data,Hashable)
+newtype Module     = Module     String deriving (Show,Eq,Ord,Generic,Data,Hashable)
+newtype Identifier = Identifier String deriving (Show,Eq,Ord,Generic,Data,Hashable)
 
 -- | only 'NameG' is global, i.e. is unique modulo package and module.
 fromGlobalName :: Name -> Possibly GUI
@@ -259,9 +261,10 @@ snoc xs x = xs <> [x]
 data Address = Address
  { _host :: Host
  , _port :: Port
- } deriving (Show,Eq,Ord)
-newtype Host = Host String deriving (Show,Eq,Ord)
-newtype Port = Port Int deriving (Show,Eq,Ord)
+ } deriving (Show,Eq,Ord,Data)
+
+newtype Host = Host String deriving (Show,Eq,Ord,Data)
+newtype Port = Port Int deriving (Show,Eq,Ord,Data)
 
 -- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
 -- "http://localhost:8000"

@@ -14,17 +14,13 @@ you can import this module to your "configuration" module, which should just def
 -}
 module Commands.Core
  ( module Commands.Etc
- , module Commands.Symbol.Types
- , module Commands.Grammar
  , module Commands.Munging
  , module Commands.LHS
  -- , module Commands.Parsers.Earley
  ) where
 
 import Commands.Etc
-import Commands.Grammar
 import Commands.Instances      ()
 import Commands.LHS
 import Commands.Munging
 -- import Commands.Parsers.Earley
-import Commands.Symbol.Types

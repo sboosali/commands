@@ -1,8 +1,8 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DeriveGeneric #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DataKinds, DeriveAnyClass, DeriveFunctor, DeriveGeneric #-}
 {-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TypeOperators  #-}
 module Commands.Servers.Servant.Types where
 import qualified Commands.Backends.OSX                 as OSX
--- import           Commands.Etc
+import           Commands.Etc
 import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Mixins.DNS13OSX9             (EarleyParser, RULED)
 
@@ -53,7 +53,7 @@ data VSettings z a = VSettings
 {- |
 -}
 data VError = VError String
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord, Data)
 
 {- | read-only.
 "dynamic" configuration

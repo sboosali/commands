@@ -10,6 +10,7 @@ import Data.Char
 --
 -- see 'defSpacing' for an example.
 newtype Spacing = Spacing { getSpacing :: SpacingX -> String }
+
 -- type Spacing = (Map SpacingX String, String)
 -- TODO replace the Map with generic "lookup" i.e. any function into
 -- Maybe

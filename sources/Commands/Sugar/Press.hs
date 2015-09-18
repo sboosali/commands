@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, TupleSections, TypeFamilies #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, FlexibleInstances, TupleSections, TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances                           #-}
 {- | syntactic sugar for defining type-safe keyboard shortcuts, under the 'Actions' monad.
 
@@ -12,6 +12,7 @@ by polluting the global namespace with single-letter identifiers, your config wi
 
 -}
 module Commands.Sugar.Press where -- TODO move aliases to Commands.Sugar.Aliases. They keep polluting the namespace.
+import Commands.Etc
 import Commands.Backends.OSX.DSL
 import Commands.Backends.OSX.Types
 
@@ -118,6 +119,7 @@ instance (PressArg a, PressFun f) => PressFun (a -> f)  where
 --
 --
 data ModifierSynonym = M | C | S | O | F
+ deriving (Bounded, Enum, Show, Ord, Eq, Data) 
 
 pattern :: ModifierSynonym -> Modifier
 pattern M = CommandMod

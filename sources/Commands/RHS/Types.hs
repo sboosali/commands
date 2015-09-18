@@ -1,16 +1,16 @@
-{-# LANGUAGE DeriveFunctor, FlexibleContexts, FlexibleInstances, GADTs #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, FlexibleContexts, FlexibleInstances, GADTs #-}
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators              #-}
 module Commands.RHS.Types where
+-- import           Commands.Etc
 
--- import           Control.Lens
+import           Control.Lens
 import           Data.List.NonEmpty  (NonEmpty (..))
 import qualified Data.List.NonEmpty  as NonEmpty
 
 import           Control.Applicative
-import           Control.Lens
 import           Data.Foldable       (asum)
 import           Data.Monoid
 import           GHC.Exts            (IsList (..), IsString (..))
@@ -41,6 +41,7 @@ pattern Empty = Alter []
 
 -- TODO expects constraint:
 deriving instance (Functor (n t f)) => (Functor (RHS n t f))
+-- deriving instance () => Data (RHS n t f a)
 
 instance (Functor f, Functor (n t f)) => Monoid (RHS n t f a) where
  mempty = Empty

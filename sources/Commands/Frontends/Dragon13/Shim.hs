@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, QuasiQuotes, RankNTypes, RecordWildCards #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, QuasiQuotes, RankNTypes, RecordWildCards #-}
 -- | (you should read the source for documentation: just think of this module as a config file)
 module Commands.Frontends.Dragon13.Shim where
 
@@ -22,10 +22,10 @@ data ShimR t = ShimR
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
  , __serverHost__ :: t  -- ^ a Python String
  , __serverPort__ :: t  -- ^ a Python Int
- } deriving (Show,Eq,Ord,Functor)
+ } deriving (Show,Eq,Ord,Functor,Data)
 
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
-newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord)
+newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord,Data)
 
 
 -- | smart constructor for 'PythonFile'.

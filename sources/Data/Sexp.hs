@@ -1,6 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor        #-}
 {-# LANGUAGE LambdaCase, OverloadedLists, OverloadedStrings, TypeFamilies #-}
 module Data.Sexp where
+import Commands.Etc
 
 import Control.Lens
 import Data.Semigroup
@@ -34,7 +35,7 @@ data Sexp f a
  = Atom a
  | List   [Sexp f a]
  | Sexp f [Sexp f a]
- deriving (Show,Eq,Ord, Functor)
+ deriving (Show,Eq,Ord, Functor, Data)
 
 -- | default from the 'Monad' subclass.
 instance Applicative (Sexp f) where
@@ -185,7 +186,7 @@ listSexp = List . map Atom
 data SexpF a r
  = AtomF a
  | ListF [r]
- deriving (Show,Eq,Ord, Functor)
+ deriving (Show,Eq,Ord, Functor, Data)
 
 -- type Sexp' a = Fix (SexpF a)
 

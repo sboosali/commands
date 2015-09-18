@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, GADTs, NamedFieldPuns, OverloadedStrings #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DataKinds, GADTs, NamedFieldPuns, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes, ViewPatterns, RecordWildCards          #-}
 -- | Uses pretty printer combinators for readability of serialization.
 --
@@ -28,7 +28,8 @@ data SerializedGrammar = SerializedGrammar
  { serializedRules  :: Doc
  , serializedLists  :: Doc
  , serializedExport :: Doc
- }
+ } deriving (Show)
+ -- deriving(Show,Eq,Ord,Data) 
 
 {- $setup
 

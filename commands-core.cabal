@@ -60,7 +60,6 @@ library
         Commands.Servers.Servant.Types
         Commands.Servers.Servant.API
         Commands.Mixins.DNS13OSX9
-        Commands.Sugar
         Commands.Sugar.Press
         Commands.Sugar.Alias
         Commands.Sugar.Keys

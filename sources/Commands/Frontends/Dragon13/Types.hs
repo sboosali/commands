@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable,  DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
 {-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
@@ -62,7 +62,7 @@ data DNSGrammar i t n = DNSGrammar
  -- TODO _dnsExports  :: NonEmpty (DNSProduction i t n)
  -- TODO _dnsP? :: (DNSProduction i t n)
  -- TODO dnsProductions = dnsExports <> _dnsP?
- } deriving (Show, Eq)
+ } deriving (Show,Eq,Ord)
 
 instance Semigroup (DNSGrammar i t n) where
  DNSGrammar ps vs is <> DNSGrammar ps' vs' is' = DNSGrammar (ps <> ps') (vs <> vs') (is <> is')
@@ -85,6 +85,8 @@ defaultDNSGrammar ps = DNSGrammar ps [] dnsHeader
 --
 --
 data DNSImport n = forall s. DNSImport (DNSLHS LHSRule s n)
+-- deriving instance (Data n) => Data (DNSImport n)
+
 -- a type alias would demand ImpredicativeTypes for the [DNSImport n]
 --
 -- A newtype constructor cannot have existential type variables
@@ -116,6 +118,7 @@ data DNSProduction i t n = DNSProduction
  , _dnsProductionRHS  :: (DNSRHS t n)
  }
  deriving (Show,Eq,Ord)
+ -- deriving (Show,Eq,Ord,Data)
 
 instance Bifunctor     (DNSProduction i) where bimap     = bimapDefault
 instance Bifoldable    (DNSProduction i) where bifoldMap = bifoldMapDefault
@@ -135,6 +138,7 @@ data DNSVocabulary i t n = DNSVocabulary
  , _dnsVocabularyTokens :: [DNSToken t]
  }
  deriving (Show,Eq,Ord)
+ -- deriving (Show,Eq,Ord,Data)
 
 instance Bifunctor     (DNSVocabulary i) where bimap     = bimapDefault
 instance Bifoldable    (DNSVocabulary i) where bifoldMap = bifoldMapDefault
@@ -157,6 +161,7 @@ data DNSRHS t n
  | DNSSequence     (NonEmpty (DNSRHS t n)) -- ^ e.g. @first second ...@
  | DNSAlternatives (NonEmpty (DNSRHS t n)) -- ^ e.g. @(alternative | ...)@
  deriving (Show,Eq,Ord)
+ -- deriving (Show,Eq,Ord,Data)
 
 instance Bifunctor     DNSRHS where bimap     = bimapDefault
 instance Bifoldable    DNSRHS where bifoldMap = bifoldMapDefault
@@ -314,6 +319,7 @@ data DNSLHS (l :: LHSKind) (s :: LHSSide) n where
 deriving instance (Show n) => Show (DNSLHS l s n)
 instance (Eq n)  => Eq  (DNSLHS l s n) where (==)    = equalDNSLHS
 instance (Ord n) => Ord (DNSLHS l s n) where compare = compareDNSLHS
+-- deriving instance (Data n) => Data (DNSLHS l s n)
 
 instance Functor     (DNSLHS l s) where fmap     = fmapDefault
 instance Foldable    (DNSLHS l s) where foldMap  = foldMapDefault
@@ -349,7 +355,7 @@ rankDNSLHS = \case
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
 data DNSBuiltinRule = DGNDictation | DGNWords | DGNLetters
- deriving (Show, Eq, Ord, Enum)
+ deriving (Show, Eq, Ord, Enum,Data)
 
 displayDNSBuiltinRule :: DNSBuiltinRule -> String
 displayDNSBuiltinRule = fmap toLower . show
@@ -358,7 +364,7 @@ displayDNSBuiltinRule = fmap toLower . show
 --
 -- (in the future, DNS better have more built-in lists.)
 data DNSBuiltinList = DNSEmptyList
- deriving (Show, Eq, Ord, Enum)
+ deriving (Show, Eq, Ord, Enum,Data)
 
 displayDNSBuiltinList :: DNSBuiltinList -> String
 displayDNSBuiltinList DNSEmptyList = "emptyList"
@@ -392,6 +398,7 @@ data SomeDNSLHS n = forall l s. SomeDNSLHS (DNSLHS l s n)
 instance (Show n) => Show (SomeDNSLHS n) where showsPrec d (SomeDNSLHS l) = showsPrecNewtype d "SomeDNSLHS" l
 instance (Eq   n) => Eq   (SomeDNSLHS n) where SomeDNSLHS l1 ==        SomeDNSLHS l2 = l1 `equalDNSLHS`   l2
 instance (Ord  n) => Ord  (SomeDNSLHS n) where SomeDNSLHS l1 `compare` SomeDNSLHS l2 = l1 `compareDNSLHS` l2
+-- deriving instance (Data n) => Data (SomeDNSLHS n)
 
 instance Functor     SomeDNSLHS where fmap     = fmapDefault
 instance Foldable    SomeDNSLHS where foldMap  = foldMapDefault
@@ -404,7 +411,7 @@ instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$>
 data DNSToken t
  = DNSToken t -- ^ e.g. @"word or phrase"@
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
- deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+ deriving (Show, Eq, Ord, Functor, Foldable, Traversable,Data)
 
 -- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
@@ -451,7 +458,7 @@ data DNSInfo = DNSInfo
  { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
  , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
  }
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Data)
 
 -- | no expansion and no inlining.
 defaultDNSInfo :: DNSInfo

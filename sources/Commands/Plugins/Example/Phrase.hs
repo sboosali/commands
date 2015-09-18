@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, LambdaCase, TypeFamilies          #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, LambdaCase, TypeFamilies          #-}
 {-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
@@ -49,14 +49,14 @@ data Phrase_
  | Capped_   [Char] -- ^ atom-like.
  | Spelled_  [Char] -- ^ list-like.
  | Dictated_ Dictation -- ^ list-like.
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Data)
 
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Typeable)
-data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord)
-data Brackets = Brackets String String deriving (Show,Eq,Ord)
-newtype Separator = Separator String  deriving (Show,Eq,Ord)
+data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Data)
+data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord,Data)
+data Brackets = Brackets String String deriving (Show,Eq,Ord,Data)
+newtype Separator = Separator String  deriving (Show,Eq,Ord,Data)
 type Keyword = String -- TODO
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord)
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord,Data)
 
 instance IsString Dictation where
  fromString = Dictation . words               -- safe: words "" == []
@@ -89,7 +89,7 @@ data PFunc
  = Cased      Casing
  | Joined     Joiner
  | Surrounded Brackets
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Data)
 
 -- | "Phrase Atom".
 --
@@ -98,7 +98,7 @@ data PFunc
 data PAtom
  = PWord String
  | PAcronym [Char]
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Data)
 
 -- | for doctest
 instance IsString PAtom where fromString = PWord
@@ -110,7 +110,7 @@ but we only know (what words are in) the Pasted at (DSL-)"runtime"
 (i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
 
 -}
-data Pasted = Pasted  deriving (Show,Eq,Ord)
+data Pasted = Pasted  deriving (Show,Eq,Ord,Data)
 
 -- | used by 'pPhrase'.
 type PStack = NonEmpty PItem

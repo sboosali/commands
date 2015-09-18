@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell, ConstraintKinds, FlexibleContexts #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell, ConstraintKinds, FlexibleContexts #-}
 module Commands.Backends.OSX.Types where
 import Commands.Etc
 
@@ -49,6 +49,7 @@ data ActionF k
  -- TODO  | Annihilate      SomeException                       -- no k, it annihilates the action, for mzero and MonadThrow
  -- TODO   | PerformIO       (IO a)                           (a -> k)
  deriving (Functor)
+ -- deriving (Functor,Data)
 
 type ClipboardText = String
 
@@ -104,8 +105,8 @@ type CGEventFlags  = CULLong
 --  deriving (Show,Eq,Ord,Enum)
 
 -- | a (pseudo)-refinement type.
-newtype Positive = Positive { getPositive :: Int }
- deriving (Show,Eq,Ord)
+newtype Positive = Positive { getPositive :: Int } -- TODO or just use Natural? 
+ deriving (Show,Eq,Ord,Data)    -- not Num
 
 -- -- | smart constructor for 'Positive'.
 -- newPositive :: Int -> Possibly Positive
@@ -144,7 +145,7 @@ the escape key is "pressed", not "held", it seems.
 -}
 data Modifier = Control | CommandMod | Shift | Option | Function
  -- Command is qualified to not conflict with Commands.Command.Types
- deriving (Show,Eq,Ord,Enum)
+ deriving (Show,Eq,Ord,Bounded,Enum,Data)
 -- data Modifier = ControlMod | CommandMod | ShiftMod | OptionMod | FunctionMod
 
 {- | all the keys on a standard keyboard.
@@ -243,7 +244,7 @@ data Key
  | F19Key
  | F20Key
 
- deriving (Show,Eq,Ord)
+ deriving (Show,Eq,Ord,Bounded,Enum,Data)
 
 {- |
 

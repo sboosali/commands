@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable,  DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
 {-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
 {-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
@@ -355,7 +355,7 @@ rankDNSLHS = \case
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
 data DNSBuiltinRule = DGNDictation | DGNWords | DGNLetters
- deriving (Show, Eq, Ord, Enum,Data)
+ deriving (Show,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinRule :: DNSBuiltinRule -> String
 displayDNSBuiltinRule = fmap toLower . show
@@ -364,7 +364,7 @@ displayDNSBuiltinRule = fmap toLower . show
 --
 -- (in the future, DNS better have more built-in lists.)
 data DNSBuiltinList = DNSEmptyList
- deriving (Show, Eq, Ord, Enum,Data)
+ deriving (Show,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinList :: DNSBuiltinList -> String
 displayDNSBuiltinList DNSEmptyList = "emptyList"
@@ -411,7 +411,7 @@ instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$>
 data DNSToken t
  = DNSToken t -- ^ e.g. @"word or phrase"@
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
- deriving (Show, Eq, Ord, Functor, Foldable, Traversable,Data)
+ deriving (Show,Eq,Ord,Functor,Foldable,Traversable,Data,Generic)
 
 -- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
@@ -458,7 +458,7 @@ data DNSInfo = DNSInfo
  { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
  , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
  }
- deriving (Show,Eq,Ord,Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 
 -- | no expansion and no inlining.
 defaultDNSInfo :: DNSInfo

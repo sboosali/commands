@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, PatternSynonyms, RankNTypes, TemplateHaskell, ConstraintKinds, FlexibleContexts #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, DeriveGeneric, PatternSynonyms, RankNTypes, TemplateHaskell, ConstraintKinds, FlexibleContexts #-}
 module Commands.Backends.OSX.Types where
 import Commands.Etc
 
@@ -106,7 +106,7 @@ type CGEventFlags  = CULLong
 
 -- | a (pseudo)-refinement type.
 newtype Positive = Positive { getPositive :: Int } -- TODO or just use Natural? 
- deriving (Show,Eq,Ord,Data)    -- not Num
+ deriving (Show,Eq,Ord,Data)    -- not Nu,Genericm
 
 -- -- | smart constructor for 'Positive'.
 -- newPositive :: Int -> Possibly Positive
@@ -145,7 +145,7 @@ the escape key is "pressed", not "held", it seems.
 -}
 data Modifier = Control | CommandMod | Shift | Option | Function
  -- Command is qualified to not conflict with Commands.Command.Types
- deriving (Show,Eq,Ord,Bounded,Enum,Data)
+ deriving (Show,Eq,Ord,Bounded,Enum,Data,Generic)
 -- data Modifier = ControlMod | CommandMod | ShiftMod | OptionMod | FunctionMod
 
 {- | all the keys on a standard keyboard.
@@ -244,7 +244,7 @@ data Key
  | F19Key
  | F20Key
 
- deriving (Show,Eq,Ord,Bounded,Enum,Data)
+ deriving (Show,Eq,Ord,Bounded,Enum,Data,Generic)
 
 {- |
 

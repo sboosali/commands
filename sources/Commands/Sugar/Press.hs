@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, FlexibleInstances, TupleSections, TypeFamilies #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric,  FlexibleInstances, TupleSections, TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances                           #-}
 {- | syntactic sugar for defining type-safe keyboard shortcuts, under the 'Actions' monad.
 
@@ -119,7 +119,7 @@ instance (PressArg a, PressFun f) => PressFun (a -> f)  where
 --
 --
 data ModifierSynonym = M | C | S | O | F
- deriving (Bounded, Enum, Show, Ord, Eq, Data) 
+ deriving (Show,Ord,Eq,Bounded,Enum,Data,Generic)
 
 pattern :: ModifierSynonym -> Modifier
 pattern M = CommandMod

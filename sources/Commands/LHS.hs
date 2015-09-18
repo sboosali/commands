@@ -6,7 +6,6 @@ import Data.Hashable
 
 import Data.List                  (intercalate)
 import Data.Monoid                ((<>))
-import GHC.Generics               (Generic)
 import Language.Haskell.TH.Syntax (Name)
 import Data.Typeable (Typeable)
 
@@ -16,7 +15,7 @@ data LHS
  = LHS    !GUI                  -- ^ for tokens guaranteed unique by Haskell's name resolution modulo package
  | LHSInt !Int                  -- ^ for tokens guaranteed unique by safe/monadic generation
  | LHSApp !LHS [LHS]            -- ^ for reifying @app@lication of higher-order 'Rule's
- deriving (Show, Eq, Ord, Generic,Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 instance Hashable LHS
 
 

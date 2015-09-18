@@ -29,7 +29,7 @@ data SerializedGrammar = SerializedGrammar
  , serializedLists  :: Doc
  , serializedExport :: Doc
  } deriving (Show)
- -- deriving(Show,Eq,Ord,Data) 
+ -- deriving(Show,Eq,Ord,Data, Generic) 
 
 {- $setup
 

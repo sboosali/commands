@@ -7,6 +7,7 @@ module Commands.Etc
  , module Commands.Instances
  , module Control.Arrow
  , module Data.Data
+ , module GHC.Generics
  ) where
 import           Commands.Instances
 
@@ -94,11 +95,11 @@ data GUI = GUI
  { _guiPackage    :: !Package
  , _guiModule     :: !Module
  , _guiIdentifier :: !Identifier
- } deriving (Show,Eq,Ord,Hashable,Generic,Data)
+ } deriving (Show,Eq,Ord,Data,Generic,Hashable)
 
-newtype Package    = Package    String deriving (Show,Eq,Ord,Generic,Data,Hashable)
-newtype Module     = Module     String deriving (Show,Eq,Ord,Generic,Data,Hashable)
-newtype Identifier = Identifier String deriving (Show,Eq,Ord,Generic,Data,Hashable)
+newtype Package    = Package    String deriving (Show,Eq,Ord,Data,Generic,Hashable)
+newtype Module     = Module     String deriving (Show,Eq,Ord,Data,Generic,Hashable)
+newtype Identifier = Identifier String deriving (Show,Eq,Ord,Data,Generic,Hashable)
 
 -- | only 'NameG' is global, i.e. is unique modulo package and module.
 fromGlobalName :: Name -> Possibly GUI
@@ -261,10 +262,10 @@ snoc xs x = xs <> [x]
 data Address = Address
  { _host :: Host
  , _port :: Port
- } deriving (Show,Eq,Ord,Data)
+ } deriving (Show,Eq,Ord,Data,Generic)
 
-newtype Host = Host String deriving (Show,Eq,Ord,Data)
-newtype Port = Port Int deriving (Show,Eq,Ord,Data)
+newtype Host = Host String deriving (Show,Eq,Ord,Data,Generic)
+newtype Port = Port Int deriving (Show,Eq,Ord,Data,Generic)
 
 -- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
 -- "http://localhost:8000"

@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, LambdaCase, TypeFamilies          #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveGeneric, DeriveDataTypeable, DeriveFunctor, LambdaCase, TypeFamilies          #-}
 {-# LANGUAGE PostfixOperators, ScopedTypeVariables, TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 module Commands.Plugins.Example.Phrase where
@@ -49,14 +49,14 @@ data Phrase_
  | Capped_   [Char] -- ^ atom-like.
  | Spelled_  [Char] -- ^ list-like.
  | Dictated_ Dictation -- ^ list-like.
- deriving (Show,Eq,Ord,Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 
-data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Data)
-data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord,Data)
-data Brackets = Brackets String String deriving (Show,Eq,Ord,Data)
-newtype Separator = Separator String  deriving (Show,Eq,Ord,Data)
+data Casing = Upper | Lower | Capper deriving (Show,Eq,Ord,Enum,Data,Generic)
+data Joiner = Joiner String | CamelJoiner | ClassJoiner deriving (Show,Eq,Ord,Data,Generic)
+data Brackets = Brackets String String deriving (Show,Eq,Ord,Data,Generic)
+newtype Separator = Separator String  deriving (Show,Eq,Ord,Data,Generic)
 type Keyword = String -- TODO
-newtype Dictation = Dictation [String] deriving (Show,Eq,Ord,Data)
+newtype Dictation = Dictation [String] deriving (Show,Eq,Ord,Data,Generic)
 
 instance IsString Dictation where
  fromString = Dictation . words               -- safe: words "" == []
@@ -89,7 +89,7 @@ data PFunc
  = Cased      Casing
  | Joined     Joiner
  | Surrounded Brackets
- deriving (Show,Eq,Ord,Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 
 -- | "Phrase Atom".
 --
@@ -98,7 +98,7 @@ data PFunc
 data PAtom
  = PWord String
  | PAcronym [Char]
- deriving (Show,Eq,Ord,Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 
 -- | for doctest
 instance IsString PAtom where fromString = PWord
@@ -110,7 +110,7 @@ but we only know (what words are in) the Pasted at (DSL-)"runtime"
 (i.e. wrt the DSL, not Haskell). Thus, it's a placeholder.
 
 -}
-data Pasted = Pasted  deriving (Show,Eq,Ord,Data)
+data Pasted = Pasted  deriving (Show,Eq,Ord,Data,Generic)
 
 -- | used by 'pPhrase'.
 type PStack = NonEmpty PItem

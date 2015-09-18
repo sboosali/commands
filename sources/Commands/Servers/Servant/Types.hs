@@ -12,8 +12,6 @@ import           Data.Text.Lazy                        (Text)
 import qualified Network.Wai.Handler.Warp              as Wai
 import           Servant
 
-import           GHC.Generics                          (Generic)
-
 
 type Response = EitherT ServantErr IO
 
@@ -37,7 +35,7 @@ type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON
 
 {- |
 -}
-newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Generic,FromJSON)
+newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Data,Generic,FromJSON)
 
 {- | read-only.
 "static" configuration
@@ -53,7 +51,7 @@ data VSettings z a = VSettings
 {- |
 -}
 data VError = VError String
- deriving (Show,Eq,Ord, Data)
+ deriving (Show,Eq,Ord,Data,Generic)
 
 {- | read-only.
 "dynamic" configuration

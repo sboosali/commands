@@ -38,8 +38,6 @@ library
         Commands
         Commands.Core
         Commands.RHS.Types
-        Commands.Symbol
-        Commands.Symbol.Types
         -- Commands.Parsers.Earley
         Commands.Frontends.Dragon13
         Commands.Frontends.Dragon13.Types
@@ -67,7 +65,6 @@ library
         Commands.Sugar.Alias
         Commands.Sugar.Keys
         Commands.Etc
-        Commands.Etc.Generics
         Commands.Instances
         Commands.LHS
         Commands.Munging

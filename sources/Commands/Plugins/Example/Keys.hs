@@ -15,13 +15,12 @@ import           Data.Foldable                   (traverse_)
 -- | a riff is some chords?
 keyriff :: R z KeyRiff
 keyriff = 'keyriff
- <=> (keychord-++)
+ <=> "press" *> (keychord-++)
 
--- | the terminals in key and modifier should be disjoint; otherwise, there is ambiguity.
+-- | the terminals in key and modifier are disjoint; otherwise, there is ambiguity.
 keychord :: R z KeyChord
 keychord = 'keychord
- <=> moveShift <$ "press" <*> (modifier-*)  <*> key      -- zero or more modifiers (prefixed) 
- <|> moveShift <$>            (modifier-++) <*> key      -- one or more modifiers (not prefixed) 
+ <=> moveShift <$> (modifier-*) <*> key
  where
  moveShift ms (ms', k) = KeyPress (ms ++ ms') k
 
@@ -44,7 +43,7 @@ so we can't embed the one into the other, but we'll just keep things simple with
 -}
 key :: R z KeyPress
 key = 'key
- <=> ((either __BUG__ id) . char2keypress) <$> (inlineRHS(character))
+ <=> ((either __BUG__ id) . char2keypress) <$> (__inlineRHS__(character))
   -- inlined to trigger vocabulary optimization, the right-hand side which must have only tokens
 
  <|> "up" $> KeyPress [] UpArrowKey

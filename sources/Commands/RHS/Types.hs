@@ -213,9 +213,10 @@ foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
 
 {- | unwraps a 'NonTerminal', otherwise preserves the input.
 when NonTerminals are interpreted as tagging a right-hand side with a left-hand side for "sharing", this function should "unshare" its input from other right-hand side expressions with the same "name".
+(the double underscores at weirdness)
 -}
-inlineRHS :: RHS n t f a -> RHS n t f a
-inlineRHS = \case
+__inlineRHS__ :: RHS n t f a -> RHS n t f a
+__inlineRHS__ = \case
  NonTerminal _ r -> r
  r -> r
 

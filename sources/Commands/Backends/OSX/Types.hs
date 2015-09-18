@@ -251,6 +251,34 @@ data Key
 int2keypress :: Integer -> [KeyPress]
 int2keypress = concatMap char2keypress . show
 
+{- | 
+
+a (base ten) digit is a number between zero and nine inclusive.
+
+>>> digit2keypress 2
+([],TwoKey)
+
+>>> digit2keypress -2
+Nothing
+
+>>> digit2keypress 12
+Nothing
+
+-}
+digit2keypress :: Integer -> Possibly KeyPress
+digit2keypress 0  = return $ NoMod ZeroKey
+digit2keypress 1  = return $ NoMod OneKey
+digit2keypress 2  = return $ NoMod TwoKey
+digit2keypress 3  = return $ NoMod ThreeKey
+digit2keypress 4  = return $ NoMod FourKey
+digit2keypress 5  = return $ NoMod FiveKey
+digit2keypress 6  = return $ NoMod SixKey
+digit2keypress 7  = return $ NoMod SevenKey
+digit2keypress 8  = return $ NoMod EightKey
+digit2keypress 9  = return $ NoMod NineKey
+
+digit2keypress k = fail $ "digit2keypress: digits must be between zero and nine: " <> show k
+
 
 {- | the keypress that would insert the character into the application.
 
@@ -369,7 +397,7 @@ char2keypress ' '  = return $ (,) [     ] SpaceKey
 char2keypress '\t' = return $ (,) [     ] TabKey
 char2keypress '\n' = return $ (,) [     ] ReturnKey
 
-char2keypress c = fail $ "Commands.Compile.char2keypress: un-pressable Char: " <> show c
+char2keypress c = fail $ "char2keypress: un-pressable Char: " <> show c
 
 
 {- | the character that represents the keypress:
@@ -491,6 +519,6 @@ keypress2char ((,) [     ] SpaceKey)        = return $ ' '
 keypress2char ((,) [     ] TabKey)          = return $ '\t'
 keypress2char ((,) [     ] ReturnKey)       = return $ '\n'
 
-keypress2char k = fail $ "Commands.Compile.keypress2char: non-unicode-representable Keypress: " <> show k
+keypress2char k = fail $ "keypress2char: non-unicode-representable Keypress: " <> show k
 
 -- TODO partial isomorphism between char2keypress and keypress2char?

@@ -2,10 +2,6 @@
 
 #import "objc_actor.h"
 
-#import <Cocoa/Cocoa.h>
-
-#import "objc_actor.h"
-
 
 /* appInfo
 
@@ -115,10 +111,35 @@ void openApplication(const char* s) {
   [[NSWorkspace sharedWorkspace] launchApplication:fromUTF8(s)];
 }
 
+// simulates a key press from the keyboard. works in pop-ups like Alfred. 
 void pressKey(CGEventFlags modifiers, CGKeyCode key) {
+  // NSLog(@"pressKey");         // debug
+    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState); // kCGEventSourceStateCombinedSessionState
+
+    // events to press a key
+    CGEventRef event1 = CGEventCreateKeyboardEvent(source, key, true);  // key down
+    CGEventRef event2 = CGEventCreateKeyboardEvent(source, key, false); // key up
+
+    // add modifiers to event
+    CGEventSetFlags(event1, modifiers);
+    CGEventSetFlags(event2, modifiers);
+
+    // send a keyboard event (a quartz event) "globally"
+    CGEventPost(kCGHIDEventTap, event1); // kCGSessionEventTap
+    CGEventPost(kCGHIDEventTap, event2); // kCGSessionEventTap
+
+ // free memory
+ CFRelease(event1);
+ CFRelease(event2);
+ CFRelease(source);
+}
+
+// may take up to 15s (!) when the keypresses sent to and after besides the one that's running the server
+void pressKeyToCurrentApplication(CGEventFlags modifiers, CGKeyCode key) {
   pressKeyTo(modifiers, key, currentApplicationPSN());
 }
 
+// send a keypress to a specific process/application
 void pressKeyTo(CGEventFlags modifiers, CGKeyCode key, ProcessSerialNumber psn) {
 
     // events to press a key
@@ -155,3 +176,31 @@ void openURL(const char* url) {
    openURL:[NSURL URLWithString: fromUTF8(url)]];
 }
 
+
+// CGEventRef CGEventCreateMouseEvent ( CGEventSourceRef source, CGEventType mouseType, CGPoint mouseCursorPosition, CGMouseButton mouseButton );
+// http://stackoverflow.com/questions/1117065/cocoa-getting-the-current-mouse-position-on-the-screen
+void clickMouse(CGEventFlags modifiers, CGMouseButton mouseButton, CGEventType mouseDown, CGEventType mouseUp, UInt32 numClicks) {
+
+  CGPoint currentPosition = CGEventGetLocation(CGEventCreate(NULL));
+
+  CGEventRef eventDown = CGEventCreateMouseEvent(NULL, kCGEventOtherMouseDown, currentPosition, mouseButton);
+  CGEventRef eventUp   = CGEventCreateMouseEvent(NULL, kCGEventOtherMouseUp,   currentPosition, mouseButton);
+
+// hold down modifiers
+CGEventSetFlags(eventDown, modifiers);
+CGEventSetFlags(eventUp,   modifiers);
+
+// click numClicks times. each click must say which it is (1st, 2nd, 3rd, etc)
+
+for (int nthClick=1; nthClick<=numClicks; nthClick++) {
+  CGEventSetIntegerValueField(eventDown, kCGMouseEventClickState, nthClick);
+  CGEventSetIntegerValueField(eventUp,   kCGMouseEventClickState, nthClick);
+  CGEventPost(kCGHIDEventTap, eventDown);  
+  CGEventPost(kCGHIDEventTap, eventUp);  
+ }
+
+// free memory
+CFRelease(eventDown); 
+CFRelease(eventUp);
+
+}

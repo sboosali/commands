@@ -12,8 +12,19 @@
 
 int main(int argc, char** argv)
 {
+
+  // // doesn't work, and catastrophically disabled mouse input within the app it sent the mouseclick to 
+  // clickMouse(0, kCGMouseButtonLeft, kCGEventLeftMouseDown, kCGEventLeftMouseUp, 2);
+  // clickMouse(kCGEventFlagMaskControl, kCGMouseButtonLeft, 0, 0, 1);
+  // kCGEventOtherMouseDown, kCGEventOtherMouseDragged, or kCGEventOtherMouseUp
+
   // type command-shift-b, into current application
   // pressKey((kCGEventFlagMaskCommand | kCGEventFlagMaskControl), kVK_ANSI_B);
+
+ //  // type command-space, as if from keyboard
+ //  pressKey((kCGEventFlagMaskCommand), 0x31);
+ // [NSThread sleepForTimeInterval:0.5f];
+ //  pressKey((kCGEventFlagMaskCommand), kVK_ANSI_V);
 
     // setClipboard(currentApplicationPath());
     // char * site  = "https://www.google.com/search?q=";
@@ -25,10 +36,10 @@ int main(int argc, char** argv)
 
  // openURL("https://www.google.com/search?q=somewords");
 
-     openApplication("Notes");  // works, sometimes
-     // when launched from another Emacs like Work, Notes inherits its environment variables
- [NSThread sleepForTimeInterval:0.5f];
- openApplication("Google Chrome");  // works, no more weirdness
+ //     openApplication("Notes");  // works, sometimes
+ //     // when launched from another Emacs like Work, Notes inherits its environment variables
+ // [NSThread sleepForTimeInterval:0.5f];
+ // openApplication("Google Chrome");  // works, no more weirdness
 
 
 //   // printApplications ();

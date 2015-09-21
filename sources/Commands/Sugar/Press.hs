@@ -1,5 +1,5 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric,  FlexibleInstances, TupleSections, TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances                           #-}
+{-# LANGUAGE TypeSynonymInstances, PatternSynonyms, FlexibleContexts, UndecidableInstances                             #-}
 {- | syntactic sugar for defining type-safe keyboard shortcuts, under the 'Actions' monad.
 
 * the @instance PressArg Integer@ is the sugar for the number keys;
@@ -12,9 +12,11 @@ by polluting the global namespace with single-letter identifiers, your config wi
 
 -}
 module Commands.Sugar.Press where -- TODO move aliases to Commands.Sugar.Aliases. They keep polluting the namespace.
-import Commands.Etc
+import Commands.Etc() 
 import Commands.Backends.OSX.DSL
 import Commands.Backends.OSX.Types
+
+-- import Control.Monad.Free (MonadFree)
 
 import Data.Foldable               (traverse_)
 import Data.Monoid                 ((<>))
@@ -26,7 +28,7 @@ import Data.Monoid                 ((<>))
 e.g. @(C-u) x 1@, an Emacs keyboard shortcut, in the DSL:
 
 @
-press C u >> press x 1
+press C \'u\' >> press \'x\' 1
 @
 
 e.g. all features (all instances, multiple modifiers):
@@ -48,34 +50,43 @@ return ()
 this is a huge hack, but increases the readability of your configuration.
 an imperative DSL (here, an expression of type 'Actions ()' using 'press'),
 whose commands are triggered by *voice* (e.g. "press command zee"),
-is one of the few cases I really want to my code to "read like English".
+is one of the cases I really want to my code to "read like English".
 
+@press = 'pressFun' ([],[])@ 
 
+(takes at least one argument) 
 -}
 press :: (PressArg a, PressFun f) => a -> f
 press = pressFun ([],[])
 
 
 type PressArgs = ([Modifier], [KeyPress])
-type PressArgT = Either Modifier [KeyPress]
 
--- | its instances can be an argument to 'press'. simply injects into a sum type.
-class PressArg a where toPressArg :: a -> PressArgT
+{- | its instances can be an argument to 'press'. simply injects into a sum type. 
 
-instance PressArg ModifierSynonym  where toPressArg = Left . pattern
+see 'pressFun':
+ 
+* @Left@ means merge the modifiers together 
+* @Right@ means don't merge the modifier (always 'Shift') 
+
+e.g. @'press' M C \'T\' \'x\'@ works on:
+
+@[Left CommandMod, Left Control, Right (KeyPress [Shift] TKey), Right (KeyPress [] XKey)]@ 
+
+-}
+class PressArg a
+ where toPressArg :: a -> Either Modifier [KeyPress]
+
 instance PressArg Modifier  where toPressArg = Left
+instance PressArg KeyRiff   where toPressArg = Right
 instance PressArg KeyPress  where toPressArg = Right . (:[])
-instance PressArg Key       where toPressArg = Right . (:[]) . ([],)
+instance PressArg Key       where toPressArg = Right . (:[]) . NoMod
 instance PressArg Char      where toPressArg = Right . char2keypress
+-- ^ 
 instance PressArg String    where toPressArg = Right . concatMap char2keypress
 instance PressArg Integer   where toPressArg = Right . int2keypress
 -- any IsString
 -- any Num?
-
-
-
-
-
 
 
 class PressFun f where
@@ -102,29 +113,23 @@ since @(Actions ())@ is the only type for which this instance makes sense, and b
 instance (a ~ ()) => PressFun (Actions a) where
  pressFun (modifiers, keypresses) = traverse_ (\(ms,k) -> sendKeyPress (modifiers <> ms) k) keypresses
 
+-- instance (a ~ (), MonadFree ActionF m) => PressFun (m a) where
+-- the instances benignly overlap. since the function arrow (@(->)@) is a unary constructor, like the Monad (@m@).
+-- TODO possible without forcing overlapping influences on client?  
+
 instance (PressArg a, PressFun f) => PressFun (a -> f)  where
  pressFun (modifiers, keypresses) arg = case toPressArg arg of
   Left  m   -> pressFun (modifiers <> [m], keypresses)
   Right kps -> pressFun (modifiers,        keypresses <> kps)
 
--- | exported @PatternSynonyms@ breaks (my version of) Haddock/GHC (something about the interface files). once fixed, I will replace this type with:
---
--- @
--- pattern M = Command
--- pattern C = Control
--- pattern S = Shift
--- pattern O = Option
--- pattern F = Function
--- @
---
---
-data ModifierSynonym = M | C | S | O | F
- deriving (Show,Ord,Eq,Bounded,Enum,Data,Generic)
-
-pattern :: ModifierSynonym -> Modifier
+-- ^ alias for 'CommandMod'
 pattern M = CommandMod
+-- ^ alias for 'Control'
 pattern C = Control
+-- ^ alias for 'Shift'
 pattern S = Shift
+-- ^ alias for 'Option'
 pattern O = Option
+-- ^ alias for 'Function'
 pattern F = Function
 

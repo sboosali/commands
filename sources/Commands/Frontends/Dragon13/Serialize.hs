@@ -33,6 +33,7 @@ data SerializedGrammar = SerializedGrammar
 
 {- $setup
 
+>>> :set +m
 >>> :set -XOverloadedLists -XOverloadedStrings -XNamedFieldPuns
 >>> :{
 let root = DNSProduction () (DNSRule "root") $ DNSAlternatives

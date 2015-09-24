@@ -21,7 +21,6 @@ import           Control.Applicative
 import           Data.Char
 import           Data.Foldable                    (Foldable (..))
 import qualified Data.List                        as List
-import           Data.Typeable                    (Typeable)
 import           GHC.Exts                         (IsString (..),IsList (..))
 import           Prelude                          hiding (foldr1, mapM)
 

@@ -282,7 +282,7 @@ digit2keypress 7  = return $ NoMod SevenKey
 digit2keypress 8  = return $ NoMod EightKey
 digit2keypress 9  = return $ NoMod NineKey
 
-digit2keypress k = fail $ "digit2keypress: digits must be between zero and nine: " <> show k
+digit2keypress k = failed $ "digit2keypress: digits must be between zero and nine: " <> show k
 
 
 {- | the keypress that would insert the character into the application.
@@ -402,7 +402,7 @@ char2keypress ' '  = return $ (,) [     ] SpaceKey
 char2keypress '\t' = return $ (,) [     ] TabKey
 char2keypress '\n' = return $ (,) [     ] ReturnKey
 
-char2keypress c = fail $ "char2keypress: un-pressable Char: " <> show c
+char2keypress c = failed $ "char2keypress: un-pressable Char: " <> show c
 
 
 {- | the character that represents the keypress:
@@ -524,6 +524,6 @@ keypress2char ((,) [     ] SpaceKey)        = return $ ' '
 keypress2char ((,) [     ] TabKey)          = return $ '\t'
 keypress2char ((,) [     ] ReturnKey)       = return $ '\n'
 
-keypress2char k = fail $ "keypress2char: non-unicode-representable Keypress: " <> show k
+keypress2char k = failed $ "keypress2char: non-unicode-representable Keypress: " <> show k
 
 -- TODO partial isomorphism between char2keypress and keypress2char?

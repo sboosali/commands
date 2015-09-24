@@ -10,6 +10,7 @@ import           Commands.Plugins.Example.Shortcut
 import           Commands.Plugins.Example.Phrase
 import           Commands.Plugins.Example.Keys
 import           Commands.Plugins.Example.Spacing
+import Data.Enumerate
 
 import Commands.Munging
 import           Commands.Backends.OSX
@@ -721,7 +722,21 @@ realMain = do
  let rootG = root
  attemptSerialize rootG
 
+ putStrLn ""
  attemptMunge "par round grave camel lit with async break break action"
+
+ putStrLn ""
+ print demoEnumerated
+
+ putStrLn ""
+ let uppercasePartial :: Char -> Possibly Char 
+     uppercasePartial = \c -> case c of
+      'a' -> return 'A'
+      'b' -> return 'B'
+      'z' -> return 'Z'
+      _   -> failed "uppercasePartial"
+ print$ reifyFunctionAtM ['a'..'c'] uppercasePartial
+ -- [('a','A'),('b','B')] 
 
 main = do
  realMain

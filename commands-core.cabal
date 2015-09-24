@@ -82,6 +82,8 @@ library
         Data.Sexp
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
+        Data.Enumerate
+
     build-depends:
         base ==4.8.*,
         template-haskell >=2.10,

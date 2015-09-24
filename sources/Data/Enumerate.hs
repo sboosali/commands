@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, DeriveGeneric, DefaultSignatures, TypeOperators, FlexibleInstances, FlexibleContexts, DeriveAnyClass, RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveGeneric, DefaultSignatures, TypeOperators, FlexibleInstances, FlexibleContexts, DeriveAnyClass, RankNTypes, LambdaCase #-}
 
 {- | see 'Enumerable'.  
 
@@ -42,7 +42,6 @@ import           Data.List (genericLength)
 import           Data.Void (Void)
 import           Data.Word (Word8, Word16)
 import           Data.Int (Int8, Int16)
-import Control.Exception (ErrorCall(..))
 
 
 {- | enumerate the set of (depth first) all values in a (finitely enumerable) type.
@@ -139,7 +138,7 @@ instance Enumerable Bool
 instance Enumerable Ordering
 {- | 
 
->>> (maxBound::Word8) - (minBound::Word8)
+>>> (maxBound::Int8) - (minBound::Int8)
 256
 
 -}
@@ -147,7 +146,7 @@ instance Enumerable Int8 where enumerated = boundedEnumerated
 instance Enumerable Word8 where enumerated = boundedEnumerated
 {- | 
 
->>> (maxBound::Word16) - (minBound::Word16) 
+>>> (maxBound::Int16) - (minBound::Int16) 
 65535
 
 -}
@@ -194,22 +193,20 @@ boundedEnumerated = enumFromTo minBound maxBound
 enumEnumerated :: (Enum a) => [a]
 enumEnumerated = enumFrom (toEnum 0)
 
--- -- | reify a total function
--- reifyFunction :: (Enumerable a) => (a -> b) -> Map a b
--- -- reifyFunction :: (Enumerable a) => (a -> b) -> Map a b
--- reifyFunction = reifyFunctionM . return
--- {-# INLINABLE reifyFunction #-}
+-- | reify a total function
+reifyFunction :: (Enumerable a) => (a -> b) -> [(a,b)]
+reifyFunction f = reifyFunctionM (return . f)
+{-# INLINABLE reifyFunction #-}
 
--- reifyFunctionAt :: [a] -> (a -> b) -> Map a b
--- -- reifyFunctionAt :: [a] -> (a -> b) -> Map a b
--- reifyFunctionAt domain = reifyFunctionAtM domain . return
--- {-# INLINABLE reifyFunctionAt #-}
+-- | reify a total function at any subset of the domain. 
+reifyFunctionAt :: [a] -> (a -> b) -> [(a,b)]
+reifyFunctionAt domain f = reifyFunctionAtM domain (return . f)
+{-# INLINABLE reifyFunctionAt #-}
 
--- -- | reify a partial function into a map (which is implicitly partial, where @Map.lookup@ is like @($)@.
--- reifyFunctionM :: (Enumerable a) => (forall m. MonadThrow m => a -> m b) -> Map a b
--- -- reifyFunctionM :: (MonadThrow m, Enumerable a) => (a -> m b) -> Map a b
--- reifyFunctionM= reifyFunctionAtM enumerated
--- {-# INLINABLE reifyFunctionM #-}
+-- | reify a partial function into a map (which is implicitly partial, where @Map.lookup@ is like @($)@.
+reifyFunctionM :: (Enumerable a) => (forall m. MonadThrow m => a -> m b) -> [(a,b)]
+reifyFunctionM= reifyFunctionAtM enumerated
+{-# INLINABLE reifyFunctionM #-}
 
 {- | reify a partial function at any domain. 
 use when your domain isn't 'Enumerable'. 
@@ -230,11 +227,15 @@ let uppercasePartial :: Char -> Possibly Char
 
 @ 
 
+if your function doesn't fail under @MonadThrow@, see: 
+
+* 'reifyFunctionAtMaybe'
+* 'reifyFunctionAtList'
+* 'reifyFunctionAtEither'
+
 -}
-reifyFunctionAtM :: [a] -> (a -> Possibly b) -> [(a,b)]
--- reifyFunctionAtM :: [a] -> (a -> (forall m. MonadThrow m => m b)) -> Map a b
--- reifyFunctionAtM :: [a] -> (forall m. MonadThrow m => a -> m b) -> Map a b
--- reifyFunctionAtM :: (MonadThrow m) => [a] -> (a -> m b) -> Map a b
+reifyFunctionAtM :: [a] -> (forall m. MonadThrow m => a -> m b) -> [(a,b)]
+-- reifyFunctionAtM :: (MonadThrow m) => [a] -> (a -> m b) -> m (Map a b)
 reifyFunctionAtM domain f 
  = concatMap (bitraverse pure id)
  . fmap (id &&& f)
@@ -242,42 +243,86 @@ reifyFunctionAtM domain f
  where
  bitraverse f g (x,y) = (,) <$> f x <*> g y  -- avoid bifunctors dependency
 
-reifyPredicateAtM :: [a] -> (a -> Bool) -> [a]
-reifyPredicateAtM domain p = map fst (reifyFunctionAtM domain f)
- where
- f x = if p x then return x else throwM (ErrorCall "False")
+-- | @reifyPredicateAt = 'flip' 'filter'@
+reifyPredicateAt :: [a] -> (a -> Bool) -> [a]
+reifyPredicateAt = flip filter
+-- reifyPredicateAtM domain p = map fst (reifyFunctionAtM domain f)
+--  where
+--  f x = if p x then return x else throwM (ErrorCall "False")
 
 -- MonadThrow Maybe	 
 -- (e ~ SomeException) => MonadThrow (Either e)
 -- MonadThrow []	 
 
--- reifyFunctionMaybe 
--- reifyFunctionEither 
--- reifyFunctionList
+-- | reify a partial function that fails specifically under @Maybe@. 
+reifyFunctionAtMaybe :: [a] -> (a -> Maybe b) -> [(a, b)]
+reifyFunctionAtMaybe domain f = reifyFunctionAtM domain (maybe2throw f)
+{-# INLINABLE reifyFunctionAtMaybe #-}
+
+-- | reify a partial function that fails specifically under @[]@. 
+reifyFunctionAtList :: [a] -> (a -> [b]) -> [(a, b)]
+reifyFunctionAtList domain f = reifyFunctionAtM domain (list2throw f)
+{-# INLINABLE reifyFunctionAtList #-}
+
+-- | reify a partial function that fails specifically under @Either SomeException@. 
+reifyFunctionAtEither :: [a] -> (a -> Either SomeException b) -> [(a, b)]
+reifyFunctionAtEither  domain f = reifyFunctionAtM domain (either2throw f)
+{-# INLINABLE reifyFunctionAtEither #-}
+
+-- | generalize a function that fails with @Nothing@. 
+maybe2throw :: (a -> Maybe b) -> (forall m. MonadThrow m => a -> m b) 
+maybe2throw f = f >>> \case
+ Nothing -> failed "Nothing"
+ Just x  -> return x 
+
+-- | generalize a function that fails with @[]@.  
+list2throw :: (a -> [b]) -> (forall m. MonadThrow m => a -> m b)
+list2throw f = f >>> \case
+ []    -> failed "[]"
+ (x:_) -> return x
+
+-- | generalize a function that fails with @Left@. 
+either2throw :: (a -> Either SomeException b) -> (forall m. MonadThrow m => a -> m b)
+either2throw f = f >>> \case
+ Left  e -> throwM e
+ Right x -> return x 
 
 -- forces function to be strict 
 -- reifyFunctionSpoon 
 
+-- | reify a binary total function
+reifyFunction2 :: (Enumerable a, Enumerable b) => (a -> b -> c) -> [(a,[(b,c)])]
+reifyFunction2 f = reifyFunction2At enumerated enumerated f
+{-# INLINABLE reifyFunction2 #-}
 
--- -- | reify a binary function
--- reifyFunction2AtM :: (MonadThrow m) => [a] -> [b] -> (a -> b -> m c) -> Map a (Map b c)
--- reifyFunction2AtM as bs f = reifyFunctionAt as (reifyFunctionAtM bs . f)
+-- | reify a binary total function at some domain
+reifyFunction2At :: [a] -> [b] -> (a -> b -> c) -> [(a,[(b,c)])]
+reifyFunction2At as bs f = reifyFunction2AtM as bs (\x y -> pure (f x y))
+{-# INLINABLE reifyFunction2At #-}
 
--- reifyFunction2 :: (Enumerable a, Enumerable b) -> (a -> b -> c) -> Map a (Map b c)
--- reifyFunction2 f = reifyFunction2AtM enumerated enumerated (\x y -> pure (f x y))
--- {-# INLINABLE reifyFunction2 #-}
+-- | reify a binary partial function
+reifyFunction2M :: (Enumerable a, Enumerable b) => (forall m. MonadThrow m => a -> b -> m c) -> [(a,[(b,c)])]
+reifyFunction2M f = reifyFunction2AtM enumerated enumerated f
+{-# INLINABLE reifyFunction2M #-}
 
--- module Enumerable.Function.Instances where
-
--- -- | brute-force function extensionality 
--- instance (Enumerable a, Eq b) => Eq (a -> b) where
---   f == g = all ((==) <$> f <*> g) enumerate
---   f /= g = any ((/=) <$> f <*> g) enumerate
+-- | reify a binary partial function at some domain 
+reifyFunction2AtM :: [a] -> [b] -> (forall m. MonadThrow m => a -> b -> m c) -> [(a,[(b,c)])]
+reifyFunction2AtM as bs f = reifyFunctionAt as (\a -> reifyFunctionAtM bs (f a))
 
 -- -- | finite but too big. @2^64@ is over a billion billion (@1,000,000,000,000@). e.g. 'Enumerate.reifyFunction' on a function of type @(:: Int -> Bool)@ won't realistically terminate TODO is this true? 
--- module Enumerable.Numbers.Instances where
+-- instance Enumerable.Instances where
 
--- instance Enumerable.Large where
+-- -- | brute-force function extensionality. 
+-- -- beware: the size of the domain grows exponentially in the number of arguments. 
+-- -- note: orphan instance 
+-- instance (Enumerable a, Eq b) => Eq (a -> b) where
+--  f == g = all ((==) <$> f <*> g) enumerated
+--  f /= g = any ((/=) <$> f <*> g) enumerated
+
+-- instance Enumerable Int32 where enumerated = boundedEnumerated
+-- instance Enumerable Word32 where enumerated = boundedEnumerated
+-- instance Enumerable Int64 where enumerated = boundedEnumerated
+-- instance Enumerable Word64 where enumerated = boundedEnumerated
 
 {- | (for documentation) 
 

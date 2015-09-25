@@ -18,35 +18,43 @@ import           GHC.Exts            (IsList (..), IsString (..))
 
 data RHS n t f a where
 
- -- Applicative instance
- Pure        :: a                                     -> RHS n t f a
- Apply       :: (RHS n t f (x -> a)) -> (f x)         -> RHS n t f a
- (:<*>)      :: (RHS n t f (x -> a)) -> (RHS n t f x) -> RHS n t f a
+ Pure        :: a                                     -> RHS n t f a -- ^ Applicative 'pure'
+ Apply       :: (RHS n t f (x -> a)) -> (f x)         -> RHS n t f a -- ^ Applicative '<*>'
+ (:<*>)      :: (RHS n t f (x -> a)) -> (RHS n t f x) -> RHS n t f a -- ^ Applicative '<*>'
 
- -- Alternative/Monoid instance
- Alter       :: ![RHS n t f a] -> RHS n t f a
+ Alter       :: ![RHS n t f a]                    -> RHS n t f a -- ^ Alternative '<|>' / Monoid '<>'  
+ Opt         :: !(Maybe x    -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'optional'
+ Many        :: !([x]        -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'many'
+ Some        :: !(NonEmpty x -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'some'
 
- -- (Coyoneda'd?) methods
- Opt         :: !(Maybe x    -> a) -> RHS n t f x -> RHS n t f a
- Many        :: !([x]        -> a) -> RHS n t f x -> RHS n t f a
- Some        :: !(NonEmpty x -> a) -> RHS n t f x -> RHS n t f a
+ -- grammar-specific stuff
+ Terminal     :: !(t -> a)  -> !t          -> RHS n t f a   -- ^ grammatical terminal symbol (Coyoneda'd)
+ NonTerminal  :: !(n t f a) -> RHS n t f a -> RHS n t f a   -- ^ grammatical non-terminal symbol
+ -- AllTerminals ::                              RHS n t f [t] -- ^ represents the set of all terminal symbols in the grammar 
 
- -- (Coyoneda'd?) grammar-specific stuff
- Terminal    :: !(t -> a)  -> !t          -> RHS n t f a
- NonTerminal :: !(n t f a) -> RHS n t f a -> RHS n t f a
-
+-- | @pattern Empty = Alter []@
 pattern Empty = Alter []
 
 -- type RHSFunctorC n t f = (Functor f, Functor (n t f)) ConstraintKinds
 
--- TODO expects constraint:
-deriving instance (Functor (n t f)) => (Functor (RHS n t f))
+deriving instance (Functor (n t f)) => (Functor (RHS n t f)) -- TODO expects constraint:
 -- deriving instance () => Data (RHS n t f a)
 
+-- | lawful (coincides with 'Alternative' instance)
 instance (Functor f, Functor (n t f)) => Monoid (RHS n t f a) where
  mempty = Empty
  mappend = (<|>)
 
+{- | mostly lawful. 'fmap' and 'pure' behave lawfully. 
+
+left-distributivity of '<*>' over '<|>' is intentionally violated. that is, we want @(x <|> y) <*> z@ to be preserved, not to be distributed into @(x <*> z) <|> (y <*> z)@. this helps: 
+
+* when @(x <|> y)@ is actually the infinite @(x <|> y <|> ...)@, interpreting the undistributed @(x <|> y) <*> z@ might terminate while the @(x <|> y <|> ...) <*> z@ may terminate while the distributed @(x <*> z) <|> (y <*> z) <|> ...@ will not.
+* when the interpretation (e.g. a chart parser) can increase performance by sharing such "inner alternation". 
+
+'<*>' is left-associated. 
+
+-}
 instance (Functor f, Functor (n t f)) => Applicative (RHS n t f) where
  pure = Pure
 
@@ -62,14 +70,17 @@ instance (Functor f, Functor (n t f)) => Applicative (RHS n t f) where
  txa     <*> (tyx `Apply` fy)  = ((.) <$> txa <*> tyx) `Apply` fy -- Composition
  txa     <*> (tyx :<*>    ty)  = ((.) <$> txa <*> tyx) :<*>    ty -- Composition
 
- txa     <*> (Opt  ysa ty)     = txa :<*> Opt  ysa ty -- TODO correct?
- txa     <*> (Many ysa ty)     = txa :<*> Many ysa ty
- txa     <*> (Some ysa ty)     = txa :<*> Some ysa ty
+ txa     <*> (Opt  ysa ty)     = txa :<*> Opt  ysa ty -- NOTE doesn't distribute, intentionally 
+ txa     <*> (Many ysa ty)     = txa :<*> Many ysa ty -- NOTE doesn't distribute, intentionally 
+ txa     <*> (Some ysa ty)     = txa :<*> Some ysa ty -- NOTE doesn't distribute, intentionally 
 
- txa     <*> (Terminal    i t)   = txa :<*> Terminal    i t -- TODO correct?
+ txa     <*> (Terminal i t)   = txa :<*> Terminal    i t -- TODO correct?
  txa     <*> nx@NonTerminal{} = txa :<*> nx -- TODO to preserve sharing?
+ -- txa     <*> AllTerminals     = txa :<*> AllTerminals -- NOTE greatly simplifies "self-referential" grammars (self-recursive grammars are already simple)
+
 -- https://hackage.haskell.org/package/Earley-0.8.3/docs/src/Text-Earley-Grammar.html#line-85
 
+-- | lawful.  
 instance (Functor f, Functor (n t f)) => Alternative (RHS n t f) where
  empty = Empty
 
@@ -117,44 +128,44 @@ instance IsList (RHS n t f a) where
 terminal :: t -> RHS n t f t
 terminal = Terminal id
 
--- | @(-?) = 'optionalRHS'@
+-- | zero or one. @(-?) = 'optionalRHS'@
 (-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
 (-?) = optionalRHS
-optionalRHS = Opt id
+optionalRHS = Opt id -- NOTE constructors (rather than methods) avoid Functor constraint 
 
--- | @(-?-) = 'flip' 'optionRHS'@
+-- | zero or one. @(-?-) = 'flip' 'optionRHS'@
 (-?-) :: RHS n t f a -> a -> RHS n t f a
 (-?-) = flip optionRHS
 optionRHS :: a -> RHS n t f a -> RHS n t f a
-optionRHS x = Opt (maybe x id)
+optionRHS x = Opt (maybe x id) -- NOTE constructors (rather than methods) avoid Functor constraint 
 
--- | @(-*) = 'manyRHS'@
+-- | zero or more. @(-*) = 'manyRHS'@
 (-*), manyRHS :: RHS n t f a -> RHS n t f [a]
 (-*) = manyRHS
-manyRHS = Many id
+manyRHS = Many id -- NOTE constructors (rather than methods) avoid Functor constraint 
 
--- | @(-+) = 'someRHS'@
+-- | one or more. @(-+) = 'someRHS'@
 (-+), someRHS :: RHS n t f a -> RHS n t f (NonEmpty a)
 (-+) = someRHS
-someRHS = Some id
+someRHS = Some id -- NOTE constructors (rather than methods) avoid Functor constraint 
 
--- | @(-++) = 'many1RHS'@
+-- | one or more. @(-++) = 'many1RHS'@
 --
 -- like 'someRHS', but "downcasted" to a list.
 (-++), many1RHS :: RHS n t f a -> RHS n t f [a]
 (-++) = many1RHS
-many1RHS = Some NonEmpty.toList
+many1RHS = Some NonEmpty.toList -- NOTE constructors (rather than methods) avoid Functor constraint 
 
 -- | @(-|-) = 'eitherRHS'@
 --
 -- a heterogeneous binary 'Alter'.
 (-|-), eitherRHS :: RHS n t f a -> RHS n t f b -> RHS n t f (Either a b)
 (-|-) = eitherRHS
-eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- constructors avoid Functor constraint 
--- eitherRHS l r = (Left <$> l) <|> (Right <$> r)
+eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- NOTE constructors (rather than methods) avoid Functor constraint
+-- thanks to quasi-lawfulness, about the same as {{eitherRHS l r = (Left <$> l) <|> (Right <$> r)}} 
 
-(-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
-(-#-) k = traverse id . replicate k
+-- (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
+-- (-#-) k = traverse id . replicate k -- TODO what is this
 
 
 runRHS
@@ -192,7 +203,7 @@ foldRHS
  -> (forall x. f x                    -> b)
  -> b
  -> (b -> b -> b)
- -> ([b] -> b)
+ -> ([b] -> b)which 
  -> (b -> b)
  -> (b -> b)
  -> (b -> b)
@@ -213,8 +224,11 @@ foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
  go = foldRHS fromN fromT fromF unit mul add opt_ many_ some_
 
 {- | unwraps a 'NonTerminal', otherwise preserves the input.
+
 when NonTerminals are interpreted as tagging a right-hand side with a left-hand side for "sharing", this function should "unshare" its input from other right-hand side expressions with the same "name".
-(the double underscores at weirdness)
+
+(the double underscores imply magic; while this function is a magical, it's useful with magical interpretations like observed sharing)
+
 -}
 __inlineRHS__ :: RHS n t f a -> RHS n t f a
 __inlineRHS__ = \case

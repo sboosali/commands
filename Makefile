@@ -2,6 +2,8 @@ PACKAGE = commands-core
 VERSION = 0.0.0
 
 HC = cabal exec -- ghc
+HADDOCK = $(HOME)/haddock/.cabal-sandbox/bin/haddock
+HADDOCK_OPTIONS = --hyperlinked-source
 
 CODE = sources # tests
 
@@ -36,6 +38,8 @@ test:
 
 
 document:
+# try to document with local haddock for the hyperlink source option 
+# 	cabal haddock --with-haddock="$(HADDOCK)" --haddock-options="$(HADDOCK_OPTIONS)" # ||
 	cabal haddock
 	open dist/doc/html/$(PACKAGE)/index.html
 

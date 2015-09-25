@@ -73,8 +73,8 @@ type DNSEarleyRHS z = RHS
  (DNSEarleyFunc z (DNSEarleyName String) Text)
 
 data DNSEarleyFunc z n t a
- =           LeafRHS (E.Prod z String t a) (DNSRHS t Void)
- | forall x. TreeRHS (RHS n t (DNSEarleyFunc z n t) a) (RHS n t (DNSEarleyFunc z n t) x)
+ = LeafRHS (E.Prod z String t a) (DNSRHS t Void)
+ | TreeRHS (RHS n t (DNSEarleyFunc z n t) a) (RHS n t (DNSEarleyFunc z n t) a)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
 deriving instance (Functor (n t (DNSEarleyFunc z n t))) => Functor (DNSEarleyFunc z n t) --TODO UndecidableInstances
 -- Variables ‘n, t’ occur more often than in the instance head in the constraint
@@ -83,6 +83,9 @@ data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t) --TODO n
 
 -- | @ConstraintKinds@
 type Functor'RHS n t f = (Functor (n t f), Functor f)
+
+
+
 
 liftLeaf :: forall a
                          (n :: * -> (* -> *) -> * -> *)
@@ -99,11 +102,10 @@ liftTree :: forall a
                          t
                          (z :: * -> * -> * -> *)
                          (n1 :: * -> (* -> *) -> * -> *)
-                         t1
-                         x.
-                  RHS n1 t1 (DNSEarleyFunc z n1 t1) a
-                  -> RHS n1 t1 (DNSEarleyFunc z n1 t1) x
-                  -> RHS n t (DNSEarleyFunc z n1 t1) a
+                         t1. 
+                     RHS n1 t1 (DNSEarleyFunc z n1 t1) a
+                  -> RHS n1 t1 (DNSEarleyFunc z n1 t1) a
+                  -> RHS n  t  (DNSEarleyFunc z n1 t1) a
 liftTree p r = liftRHS (TreeRHS p r)
 
 anyWord :: E.Prod z String Text Text --TODO  t t
@@ -127,6 +129,7 @@ renameDNSEarleyFunc
 renameDNSEarleyFunc u = \case
  k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
  Terminal i r       ->  pure$ Terminal i r
+ Terminals i        ->  pure$ Terminals i 
  Opt  i r           ->  Opt  i <$> go r
  Many i r           ->  Many i <$> go r
  Some i r           ->  Some i <$> go r
@@ -355,7 +358,8 @@ renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
  return$ DNSUniqueName i n k
 
 induceDNS
- :: RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
+ :: (Eq t)
+ => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -> Cofree (DNSRHS t) (DNSInfo, String)
 induceDNS = induceDNS' >>> \case
  SomeDNSNonTerminal (DNSRule ((i,n) :< r)) -> (i,n)         :< r
@@ -366,7 +370,8 @@ defaultDNSLHS = (defaultDNSInfo,"defaultDNSLHS") -- TODO should be unique; quote
 
 induceDNS' -- TODO doesn't terminate on cyclic data
  -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a
- :: RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
+ :: (Eq t)
+ => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
  -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
 induceDNS' = foldRHS
@@ -556,7 +561,7 @@ simpleGrammar :: Name -> (E.Prod z String Text a) -> (DNSRHS Text Void) -> DNSEa
 simpleGrammar n p r = genericGrammar n $ liftLeaf p r
 
 -- | manually construct a special rule, with two independent right-hand sides.
-complexGrammar :: Name -> DNSEarleyRHS z a -> DNSEarleyRHS z x -> DNSEarleyRHS z a
+complexGrammar :: Name -> DNSEarleyRHS z a -> DNSEarleyRHS z a -> DNSEarleyRHS z a
 complexGrammar n p r = genericGrammar n $ liftTree p r
 
 -- | automatically generate a grammar from a type: the left-hand side comes from the type, and the right-hand side comes from the 'Show'n and transformed 'constructors'.

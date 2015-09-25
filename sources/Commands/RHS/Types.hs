@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators              #-}
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures -fno-warn-missing-signatures  #-}
 module Commands.RHS.Types where
 -- import           Commands.Etc
 
@@ -10,6 +11,7 @@ import           Control.Lens
 import           Data.List.NonEmpty  (NonEmpty (..))
 import qualified Data.List.NonEmpty  as NonEmpty
 
+import qualified Data.List as List 
 import           Control.Applicative
 import           Data.Foldable       (asum)
 import           Data.Monoid
@@ -18,19 +20,19 @@ import           GHC.Exts            (IsList (..), IsString (..))
 
 data RHS n t f a where
 
- Pure        :: a                                     -> RHS n t f a -- ^ Applicative 'pure'
- Apply       :: (RHS n t f (x -> a)) -> (f x)         -> RHS n t f a -- ^ Applicative '<*>'
- (:<*>)      :: (RHS n t f (x -> a)) -> (RHS n t f x) -> RHS n t f a -- ^ Applicative '<*>'
+ Pure        :: a                                     -> RHS n t f a -- Applicative 'pure'
+ Apply       :: (RHS n t f (x -> a)) -> (f x)         -> RHS n t f a -- Applicative '<*>'
+ (:<*>)      :: (RHS n t f (x -> a)) -> (RHS n t f x) -> RHS n t f a -- Applicative '<*>'
 
- Alter       :: ![RHS n t f a]                    -> RHS n t f a -- ^ Alternative '<|>' / Monoid '<>'  
- Opt         :: !(Maybe x    -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'optional'
- Many        :: !([x]        -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'many'
- Some        :: !(NonEmpty x -> a) -> RHS n t f x -> RHS n t f a -- ^ Alternative 'some'
+ Alter       :: [RHS n t f a]                    -> RHS n t f a -- Alternative '<|>' / Monoid '<>'  
+ Opt         :: (Maybe x    -> a) -> RHS n t f x -> RHS n t f a -- Alternative 'optional'
+ Many        :: ([x]        -> a) -> RHS n t f x -> RHS n t f a -- Alternative 'many'
+ Some        :: (NonEmpty x -> a) -> RHS n t f x -> RHS n t f a -- Alternative 'some'
 
  -- grammar-specific stuff
- Terminal     :: !(t -> a)  -> !t          -> RHS n t f a   -- ^ grammatical terminal symbol (Coyoneda'd)
- NonTerminal  :: !(n t f a) -> RHS n t f a -> RHS n t f a   -- ^ grammatical non-terminal symbol
- -- AllTerminals ::                              RHS n t f [t] -- ^ represents the set of all terminal symbols in the grammar 
+ Terminal     :: (t -> a)  -> !t          -> RHS n t f a   -- grammatical terminal symbol (Coyoneda'd)
+ NonTerminal  :: (n t f a) -> RHS n t f a -> RHS n t f a   -- grammatical non-terminal symbol
+ Terminals    :: (t -> a)               -> RHS n t f a -- a placeholder for a set of terminals (e.g. set of all terminal symbols in the grammar. see 'getTerminals')
 
 -- | @pattern Empty = Alter []@
 pattern Empty = Alter []
@@ -76,7 +78,7 @@ instance (Functor f, Functor (n t f)) => Applicative (RHS n t f) where
 
  txa     <*> (Terminal i t)   = txa :<*> Terminal    i t -- TODO correct?
  txa     <*> nx@NonTerminal{} = txa :<*> nx -- TODO to preserve sharing?
- -- txa     <*> AllTerminals     = txa :<*> AllTerminals -- NOTE greatly simplifies "self-referential" grammars (self-recursive grammars are already simple)
+ txa     <*> Terminals i    = txa :<*> Terminals i -- NOTE greatly simplifies "self-referential" grammars (self-recursive grammars are already simple)
 
 -- https://hackage.haskell.org/package/Earley-0.8.3/docs/src/Text-Earley-Grammar.html#line-85
 
@@ -125,8 +127,15 @@ instance IsList (RHS n t f a) where
  fromList = Alter             -- the constructor (rather than a method like "asum") avoids the (Functor f) constraint
  toList = toRHSList
 
+
+
+-- ================================================================ --
+
 terminal :: t -> RHS n t f t
 terminal = Terminal id
+
+terminals :: RHS n t f t
+terminals = Terminals id
 
 -- | zero or one. @(-?) = 'optionalRHS'@
 (-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
@@ -168,15 +177,45 @@ eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- NOTE constructors
 -- (-#-) k = traverse id . replicate k -- TODO what is this
 
 
+
+-- ================================================================ --
+
+-- | ignores f and n (which may be mutually recursive with the whole) 
+getTerminals :: (Eq t) => RHS n t f a -> [t]
+getTerminals = getTerminalsNF (const id) (const [])
+
+-- TODO take the traversal from either the non-terminal or the functor into the right-hand side again. finds any hidden children right-hand sides. 
+-- TODO always terminates, even on recursive grammars 
+getTerminalsNF
+ :: (Eq t)
+ => (forall x. n t f x -> [t] -> [t])
+ -> (forall x. f x          -> [t])
+ -> RHS n t f a
+ -> [t]
+getTerminalsNF fromN fromF = List.nub . foldRHS' fromN (:[]) fromF [] [] (<>) concat id id id
+
 runRHS
- :: forall n t f g a. (Alternative g)
+ :: forall n t f g a. (Alternative g, Eq t)
  => (forall x. n t f x -> RHS n t f x -> g x)
  -> (          t                      -> g t)
  -> (forall x. f x                    -> g x)
+ -- -> (          [t]                    -> g [t])
+ -> RHS n t f a
+ -> g a
+runRHS fromN fromT fromF rhs
+ = runRHS' fromN fromT fromF ((asum . map fromT) (getTerminals rhs)) rhs 
+
+runRHS'
+ :: forall n t f g a. (Alternative g, Eq t)
+ => (forall x. n t f x -> RHS n t f x -> g x)
+ -> (          t                      -> g t)
+ -> (forall x. f x                    -> g x)
+ -> g t -- TODO
  -> RHS n t f a
  -> g a
 
-runRHS fromN fromT fromF = \case
+runRHS' fromN fromT fromF aTerminal = \case
+ Terminals i -> i <$> aTerminal 
  Terminal    i t -> i <$> fromT t
  NonTerminal n r ->       fromN n r
 
@@ -191,25 +230,43 @@ runRHS fromN fromT fromF = \case
 
  where
  go :: forall x. RHS n t f x -> g x
- go = runRHS fromN fromT fromF
+ go = runRHS' fromN fromT fromF aTerminal 
 
--- | An "unlifted" 'runRHS'. ignores value (in Pure) and transformations in (Terminal/Opt/Many/Some).
---
--- The arguments: @foldRHS fromN fromT fromF unit mul add opt_ many_ some_@
 foldRHS
- :: forall n t f a b. ()
+ :: forall n t f a b. (Eq t)
  => (forall x. n t f x -> b -> b)
  -> (          t                      -> b)
  -> (forall x. f x                    -> b)
  -> b
  -> (b -> b -> b)
- -> ([b] -> b)which 
+ -> ([b] -> b)
  -> (b -> b)
  -> (b -> b)
  -> (b -> b)
  -> RHS n t f a
  -> b
-foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
+foldRHS fromN fromT fromF unit mul add opt_ many_ some_ rhs
+ = foldRHS' fromN fromT fromF ((add . map fromT) (getTerminals rhs)) unit mul add opt_ many_ some_ rhs 
+
+-- | An "unlifted" 'runRHS'. ignores value (in Pure) and transformations in (Terminal/Opt/Many/Some).
+--
+-- The arguments: @foldRHS fromN fromT fromF unit mul add opt_ many_ some_@
+foldRHS'
+ :: forall n t f a b. 
+    (forall x. n t f x -> b -> b)
+ -> (          t                      -> b)
+ -> (forall x. f x                    -> b)
+ -> b  -- TODO
+ -> b
+ -> (b -> b -> b)
+ -> ([b] -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> RHS n t f a
+ -> b
+foldRHS' fromN fromT fromF aTerminal unit mul add opt_ many_ some_ = \case
+ Terminals _ -> aTerminal 
  Terminal    _ t -> fromT t
  NonTerminal n r -> fromN n (go r)
  Opt  _ x  -> opt_  (go x)
@@ -221,7 +278,7 @@ foldRHS fromN fromT fromF unit mul add opt_ many_ some_ = \case
  Alter fs  -> add (go `map` fs)
  where
  go :: forall x. RHS n t f x -> b
- go = foldRHS fromN fromT fromF unit mul add opt_ many_ some_
+ go = foldRHS' fromN fromT fromF aTerminal unit mul add opt_ many_ some_
 
 {- | unwraps a 'NonTerminal', otherwise preserves the input.
 
@@ -244,6 +301,7 @@ renameRHS'
 renameRHS' u = \case
  k@(NonTerminal x r)  ->  NonTerminal <$> u k x <*> go r -- like traverse, except this case
  -- k@(NonTerminal x r)  ->  (uncurry NonTerminal) <$> u k x r
+ Terminals i        ->  pure$ Terminals i 
  Terminal i r       ->  pure$ Terminal i r
  Opt  i r           ->  Opt  i <$> go r
  Many i r           ->  Many i <$> go r
@@ -262,6 +320,7 @@ renameRHS
  -> (                          RHS n1 t f a ->                 m (RHS n2 t f a))
 renameRHS u = \case
  k@(NonTerminal x r)  ->  uncurry(NonTerminal) <$> u k x r
+ Terminals i        ->  pure$ Terminals i 
  Terminal i r       ->  pure$ Terminal i r
  Opt  i r           ->  Opt  i <$> go r
  Many i r           ->  Many i <$> go r
@@ -273,6 +332,10 @@ renameRHS u = \case
  where
  go :: forall x. RHS n1 t f x -> m (RHS n2 t f x)
  go = renameRHS u
+
+
+
+-- ================================================================ --
 
 -- | e.g. @('RHS' (ConstName n) t f a)@
 data ConstName n t (f :: * -> *) a = ConstName { _unConstName :: !n } deriving (Functor)
@@ -303,6 +366,7 @@ data Command n t f c b a = Command
 -- instance IsRHS n t f (Command n t f c b a) where
 --   type ToRHS (Command n t f c b a) = a
 --   toRHS = _cRHS
+
 
 
 -- ================================================================ --

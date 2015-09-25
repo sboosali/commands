@@ -491,9 +491,8 @@ word_ = dragonGrammar 'word_
  (T.unpack <$> anyWord)
  (DGNWords)
 
-keyword = dragonGrammar 'keyword
- (T.unpack <$> anyWord)
- (DGNWords)
+keyword :: R z String 
+keyword = 'keyword <=> T.unpack <$> terminals
  -- <=> Keyword <$> word_
 
 letters = simpleGrammar 'letters

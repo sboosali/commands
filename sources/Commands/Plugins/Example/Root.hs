@@ -655,15 +655,13 @@ attemptAsynchronously seconds action = do
    Right (Just _) -> return ()
   )
 
-attempt = attemptAsynchronously 1
-
 attemptMunge :: String -> IO ()
 attemptMunge s = do
  putStrLn ""
  putStrLn ""
  putStrLn ""
  print s
- attempt $ parseBest bestPhrase phrase_ ((T.words . T.pack) s) & \case
+ attemptAsynchronously 1 $ parseBest bestPhrase phrase_ ((T.words . T.pack) s) & \case
   Left e -> print e
   Right raw_p -> do
    let pasted_p   = pPhrase raw_p
@@ -681,7 +679,7 @@ attemptMungeAll s = do
  putStrLn ""
  putStrLn ""
  print s
- attempt $ parseThrow phrase_ ((T.words . T.pack) s) >>= \case
+ attemptAsynchronously 1 $ parseThrow phrase_ ((T.words . T.pack) s) >>= \case
   (raw_p :| raw_ps) -> do
    let pasted_p   = pPhrase raw_p
    let splatted_p = splatPasted pasted_p ("clipboard contents")
@@ -701,10 +699,10 @@ ol xs = ifor_ xs $ \i x -> do
 attemptParse :: (Show a) => (forall  z. DNSEarleyRHS z a) -> String -> IO ()
 attemptParse rule s = do
  putStrLn ""
- attempt $ parseThrow rule ((T.words . T.pack) s) >>= \case
+ attemptAsynchronously 1 $ parseThrow rule ((T.words . T.pack) s) >>= \case
   x :| _ -> print x
 
-attemptSerialize rhs = attemptAsynchronously 3 $ do
+attemptSerialize rhs = attemptAsynchronously 10 $ do
  serialized <- formatRHS rhs
  either print printSerializedGrammar serialized
 

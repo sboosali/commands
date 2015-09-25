@@ -2,12 +2,14 @@
 {-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts     #-}
 {-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
 {-# LANGUAGE TemplateHaskell, TypeOperators                                 #-}
+-- | assorted functionality, imported by most modules in this package.  
 module Commands.Etc
  ( module Commands.Etc
  , module Commands.Instances
- , module Control.Arrow
  , module Data.Data
  , module GHC.Generics
+ , (>>>)
+ , traverse_
  ) where
 import           Commands.Instances
 
@@ -45,6 +47,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                PkgName (PkgName))
 import           GHC.Exts                          (IsString (..))
 import Data.Data (Data) 
+import           Data.Foldable                   (traverse_)
 
 
 -- | generalized 'Maybe':

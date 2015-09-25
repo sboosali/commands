@@ -11,6 +11,7 @@ import           Commands.Plugins.Example.Phrase
 import           Commands.Plugins.Example.Keys
 import           Commands.Plugins.Example.Spacing
 import Data.Enumerate
+import           Commands.Sugar.Keys
 
 import Commands.Munging
 import           Commands.Backends.OSX
@@ -32,8 +33,7 @@ import qualified System.FilePath.Posix                 as FilePath
 import           Control.Applicative                   hiding (many, optional)
 import           Control.Monad                         (replicateM_, (>=>))
 -- import           Control.Parallel
-import           Data.Foldable                         (Foldable (..), asum,
-                                                        traverse_)
+import           Data.Foldable                         (Foldable (..), asum)
 import qualified Data.List                             as List
 import           Data.Monoid
 import           Prelude                           hiding (foldl, foldr1)

@@ -1,7 +1,8 @@
-{-# LANGUAGE RecursiveDo                                #-}
+{-# LANGUAGE RecursiveDo, PatternSynonyms                                 #-}
 module Commands.Sugar.Keys where  
 import           Commands.Etc
-import           Commands.Backends.OSX
+import           Commands.Backends.OSX.Types 
+import           Commands.Backends.OSX.DSL
 import           Commands.Mixins.DNS13OSX9 (EarleyEither,toEarleyEither)
 
 import qualified Data.List.NonEmpty              as NonEmpty
@@ -12,9 +13,20 @@ import           Control.Applicative
 import           Data.Char hiding(Control)
 
 
-{- | a parser for Emacs-like keybindings syntax, like elisp @kbd@ (<http://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Sequences.html>).
+{- | parse a string, execute it as a keyboard shortcut 
 
-partial function.
+@press_ = 'runKeyRiff' . 'kbd'@
+
+warning: partial function 
+-}
+press_ :: String -> Actions_
+press_ = runKeyRiff . kbd
+
+-- | execute a keyboard shortcut 
+runKeyRiff :: KeyRiff -> Actions_
+runKeyRiff = traverse_ (\(KeyPress mods k) -> sendKeyPress mods k)
+
+{- | a grammar for Emacs-like keybindings syntax, like elisp @kbd@ (<http://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Sequences.html>).
 
 >>> kbd"a"
 [([],AKey)]
@@ -34,11 +46,13 @@ partial function.
 >>> kbd"C-x o C-x b"
 [([Control],XKey),([],OKey),([Control],XKey),([],BKey)]
 
-a partial function, wraps 'safeKbd'. 
+warning: partial function.
+
 -}
 kbd :: [Char] -> KeyRiff
 kbd cs = either (error.(("(Commands.Sugar.Keys.kbd "++(show cs)++")") ++).show) NonEmpty.head (safeKbd cs)
 
+-- | like @kbd@, but a total function 
 safeKbd :: [Char] -> EarleyEither String Char (NonEmpty KeyRiff)
 safeKbd cs = toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
 -- bimapEither toException .
@@ -48,15 +62,31 @@ safeKbd cs = toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
  lstrip = dropWhile (`elem` (" \t\n\r"::String))
  rstrip = reverse . lstrip . reverse
 
--- EarleyEither String Char [KeyChord]
+{- | a grammar for Emacs-like keybindings syntax.
 
--- | follows (a subset of) <http://emacswiki.org/emacs/EmacsKeyNotation Emacs keybinding syntax>. doesn't interpret uppercase non-modifier letters as shifted alphanumerics, for disambiguation. e.g. use @"M-S-a"@, not @"M-A"@. non-alphanumerics are in angle brackets. e.g. @"C-<tab>"@, not @"C-TAB"@. see source (of readable parser combinators) for other differences.
+follows (a subset of) <http://emacswiki.org/emacs/EmacsKeyNotation Emacs keybinding syntax>. some differences: 
+
+* doesn't interpret uppercase non-modifier letters as shifted alphanumerics, for disambiguation. 
+* e.g. use @"M-S-a"@, not @"M-A"@. non-alphanumerics are in angle brackets. 
+* e.g. @"C-<tab>"@, not @"C-TAB"@. see the source (the parser combinators are readable) for other differences.
+
+-}
 gKeychords :: E.Grammar r String (E.Prod r String Char KeyRiff)
 gKeychords = mdo
+
  pKeychords <- E.rule$ (:) <$> pKeychord <*> many (some (E.symbol ' ') *> pKeychord)
                E.<?> "keychords"
+
  pKeychord  <- E.rule$ toKeychord <$> many (pModifier <* E.symbol '-') <*> pKey
                E.<?> "keychord"
+
+ pModifier  <- E.rule$ empty
+  <|> E.symbol 'M' $> CommandMod  -- generally, the meta-key
+  <|> E.symbol 'C' $> Control
+  <|> E.symbol 'S' $> Shift
+  <|> E.symbol 'A' $> Option
+  E.<?> "modifier"
+
  pKey       <- E.rule$ empty
 
   <|> NoMod SpaceKey                             <$  E.word "<spc>"
@@ -65,10 +95,10 @@ gKeychords = mdo
   <|> NoMod DeleteKey                            <$  E.word "<del>"
   <|> NoMod EscapeKey                            <$  E.word "<esc>"
 
-  <|> NoMod UpArrowKey   <$ E.word  "<up>"
+  <|> NoMod UpArrowKey     <$ E.word  "<up>"
   <|> NoMod DownArrowKey   <$ E.word  "<down>" 
   <|> NoMod LeftArrowKey   <$ E.word  "<left>" 
-  <|> NoMod RightArrowKey   <$ E.word  "<right>" 
+  <|> NoMod RightArrowKey  <$ E.word  "<right>" 
 
   <|> NoMod F1Key <$ E.word  "<f1>"
   <|> NoMod F2Key <$ E.word  "<f2>"
@@ -93,20 +123,18 @@ gKeychords = mdo
 
   <|> (either __BUG__ id . digit2keypress . read . (:[])) <$> E.satisfy ((&&) <$> isDigit <*> isAscii)
       -- read and digit2keypress are safe because: isDigit returns number characters between zero and nine inclusive
-  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> (not.isAlphaNum) <*> isAscii)   -- must be last 
-  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> isLower <*> isAscii)   -- must be last 
+  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> (not.isAlphaNum) <*> isAscii)
+      -- must be last 
+  <|> (either __BUG__ id . char2keypress) <$> E.satisfy ((&&) <$> isLower <*> isAscii) -- TODO replace pure bug with effectfull empty 
+      -- must be last 
 
   E.<?> "key"
 
- pModifier  <- E.rule$ empty
-  <|> E.symbol 'M' $> CommandMod  -- generally, the meta-key
-  <|> E.symbol 'C' $> Control
-  <|> E.symbol 'S' $> Shift
-  <|> E.symbol 'A' $> Option
-  E.<?> "modifier"
  return pKeychords
+
  where
  toKeychord = lAppendModifiers
  lAppendModifiers ms (ms', k) = KeyPress (ms ++ ms') k
 
 -- TODO a numerate all keybindings with one modifier and one non-modifier key, it's for documentation
+

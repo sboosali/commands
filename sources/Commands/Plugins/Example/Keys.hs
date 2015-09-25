@@ -9,7 +9,6 @@ import           Commands.Mixins.DNS13OSX9
 import           Commands.Plugins.Example.Phrase (character)
 
 import           Control.Applicative
-import           Data.Foldable                   (traverse_)
 
 
 -- | a riff is some chords?
@@ -124,7 +123,4 @@ ordinal = 'ordinal
 -- Keypress [Meta] CKey
 --  OR
 -- keys M c
-
-runKeyRiff :: KeyRiff -> Actions_
-runKeyRiff = traverse_ (\(KeyPress mods k) -> sendKeyPress mods k)
 

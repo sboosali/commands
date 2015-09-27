@@ -667,7 +667,7 @@ bestPhrase = argmax rankPhrase
 rankPhrase :: [Phrase_] -> Int
 rankPhrase = sum . fmap (\case
  Escaped_ _ -> 2000
- Quoted_ _ -> 100
+ Quoted_ _ -> 2000
  Pasted_ -> 100
  Blank_ -> 100
  Spelled_ _ -> 100

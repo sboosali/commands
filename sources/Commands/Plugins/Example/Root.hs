@@ -736,6 +736,3 @@ realMain = do
  print$ reifyFunctionAtM ['a'..'c'] uppercasePartial
  -- [('a','A'),('b','B')] 
 
-main = do
- realMain
-

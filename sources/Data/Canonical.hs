@@ -1,9 +1,9 @@
-{-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeOperators, FlexibleInstances, FlexibleContexts, DeriveAnyClass, TypeFamilies, LambdaCase, EmptyCase  #-}
+{-# LANGUAGE DeriveGeneric, DefaultSignatures, TypeOperators, FlexibleInstances, FlexibleContexts, DeriveAnyClass, TypeFamilies, LambdaCase, EmptyCase, UndecidableInstances   #-}
 
 {- | lowering the lifted 'GHC.Generics' types from @(*->*)@ to @(*)@.  
 
 -}
-module Data.ADT where 
+module Data.Canonical where 
 
 import           GHC.Generics
 import Data.Void 
@@ -37,44 +37,70 @@ uses:
 the definition: @canonical = 'glower' . 'from'@
 
 -} 
-class HasCanonical a where
+class (Generic a, GHasCanonical (Rep a)) => HasCanonical a where
  type Canonical a :: *
- 
+ type Canonical a = GCanonical (Rep a) -- UndecidableInstances
+
  canonical :: a -> Canonical a 
- 
- default canonical :: (Generic a, GHasCanonical (Rep a), GCanonical (Rep a) ~ Canonical a) => a -> Canonical a 
+
+ default canonical :: (GCanonical (Rep a) ~ Canonical a) => a -> Canonical a 
  canonical = gcanonical . from
 
 
+{- | (@0@, basecase) 
+-}
 instance HasCanonical Void where
  type Canonical Void = Void 
  canonical = \case 
 
 
-instance HasCanonical ()  where
+{- | (@1@, basecase) 
+-}
+instance HasCanonical () where
  type Canonical () = () 
  canonical () = () 
 
 
+{- | (addition, basecase) 
+-}
 instance (HasCanonical a, HasCanonical b) => HasCanonical (Either a b) where
  type Canonical (Either a b) = Either (Canonical a) (Canonical b)
  canonical (Left  x) = Left  (canonical x)
  canonical (Right y) = Right (canonical y)
 
 
+{- | (multiplication, basecase) 
+-}
 instance (HasCanonical a, HasCanonical b) => HasCanonical (a,b) where
  type Canonical (a,b) = (Canonical a, Canonical b)
  canonical (a,b) = (canonical a, canonical b)
 
-instance HasCanonical Bool where 
- type Canonical Bool = Either () () -- TODO
+
+-- {- | (recursive, basecase) 
+-- -}
+-- instance (HasCanonical a) => HasCanonical [a] where
+--  type Canonical [a] = 
+--  canonical = 
+
+-- instance (HasCanonical a) => HasCanonical [a]  -- TODO incident type, loops the type checker, needs data
+
+
+
+{- | (derived) 
+-}
+instance HasCanonical Bool 
+
+-- {- | (derived) 
+-- -}
+-- instance HasCanonical Char  -- TODO takes too long 
 
 
 {- | structural equality 
 
 e.g. a flag, isomorphic to @Bool@: 
 
->>> data Flag = No | Yes deriving (Generic,HasCanonical) 
+>>> data Flag = No | Yes deriving (Generic)
+>>> instance 'HasCanonical' Flag
 >>> Yes `structuralEq` True 
 True
 >>> No `structuralEq` True 
@@ -82,7 +108,8 @@ False
 
 e.g. an error or result, isomorphic to @Either String a@: 
 
->>> data ParseResult a = ParseError String | ParseResult a deriving (Generic,HasCanonical) 
+>>> data ParseResult a = ParseError String | ParseResult a deriving (Generic)
+>>> instance ('HasCanonical' a) => 'HasCanonical' (ParseResult a) 
 >>> ParseResult True `structuralEq` Right True
 True
 >>> ParseResult True `structuralEq` Right False
@@ -91,6 +118,8 @@ False
 True
 >>> ParseError "error" `structuralEq` Right False 
 False
+-- >>> ParseError "error" `structuralEq` "error"
+-- type error: the constraint @(Canonical (ParseResult a) ~ Canonical String)@ can't be satisfied 
 
 the "structure" is only the order of the constructors/fields, not field names like record equality.
 
@@ -148,14 +177,34 @@ instance (GHasCanonical (f)) => GHasCanonical (M1 i t f) where
 
 -- TODO data Flag = No | Yes deriving (Generic,HasCanonical) 
 data Flag = No | Yes deriving (Generic)
-instance HasCanonical Flag where type Canonical Flag = Either () ()
+instance HasCanonical Flag
+-- instance HasCanonical Flag where type Canonical Flag = (GCanonical (Rep Flag))
 
-mainADT :: IO ()
-mainADT = do 
- let flag1 = No `structuralEq` True          -- False
- let flag2 = Yes `structuralEq` True         -- True
+-- TODO string is a recursive type: data ParseResult a = ParseError String | ParseResult a deriving (Generic,HasCanonical) 
+-- data ParseResult a = ParseError Bool | ParseResult a a a deriving (Generic)
+-- instance (HasCanonical a) => HasCanonical (ParseResult a) 
+-- type ExampleParseResult = ParseResult Bool
 
+mainCanonical :: IO ()
+mainCanonical = do 
  putStrLn ""
  print "Canonical" 
+
+ let flag1 = Yes `structuralEq` True         -- True
+ let flag2 = No `structuralEq` True          -- False
+
+ putStrLn "Bool: true/false"
  print flag1 
  print flag2
+
+ -- let result1 = (ParseResult True True True :: ExampleParseResult) `structuralEq` (Right (True,(True,True))    :: Canonical ExampleParseResult)
+ -- let result2 = (ParseResult True True True :: ExampleParseResult) `structuralEq` (Right (False,(False,False)) :: Canonical ExampleParseResult)
+ -- let result3 = (ParseError False :: ExampleParseResult)           `structuralEq` (Left False                  :: Canonical ExampleParseResult)
+ -- let result4 = (ParseError False :: ExampleParseResult)           `structuralEq` (Right (False,(False,False)) :: Canonical ExampleParseResult)
+
+ -- putStrLn "Eithers/Pairs: true/false/true/false"
+ -- print result1
+ -- print result2 
+ -- print result3 
+ -- print result4
+

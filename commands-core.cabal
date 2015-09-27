@@ -83,7 +83,7 @@ library
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
         Data.Enumerate
-        Data.ADT
+        Data.Canonical
 
     build-depends:
         base ==4.8.*,

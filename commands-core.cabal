@@ -84,6 +84,7 @@ library
         CabalLenses.PackageDescription.TH
         Data.Enumerate
         Data.Canonical
+        Data.Domain 
 
     build-depends:
         base ==4.8.*,
@@ -127,7 +128,8 @@ library
         vector >=0.10,
         async >=2.0,
         parallel >=3.2,
-        hashable >=1.2
+        hashable >=1.2, 
+        MemoTrie >=0.6
     cc-options: -Wno-deprecated-declarations
     ld-options: -ObjC
     frameworks: Cocoa

@@ -2,6 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 import qualified Commands.Plugins.Example       as Example
 import qualified Commands.Plugins.Example.Root as Example
+import Data.ADT 
 
 import           System.Environment             (getArgs)
 
@@ -15,4 +16,4 @@ main = mainWith =<< getArgs
 mainWith = \case
  ["serve"] -> do
   Example.exampleServer
- _ -> Example.realMain
+ _ -> Example.realMain >> mainADT 

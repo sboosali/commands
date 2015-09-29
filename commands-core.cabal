@@ -67,6 +67,7 @@ library
         Commands.Instances
         Commands.LHS
         Commands.Munging
+        Commands.Main
         Data.RefCache
         Data.RefCache.Internal
         Data.HRefCache

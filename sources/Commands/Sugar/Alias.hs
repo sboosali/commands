@@ -6,10 +6,10 @@ module Commands.Sugar.Alias where
 import Commands.Backends.OSX
 
 
-met = CommandMod
-ctrl = Control
-shift = Shift
-alt = Option
+met = CommandModifier
+ctrl = ControlModifier
+shift = ShiftModifier
+alt = OptionModifier
 
 del = DeleteKey
 tab = TabKey

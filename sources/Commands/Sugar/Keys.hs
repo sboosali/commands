@@ -80,10 +80,10 @@ gKeychords = mdo
                E.<?> "keychord"
 
  pModifier  <- E.rule$ empty
-  <|> E.symbol 'M' $> CommandMod  -- generally, the meta-key
-  <|> E.symbol 'C' $> Control
-  <|> E.symbol 'S' $> Shift
-  <|> E.symbol 'A' $> Option
+  <|> E.symbol 'M' $> CommandModifier  -- generally, the meta-key
+  <|> E.symbol 'C' $> ControlModifier
+  <|> E.symbol 'S' $> ShiftModifier
+  <|> E.symbol 'A' $> OptionModifier
   E.<?> "modifier"
 
  pKey       <- E.rule$ empty

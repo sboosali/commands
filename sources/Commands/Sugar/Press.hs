@@ -121,14 +121,14 @@ instance (PressArg a, PressFun f) => PressFun (a -> f)  where
   Left  m   -> pressFun (modifiers <> [m], keypresses)
   Right kps -> pressFun (modifiers,        keypresses <> kps)
 
--- ^ alias for 'CommandMod'
-pattern M = CommandMod
+-- ^ alias for 'CommandModifier'
+pattern M = CommandModifier
 -- ^ alias for 'Control'
-pattern C = Control
+pattern C = ControlModifier
 -- ^ alias for 'Shift'
-pattern S = Shift
+pattern S = ShiftModifier
 -- ^ alias for 'Option'
-pattern O = Option
+pattern O = OptionModifier
 -- ^ alias for 'Function'
-pattern F = Function
+pattern F = FunctionModifier
 

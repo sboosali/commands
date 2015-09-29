@@ -1,15 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{- | short aliases for the keys of a keyboard.
-
-when writing keyboard shortcuts, watch out for shadowed bindings like:
-
-* @press 'm' where :: 'Modifier'@
-* @press 'k' where :: 'Key'@
-* @press 'c' where :: Char@
-* @press 's' where :: String@
-* @press 'i' where :: Integer@
-
-if you import this module, your single-character-identifier typos (e.g. from refactoring) become confusing: @"can't unify \'a\' with Key@ instead of a scope error @\'a\' not in scope@. use at your own risk.
+{- | short aliases for some of the keys of a keyboard.
 
 -}
 module Commands.Sugar.Alias where

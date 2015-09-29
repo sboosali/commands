@@ -67,13 +67,6 @@ library
         Commands.Instances
         Commands.LHS
         Commands.Munging
-        Commands.Plugins.Example
-        Commands.Plugins.Example.Root
-        Commands.Plugins.Example.Emacs
-        Commands.Plugins.Example.Phrase
-        Commands.Plugins.Example.Spacing
-        Commands.Plugins.Example.Keys
-        Commands.Plugins.Example.Shortcut
         Data.RefCache
         Data.RefCache.Internal
         Data.HRefCache

@@ -13,8 +13,7 @@ by polluting the global namespace with single-letter identifiers, your config wi
 -}
 module Commands.Sugar.Press where -- TODO move aliases to Commands.Sugar.Aliases. They keep polluting the namespace.
 import Commands.Etc() 
-import Commands.Backends.OSX.DSL
-import Commands.Backends.OSX.Types
+import Commands.Backends.OSX
 
 -- import Control.Monad.Free (MonadFree)
 
@@ -107,10 +106,10 @@ do
  return something
 @
 
-since @(Actions ())@ is the only type for which this instance makes sense, and because these instances are "closed", we don't lose out on any desired instances with this trick.
+since @(Workflow ())@ is the only type for which this instance makes sense, and because these instances are "closed", we don't lose out on any desired instances with this trick.
 
 -}
-instance (a ~ ()) => PressFun (Actions a) where
+instance (a ~ ()) => PressFun (Workflow a) where
  pressFun (modifiers, keypresses) = traverse_ (\(ms,k) -> sendKeyChord (modifiers <> ms) k) keypresses
 
 -- instance (a ~ (), MonadFree ActionF m) => PressFun (m a) where

@@ -15,14 +15,12 @@ description:
     .
     @parse@ natural language commands with a @Grammar@, @compile@ the @data@ into @Action@s, and @execute@ those @Action@s on your computer.
     .
-    The <http://hackage.haskell.org/package/commands commands> package comes with "batteries included".
-category: Voice Control, Speech Recognition, Parsing, Natural Language Processing
+--TODO    The <http://hackage.haskell.org/package/commands commands> package comes with "batteries included".
+category: Accessibility, Natural Language Processing, Parsing, Speech Recognition, Voice Control
 author: Spiros Boosalis
-tested-with: GHC ==7.8.3
+tested-with: GHC ==7.10.1
 extra-source-files:
     README.md
-    cbits/objc_actor.h
-    cbits/Makefile
 
 source-repository head
     type: git
@@ -48,14 +46,6 @@ library
         Commands.Frontends.Dragon13.Serialize
         -- Commands.Frontends.Dragon13.Induce
         Commands.Backends.OSX
-        Commands.Backends.OSX.Example
-        Commands.Backends.OSX.Types
-        Commands.Backends.OSX.Bindings
-        Commands.Backends.OSX.Bindings.Raw
-        Commands.Backends.OSX.Constants
-        Commands.Backends.OSX.Marshall
-        Commands.Backends.OSX.Execute
-        Commands.Backends.OSX.DSL
         Commands.Servers.Servant
         Commands.Servers.Servant.Types
         Commands.Servers.Servant.API
@@ -82,6 +72,8 @@ library
 
     build-depends:
         base ==4.8.*,
+        workflow-osx ==0.0.0, 
+
         template-haskell >=2.10,
         containers >=0.5,
         mtl >=2.2,
@@ -124,17 +116,7 @@ library
         parallel >=3.2,
         hashable >=1.2, 
         MemoTrie >=0.6
-    cc-options: -Wno-deprecated-declarations
-    ld-options: -ObjC
-    frameworks: Cocoa
-    c-sources:
-        cbits/objc_actor.m
     default-language: Haskell2010
-    includes:
-        cbits/objc_actor.h
-    install-includes:
-        cbits/objc_actor.h
-    include-dirs: cbits
     hs-source-dirs: sources
     ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors
 

@@ -59,6 +59,6 @@ data VError = VError String
 data VConfig z a = VConfig
  { vGrammar :: DNS.SerializedGrammar
  , vParser  :: EarleyParser z a
- , vDesugar :: OSX.Application -> a -> OSX.Actions_
+ , vDesugar :: OSX.Application -> a -> OSX.Workflow_
  }
 

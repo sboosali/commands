@@ -3,7 +3,7 @@
 
 -}
 module Commands.Sugar.Alias where
-import Commands.Backends.OSX.Types
+import Commands.Backends.OSX
 
 
 met = CommandMod

@@ -536,7 +536,7 @@ type DNSEarleyCommand z = Command
  Text
  (DNSEarleyFunc z (DNSEarleyName String) Text)
  OSX.Application
- OSX.Actions_
+ OSX.Workflow_
 
 
 -- ================================================================ --

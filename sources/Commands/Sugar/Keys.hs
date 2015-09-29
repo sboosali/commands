@@ -1,8 +1,7 @@
 {-# LANGUAGE RecursiveDo, PatternSynonyms, FlexibleContexts                                 #-}
 module Commands.Sugar.Keys where  
 import           Commands.Etc
-import           Commands.Backends.OSX.Types 
-import           Commands.Backends.OSX.DSL
+import           Commands.Backends.OSX
 import           Commands.Mixins.DNS13OSX9 (EarleyEither,toEarleyEither)
 
 import qualified Data.List.NonEmpty              as NonEmpty
@@ -19,11 +18,11 @@ import           Data.Char hiding(Control)
 
 warning: partial function 
 -}
-press_ :: (MonadAction m) => String -> m () 
+press_ :: (MonadWorkflow m) => String -> m () 
 press_ = runKeyRiff . kbd
 
 -- | execute a keyboard shortcut 
-runKeyRiff :: (MonadAction m) => KeyRiff -> m () 
+runKeyRiff :: (MonadWorkflow m) => KeyRiff -> m () 
 runKeyRiff = traverse_ (\(KeyChord mods k) -> sendKeyChord mods k)
 
 {- | a grammar for Emacs-like keybindings syntax, like elisp @kbd@ (<http://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Sequences.html>).

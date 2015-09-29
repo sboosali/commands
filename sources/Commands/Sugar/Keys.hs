@@ -24,7 +24,7 @@ press_ = runKeyRiff . kbd
 
 -- | execute a keyboard shortcut 
 runKeyRiff :: (MonadAction m) => KeyRiff -> m () 
-runKeyRiff = traverse_ (\(KeyPress mods k) -> sendKeyPress mods k)
+runKeyRiff = traverse_ (\(KeyChord mods k) -> sendKeyChord mods k)
 
 {- | a grammar for Emacs-like keybindings syntax, like elisp @kbd@ (<http://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Sequences.html>).
 
@@ -134,7 +134,7 @@ gKeychords = mdo
 
  where
  toKeychord = lAppendModifiers
- lAppendModifiers ms (ms', k) = KeyPress (ms ++ ms') k
+ lAppendModifiers ms (ms', k) = KeyChord (ms ++ ms') k
 
 -- TODO a numerate all keybindings with one modifier and one non-modifier key, it's for documentation
 

@@ -17,9 +17,9 @@ runActions :: Actions a -> IO a
 runActions = iterM $ \case
  -- iterM :: (Monad m, Functor f) => (f (m a) -> m a) -> Free f a -> m a
 
- SendKeyPress    flags key k      -> ObjC.pressKey flags key >> k
+ SendKeyChord    flags key k      -> ObjC.pressKey flags key >> k
  SendText        s k              -> runActions (sendTextAsKeypresses s) >> k
- -- terminates because sendTextAsKeypresses is exclusively a sequence of SendKeyPress'es
+ -- terminates because sendTextAsKeypresses is exclusively a sequence of SendKeyChord'es
 
  -- TODO SendMouseClick  flags n button k -> ObjC.clickMouse flags n button >> k
 
@@ -33,10 +33,10 @@ runActions = iterM $ \case
  Delay           t k              -> threadDelay (t*1000) >> k
  -- 1,000 µs is 1ms
 
--- | returns a sequence of 'SendKeyPress'es.
+-- | returns a sequence of 'SendKeyChord'es.
 sendTextAsKeypresses :: String -> Actions ()
 sendTextAsKeypresses
- = traverse_ (\(modifiers, key) -> liftF $ SendKeyPress modifiers key ())
+ = traverse_ (\(modifiers, key) -> liftF $ SendKeyChord modifiers key ())
  . concatMap char2keypress
  -- liftF :: ActionF () -> Free ActionF ()
 
@@ -44,7 +44,7 @@ runActionsWithDelay :: Int -> Actions a -> IO a
 runActionsWithDelay t = iterM $ \case
  -- iterM :: (Monad m, Functor f) => (f (m a) -> m a) -> Free f a -> m a
 
- SendKeyPress    flags key k      -> threadDelay (t*1000) >> ObjC.pressKey flags key             >> k
+ SendKeyChord    flags key k      -> threadDelay (t*1000) >> ObjC.pressKey flags key             >> k
  SendText        s k              -> runActions (sendTextAsKeypressesWithDelay t s)              >> k
 
  GetClipboard    f                -> threadDelay (t*1000) >> ObjC.getClipboard                   >>= f
@@ -57,12 +57,12 @@ runActionsWithDelay t = iterM $ \case
  Delay           t k              -> threadDelay (t*1000)                                        >> k
  -- 1,000 µs is 1ms
 
--- | returns a sequence of 'SendKeyPress'es.
+-- | returns a sequence of 'SendKeyChord'es.
 sendTextAsKeypressesWithDelay :: Int -> String -> Actions ()
 sendTextAsKeypressesWithDelay t
  = traverse_ (\(modifiers, key) -> do
     liftF $ Delay t                    ()
-    liftF $ SendKeyPress modifiers key ())
+    liftF $ SendKeyChord modifiers key ())
  . concatMap char2keypress
  -- liftF :: ActionF () -> Free ActionF ()
 
@@ -72,9 +72,9 @@ e.g.
 
 >>> :{
 putStrLn . showActions $ do
- sendKeyPress [Command, Shift] BKey
+ sendKeyChord [Command, Shift] BKey
  delay 1000
- sendKeyPress [Command] DownArrowKey
+ sendKeyChord [Command] DownArrowKey
  x1 <- currentApplication
  x2 <- getClipboard
  openURL $ "https://www.google.com/search?q=" <> x2
@@ -82,9 +82,9 @@ putStrLn . showActions $ do
  getClipboard
 :}
 do
- sendKeyPress ([Command,Shift]) (BKey)
+ sendKeyChord ([Command,Shift]) (BKey)
  delay (1000)
- sendKeyPress ([Command]) (DownArrowKey)
+ sendKeyChord ([Command]) (DownArrowKey)
  x1 <- currentApplication
  x2 <- getClipboard
  openURL ("https://www.google.com/search?q={x2}")
@@ -111,7 +111,7 @@ showActions as = "do\n" <> evalState (showActions_ as) 1
 
  showAction_ :: (Show x) => ActionF (Actions x) -> State Gensym String
  showAction_ = \case
-  SendKeyPress    flags key k -> ((" sendKeyPress "    <> showArgs [show flags, show key]) <>)       <$> showActions_ k
+  SendKeyChord    flags key k -> ((" sendKeyChord "    <> showArgs [show flags, show key]) <>)       <$> showActions_ k
   -- TODO SendMouseClick  flags n b k -> ((" sendMouseClick "  <> showArgs [show flags, show n, show b]) <>) <$> showActions_ k
   SendText        s k         -> ((" sendText "        <> showArgs [show s]) <>)                     <$> showActions_ k
 

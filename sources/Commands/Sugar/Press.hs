@@ -23,7 +23,7 @@ import Data.Monoid                 ((<>))
 
 
 {- |a <http://chris-taylor.github.io/blog/2013/03/01/how-haskell-printf-works/ polyvariadic function>
- that desugars to a sequence of 'sendKeyPress'es.
+ that desugars to a sequence of 'sendKeyChord'es.
 
 e.g. @(C-u) x 1@, an Emacs keyboard shortcut, in the DSL:
 
@@ -60,7 +60,7 @@ press :: (PressArg a, PressFun f) => a -> f
 press = pressFun ([],[])
 
 
-type PressArgs = ([Modifier], [KeyPress])
+type PressArgs = ([Modifier], [KeyChord])
 
 {- | its instances can be an argument to 'press'. simply injects into a sum type. 
 
@@ -71,15 +71,15 @@ see 'pressFun':
 
 e.g. @'press' M C \'T\' \'x\'@ works on:
 
-@[Left CommandMod, Left Control, Right (KeyPress [Shift] TKey), Right (KeyPress [] XKey)]@ 
+@[Left CommandMod, Left Control, Right (KeyChord [Shift] TKey), Right (KeyChord [] XKey)]@ 
 
 -}
 class PressArg a
- where toPressArg :: a -> Either Modifier [KeyPress]
+ where toPressArg :: a -> Either Modifier [KeyChord]
 
 instance PressArg Modifier  where toPressArg = Left
 instance PressArg KeyRiff   where toPressArg = Right
-instance PressArg KeyPress  where toPressArg = Right . (:[])
+instance PressArg KeyChord  where toPressArg = Right . (:[])
 instance PressArg Key       where toPressArg = Right . (:[]) . NoMod
 instance PressArg Char      where toPressArg = Right . char2keypress
 -- ^ 
@@ -111,7 +111,7 @@ since @(Actions ())@ is the only type for which this instance makes sense, and b
 
 -}
 instance (a ~ ()) => PressFun (Actions a) where
- pressFun (modifiers, keypresses) = traverse_ (\(ms,k) -> sendKeyPress (modifiers <> ms) k) keypresses
+ pressFun (modifiers, keypresses) = traverse_ (\(ms,k) -> sendKeyChord (modifiers <> ms) k) keypresses
 
 -- instance (a ~ (), MonadFree ActionF m) => PressFun (m a) where
 -- the instances benignly overlap. since the function arrow (@(->)@) is a unary constructor, like the Monad (@m@).

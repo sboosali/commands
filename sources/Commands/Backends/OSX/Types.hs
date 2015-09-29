@@ -35,14 +35,19 @@ type Actions_ = Actions ()
 
 -- | the "Action Functor".
 data ActionF k
- = SendKeyPress    [Modifier] Key                   k
+ = SendKeyChord    [Modifier] Key                   k
  | SendText        String                           k -- ^ a logical grouping for debugging and optimizing
- -- TODO | SendMouseClick  [Modifier] Positive MouseButton  k
+ --TODO | SendMouseClick  [Modifier] Int MouseButton  k
 
  | GetClipboard                                     (ClipboardText -> k)
  | SetClipboard    ClipboardText                k
+
  | CurrentApplication                               (Application -> k)
  | OpenApplication Application                      k
+
+ --TODO | CurrentWindow                               (Window -> k)
+ --TODO | OpenWindow Window                      k
+
  | OpenURL         URL                              k
 
  | Delay           Time                             k
@@ -51,23 +56,25 @@ data ActionF k
  deriving (Functor)
  -- deriving (Functor,Data)
 
+-- data ActionF mod key k  TODO platform-specific keyboards 
+--  = SendKeyChord    [mod] key      k 
+-- TODO convert between keyboards, like Alt on Windows/Linux being Command on OSX 
+
 type ClipboardText = String
+-- newtype ClipboardText = ClipboardText String  deriving (Show,Eq,Ord,IsString)
 
 type Application = String
--- newtype Application = Application String  deriving (Show,Eq,Ord)
+-- newtype Application = Application String  deriving (Show,Eq,Ord,IsString)
 
 type URL = String
--- newtype URL = URL String  deriving (Show,Eq,Ord)
+-- newtype URL = URL String  deriving (Show,Eq,Ord,IsString)
 
 type Time = Int
+-- newtype Time = Time String  deriving (Show,Eq,Ord,Num)
 -- units package
 
 -- class IsString TODO needs Free ActionF, which must be lifted, which isn't better than insert 
 
-
--- | desugars the thing into Actions, given an Application.
-newtype ApplicationDesugarer b a = ApplicationDesugarer { runApplicationDesugarer :: a -> Application -> b }
--- the concrete unit @(Actions ())@ will cause type-errors when your do-block returns non-unit types (like @(copy :: Actions String)@), but avoids existential quantification.
 
 {- | relates a Haskell type with a Objective-C type:
 
@@ -102,11 +109,10 @@ type CGEventFlags  = CULLong
 --  deriving (Show,Eq,Ord)
 
 -- data MouseButton = LeftButton | MiddleButton | RightButton
---  deriving (Show,Eq,Ord,Enum)
+--  deriving (Show,Eq,Ord,Enum,Bounded)
 
--- | a (pseudo)-refinement type.
-newtype Positive = Positive { getPositive :: Int } -- TODO or just use Natural? 
- deriving (Show,Eq,Ord,Data)    -- not Nu,Genericm
+--TODO | a (pseudo)-refinement type.
+-- newtype Positive = Positive { getPositive :: Int } deriving (Show,Eq,Ord,Data,Generic,Num) -- TODO or just use Natural? 
 
 -- -- | smart constructor for 'Positive'.
 -- newPositive :: Int -> Possibly Positive
@@ -121,19 +127,17 @@ newtype Positive = Positive { getPositive :: Int } -- TODO or just use Natural?
 -- @Press []@ is natural to partially apply
 
 -- -}
--- data KeyPress = KeyPress [Modifier] Key
+-- data KeyChord = KeyChord [Modifier] Key
 --  deriving (Show,Eq,Ord)
 
 type KeyRiff  = [KeyChord]
-type KeyChord = KeyPress
-
-type KeyPress = ([Modifier], Key)
-pattern KeyPress mods k = (mods, k)
+type KeyChord = ([Modifier], Key)
+pattern KeyChord mods k = (mods, k)
 pattern NoMod         k = ([],   k)
 
-addMod :: Modifier -> KeyPress -> KeyPress
-addMod mod (mods, k) = KeyPress (mod:mods) k
--- false positive nonexhaustive warning with the KeyPress pattern 
+addMod :: Modifier -> KeyChord -> KeyChord
+addMod mod (mods, k) = KeyChord (mod:mods) k
+-- false positive nonexhaustive warning with the KeyChord pattern 
 
 {- | modifier keys are keys that can be "held".
 
@@ -253,7 +257,7 @@ data Key
 
 
 -}
-int2keypress :: Integer -> [KeyPress]
+int2keypress :: Integer -> [KeyChord]
 int2keypress = concatMap char2keypress . show
 
 {- | 
@@ -270,7 +274,7 @@ Nothing
 Nothing
 
 -}
-digit2keypress :: Integer -> Possibly KeyPress
+digit2keypress :: Integer -> Possibly KeyChord
 digit2keypress 0  = return $ NoMod ZeroKey
 digit2keypress 1  = return $ NoMod OneKey
 digit2keypress 2  = return $ NoMod TwoKey
@@ -287,19 +291,19 @@ digit2keypress k = failed $ "digit2keypress: digits must be between zero and nin
 
 {- | the keypress that would insert the character into the application.
 
->>> char2keypress '@' :: Maybe KeyPress
+>>> char2keypress '@' :: Maybe KeyChord
 Just ([Shift], TwoKey)
 
 some characters cannot be represented as keypresses, like some non-printable characters
 (in arbitrary applications, not just the terminal emulator):
 
->>> char2keypress '\0' :: Maybe KeyPress
+>>> char2keypress '\0' :: Maybe KeyChord
 Nothing
 
 prop> case char2keypress c of {  Just ([],_) -> True;  Just ([Shift],_) -> True;  Nothing -> True;  _ -> False  }
 
 -}
-char2keypress :: Char -> Possibly KeyPress -- ((,) [Modifier] Key)
+char2keypress :: Char -> Possibly KeyChord -- ((,) [Modifier] Key)
 
 char2keypress 'a'  = return $ (,) [     ] AKey
 char2keypress 'A'  = return $ (,) [Shift] AKey
@@ -421,7 +425,7 @@ prop> maybe True isAscii (keypress2char k)
 TODO replace true with redo test
 
 -}
-keypress2char :: KeyPress -> Possibly Char -- ((,) [Modifier] Key)
+keypress2char :: KeyChord -> Possibly Char -- ((,) [Modifier] Key)
 
 keypress2char ((,) [     ] AKey)            = return $ 'a'
 keypress2char ((,) [Shift] AKey)            = return $ 'A'

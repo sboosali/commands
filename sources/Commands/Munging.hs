@@ -100,20 +100,21 @@ uncapitalize :: String -> String
 uncapitalize [] = []
 uncapitalize (x:xs) = toLower x : xs
 
+{-| 
 
+>>> unCamelCase "unCamelCase"
+["un","camel","case"]
 
--- |
--- >>> unCamelCase "unCamelCase"
--- ["un","camel","case"]
---
--- >>> unCamelCase ""
--- []
---
--- prop> \(uncapitalize -> x) -> (camelCase . unCamelCase) x == x
---
+>>> unCamelCase ""
+[]
+
+prop> \(uncapitalize -> x) -> (camelCase . unCamelCase) x == x
+
+-}
 unCamelCase :: String -> [String]
 unCamelCase = fmap lower . (split . dropInitBlank . keepDelimsL . whenElt) isUpper
 
 overCamelCase :: ([String] -> [String]) -> (String -> String)
 overCamelCase f = (intercalate " ") . f . unCamelCase
 -- overCamelCase = dimap (intercalate " ") unCamelCase
+

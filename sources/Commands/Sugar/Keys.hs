@@ -14,12 +14,12 @@ import           Data.Char hiding(Control)
 
 {- | parse a string, execute it as a keyboard shortcut 
 
-@press_ = 'runKeyRiff' . 'kbd'@
+@press = 'runKeyRiff' . 'kbd'@
 
 warning: partial function 
 -}
-press_ :: (MonadWorkflow m) => String -> m () 
-press_ = runKeyRiff . kbd
+press :: (MonadWorkflow m) => String -> m () 
+press = runKeyRiff . kbd
 
 -- | execute a keyboard shortcut 
 runKeyRiff :: (MonadWorkflow m) => KeyRiff -> m () 

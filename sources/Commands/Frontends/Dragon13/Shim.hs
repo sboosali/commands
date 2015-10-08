@@ -1,44 +1,12 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, QuasiQuotes, RankNTypes, RecordWildCards #-}
+{-# LANGUAGE QuasiQuotes, RecordWildCards #-}
 -- | (you should read the source for documentation: just think of this module as a config file)
 module Commands.Frontends.Dragon13.Shim where
+import Commands.Frontends.Dragon13.Shim.Types
 
-import           Commands.Etc
--- import           Commands.Etc.Generics
-
-import           Control.Monad.Catch             (SomeException (..), throwM)
-import           Data.Text.Lazy                  (Text)
-import qualified Data.Text.Lazy                  as T
-import           Language.Python.Version2.Parser (parseModule)
 import           Text.InterpolatedString.Perl6
 
 import           GHC.Exts                        (IsString)
 
-
--- | "keyword arguments" for 'getShim'.
-data ShimR t = ShimR
- { __rules__      :: t  -- ^ a Python Docstring
- , __lists__      :: t  -- ^ a Python Dict
- , __export__     :: t  -- ^ a Python String
- -- TODO  this stuff below should probably be a separate interpolation, like servant-python
- , __serverHost__ :: t  -- ^ a Python String
- , __serverPort__ :: t  -- ^ a Python Int
- } deriving (Show,Eq,Ord,Functor,Data,Generic)
-
--- | syntactically correct Python files (when constructed with 'newPythonFile').
-newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord,Data,Generic)
-
-
--- | smart constructor for 'PythonFile'.
---
--- make sure that the input is a valid (at least, syntactically correct)
--- Python file (with 'parseModule'), reports the syntax error otherwise.
---
--- a Kleisli arrow.
---
-newPythonFile :: Text -> Possibly PythonFile
-newPythonFile s = case parseModule (T.unpack s) "" of
- Right {} -> return $ PythonFile s
- Left  e  -> throwM $ SomeException e
 
 {- |
 

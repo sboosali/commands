@@ -8,8 +8,8 @@ module Commands.Frontends.Dragon13.Serialize where
 import           Commands.Etc
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Frontends.Dragon13.Text
-import           Commands.Frontends.Dragon13.Shim
 import           Commands.Frontends.Dragon13.Lens
+import           Commands.Frontends.Dragon13.Shim.Types
 
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bitraversable
@@ -306,8 +306,12 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 >>> let Right{} = applyShim 'Commands.Frontends.Dragon13.Shim.getShim' "\'localhost\'" ('serializeGrammar' grammar)
 
 -}
-applyShim :: (ShimR Doc -> Doc) -> Address -> SerializedGrammar -> Possibly PythonFile
-applyShim getShim_ address = newPythonFile . displayDoc . getShim_ . from_SerializedGrammar_to_ShimR address
+applyShim :: (ShimR Doc -> Doc) -> Address -> SerializedGrammar -> Either PythonSyntaxError PythonFile
+applyShim getShim_ address
+ = newPythonFile
+ . displayDoc
+ . getShim_
+ . from_SerializedGrammar_to_ShimR address
 
 {- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
 

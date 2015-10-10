@@ -260,7 +260,24 @@ foldRHS
  -> RHS n t f a
  -> b
 foldRHS fromN fromT fromF unit mul add opt_ many_ some_ rhs
- = foldRHS' fromN fromT fromF ((add . map fromT) (getTerminals rhs)) unit mul add opt_ many_ some_ rhs 
+ = foldRHSWith fromN fromT fromF unit mul add opt_ many_ some_ (getTerminals rhs) rhs 
+
+foldRHSWith 
+ :: forall n t f a b. (Eq t)
+ => (forall x. n t f x -> b -> b)
+ -> (          t                      -> b)
+ -> (forall x. f x                    -> b)
+ -> b
+ -> (b -> b -> b)
+ -> ([b] -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> (b -> b)
+ -> [t] 
+ -> RHS n t f a
+ -> b
+foldRHSWith fromN fromT fromF unit mul add opt_ many_ some_ ts rhs
+ = foldRHS' fromN fromT fromF ((add . map fromT) ts) unit mul add opt_ many_ some_ rhs 
 
 -- | An "unlifted" 'runRHS'. ignores value (in Pure) and transformations in (Terminal/Opt/Many/Some).
 --

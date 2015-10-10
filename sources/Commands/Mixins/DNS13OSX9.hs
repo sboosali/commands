@@ -127,9 +127,21 @@ projectDNSEarleyFunc = \case
  TreeRHS pRHS gRHS -> Just (pRHS, gRHS) 
 
 
+-- | reach into the func (mutually recursive with the rhs).  
+getTerminalsDNSEarley
+ :: forall z t n a. (Eq t)
+ => (RHS n t (DNSEarleyFunc z n t) a)
+ -> [t] 
+getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
+ where                          -- TODO explicit signatures necessary. no let-generalization?
+ getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc z n t a -> [t])
+ getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
+ getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc z n t) a), (RHS n t (DNSEarleyFunc z n t) a)) -> [t])
+ getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
+
+
 
 -- ================================================================ --
-
 
 renameDNSEarleyFunc
  :: forall z m n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
@@ -250,16 +262,6 @@ renameRHSToEarley = renameDNSEarleyRHSST $ \_ (ConstName (_, n)) -> do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
  return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
-
--- | reach into the func (mutually recursive with the rhs).  
-getTerminalsDNSEarley
- :: forall z t n a. (Eq t)
- => (RHS (EarleyName z n) t (DNSEarleyFunc z (EarleyName z n) t) a)
- -> [t] 
-getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
- where 
- getTerminalsFromDNSEarleyFunc :: (forall x. DNSEarleyFunc z (EarleyName z n) t x -> [t])
- getTerminalsFromDNSEarleyFunc = maybe [] (getTerminalsDNSEarley . fst) . projectDNSEarleyFunc -- pick the parser RHS only
 
 induceEarley
  :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))  -- type equality only for documentation
@@ -399,7 +401,7 @@ induceDNS' -- TODO doesn't terminate on cyclic data
  => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
  -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
-induceDNS' = foldRHS
+induceDNS' rhs = foldRHSWith
   (\(DNSUniqueName i n k) r -> SomeDNSNonTerminal$ DNSRule$ (i, n <> "_" <> (show k)) :< r)
   (DNSTerminal . DNSToken)
   (\case
@@ -411,6 +413,8 @@ induceDNS' = foldRHS
   (DNSOptional)
   (DNSOptional . DNSMultiple)
   (DNSMultiple)
+  (getTerminalsDNSEarley rhs)
+  rhs 
 
 unVoidDNSRHS :: DNSRHS t Void -> DNSRHS t n
 unVoidDNSRHS = second (\case)

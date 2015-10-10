@@ -182,17 +182,19 @@ eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- NOTE constructors
 
 -- | ignores f and n (which may be mutually recursive with the whole) 
 getTerminals :: (Eq t) => RHS n t f a -> [t]
-getTerminals = getTerminalsNF (const id) (const [])
+getTerminals = getTerminals' (const id) (const [])
 
 -- TODO take the traversal from either the non-terminal or the functor into the right-hand side again. finds any hidden children right-hand sides. 
 -- TODO always terminates, even on recursive grammars 
-getTerminalsNF
+getTerminals'
  :: (Eq t)
  => (forall x. n t f x -> [t] -> [t])
  -> (forall x. f x          -> [t])
  -> RHS n t f a
  -> [t]
-getTerminalsNF fromN fromF = List.nub . foldRHS' fromN (:[]) fromF [] [] (<>) concat id id id
+getTerminals' fromN fromF
+ = List.nub
+ . foldRHS' fromN (:[]) fromF [] [] (<>) concat id id id
 
 runRHS
  :: forall n t f g a. (Alternative g, Eq t)
@@ -202,8 +204,20 @@ runRHS
  -- -> (          [t]                    -> g [t])
  -> RHS n t f a
  -> g a
-runRHS fromN fromT fromF rhs
- = runRHS' fromN fromT fromF ((asum . map fromT) (getTerminals rhs)) rhs 
+runRHS fromN fromT fromF rhs 
+ = runRHSWith fromN fromT fromF (getTerminals rhs) rhs -- TODO loops on recursive grammars 
+
+runRHSWith
+ :: forall n t f g a. (Alternative g, Eq t)
+ => (forall x. n t f x -> RHS n t f x -> g x)
+ -> (          t                      -> g t)
+ -> (forall x. f x                    -> g x)
+ -- -> (          [t]                    -> g [t])
+ -> [t]
+ -> RHS n t f a
+ -> g a
+runRHSWith fromN fromT fromF ts rhs
+ = runRHS' fromN fromT fromF ((asum . map fromT) ts) rhs -- TODO loops on recursive grammars 
 
 runRHS'
  :: forall n t f g a. (Alternative g, Eq t)

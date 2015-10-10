@@ -84,9 +84,6 @@ data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t) --TODO n
 -- | @ConstraintKinds@
 type Functor'RHS n t f = (Functor (n t f), Functor f)
 
-
-
-
 liftLeaf :: forall a
                          (n :: * -> (* -> *) -> * -> *)
                          t
@@ -116,6 +113,19 @@ anyLetter = (E.satisfy (T.all isUpper)) E.<?> "letter"
 
 _RHSInfo :: Traversal' (RHS (DNSEarleyName String) t f a) DNSInfo
 _RHSInfo = _NonTerminal._1.unConstName._1
+
+projectDNSEarleyFunc :: forall (t :: * -> * -> * -> *)
+                                     (t1 :: * -> (* -> *) -> * -> *)
+                                     t2
+                                     t3.
+                              DNSEarleyFunc t t1 t2 t3
+                              -> Maybe
+                                   (RHS t1 t2 (DNSEarleyFunc t t1 t2) t3,
+                                    RHS t1 t2 (DNSEarleyFunc t t1 t2) t3)
+projectDNSEarleyFunc = \case
+ LeafRHS _ _ -> Nothing 
+ TreeRHS pRHS gRHS -> Just (pRHS, gRHS) 
+
 
 
 -- ================================================================ --
@@ -241,6 +251,16 @@ renameRHSToEarley = renameDNSEarleyRHSST $ \_ (ConstName (_, n)) -> do
  null  <- newSTRef Nothing
  return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
 
+-- | reach into the func (mutually recursive with the rhs).  
+getTerminalsDNSEarley
+ :: forall z t n a. (Eq t)
+ => (RHS (EarleyName z n) t (DNSEarleyFunc z (EarleyName z n) t) a)
+ -> [t] 
+getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
+ where 
+ getTerminalsFromDNSEarleyFunc :: (forall x. DNSEarleyFunc z (EarleyName z n) t x -> [t])
+ getTerminalsFromDNSEarleyFunc = maybe [] (getTerminalsDNSEarley . fst) . projectDNSEarleyFunc -- pick the parser RHS only
+
 induceEarley
  :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))  -- type equality only for documentation
  => (Eq t)
@@ -249,12 +269,14 @@ induceEarley
         (DNSEarleyFunc z (EarleyName z n) t)
         a
  -> E.Prod z n t a
-induceEarley = runRHS
+induceEarley rhs = runRHSWith
  (\n r -> (unEarleyName n) (induceEarley r))  -- accessor (not pattern match) for polymorphic z (Rank2 elsewhere)
  E.symbol
  (\case
   LeafRHS p    _ -> p
   TreeRHS pRHS _ -> induceEarley pRHS)
+ (getTerminalsDNSEarley rhs) 
+ rhs 
 
 buildEarley
  :: E.Prod (E.Rule s a) n t a
@@ -293,6 +315,9 @@ e'ParseAll p ts = toEarleyEither (E.fullParses (buildEarley p ts))
  -- where
  -- report = E.fullParses result
  -- result = buildEarley (p&pProd) ts
+
+e'ParseList :: (forall r. RULED EarleyProd r a) -> [Text] -> [a]
+e'ParseList p ts = fst (E.fullParses (buildEarley p ts))
 
 -- | may 'throwM' a @('E.Report' String Text)@
 parseThrow

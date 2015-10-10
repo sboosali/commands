@@ -123,7 +123,7 @@ projectDNSEarleyFunc :: forall (t :: * -> * -> * -> *)
                                    (RHS t1 t2 (DNSEarleyFunc t t1 t2) t3,
                                     RHS t1 t2 (DNSEarleyFunc t t1 t2) t3)
 projectDNSEarleyFunc = \case
- LeafRHS _ _ -> Nothing 
+ LeafRHS{} -> Nothing 
  TreeRHS pRHS gRHS -> Just (pRHS, gRHS) 
 
 
@@ -565,7 +565,7 @@ type DNSEarleyCommand z = Command
  Text
  (DNSEarleyFunc z (DNSEarleyName String) Text)
  OSX.Application
- OSX.Workflow_
+ OSX.CWorkflow_
 
 
 -- ================================================================ --

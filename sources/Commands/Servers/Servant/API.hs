@@ -11,7 +11,7 @@ import           Servant
 
 
 
-serveNatlink :: (Show a) => (forall r. RULED VSettings r a) -> IO ()
+serveNatlink :: (Show a) => (forall r. RULED (VSettings m) r a) -> IO ()
 serveNatlink settings@VSettings{..} = do
  vSetup settings >>= \case
   Left e  -> do
@@ -22,15 +22,15 @@ serveNatlink settings@VSettings{..} = do
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
-natlinkApplication :: (Show a) => (forall r. RULED VSettings r a) -> Wai.Application
+natlinkApplication :: (Show a) => (forall r. RULED (VSettings m) r a) -> Wai.Application
 natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
 
 natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
-natlinkHandlers :: (Show a) => (forall r. RULED VSettings r a) -> Server NatlinkAPI
+natlinkHandlers :: (Show a) => (forall r. RULED (VSettings m) r a) -> Server NatlinkAPI
 natlinkHandlers = postRecognition
 
-postRecognition :: (Show a) => (forall r. RULED VSettings r a) -> DGNRecognition -> Response ()
+postRecognition :: (Show a) => (forall r. RULED (VSettings m) r a) -> DGNRecognition -> Response ()
 -- postRecognition vSettings (DGNRecognition ws) = (vSettings&vInterpretRecognition) vSettings ws
 postRecognition vSettings (DGNRecognition ws) = (vInterpretRecognition vSettings) vSettings ws

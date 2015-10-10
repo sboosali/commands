@@ -40,11 +40,11 @@ newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Data,Gener
 {- | read-only.
 "static" configuration
 -}
-data VSettings z a = VSettings
+data VSettings m z a = VSettings
  { vPort                 :: Wai.Port
- , vSetup                :: VSettings z a -> IO (Either VError ())
- , vInterpretRecognition :: (forall r. RULED VSettings r a) -> [Text] -> EitherT ServantErr IO ()
- , vConfig               :: VConfig z a
+ , vSetup                :: VSettings m z a -> IO (Either VError ())
+ , vInterpretRecognition :: (forall r. RULED (VSettings m) r a) -> [Text] -> EitherT ServantErr IO ()
+ , vConfig               :: VConfig m z a
  -- , vUpdateConfig   :: VPlugin z :~>: VConfig z
  }
 
@@ -56,9 +56,9 @@ data VError = VError String
 {- | read-only.
 "dynamic" configuration
 -}
-data VConfig z a = VConfig
+data VConfig m z a = VConfig
  { vGrammar :: DNS.SerializedGrammar
  , vParser  :: EarleyParser z a
- , vDesugar :: OSX.Application -> a -> OSX.Workflow_
+ , vDesugar :: OSX.Application -> a -> m ()
  }
 

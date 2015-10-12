@@ -64,9 +64,6 @@ library
         Data.Sexp
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
-        Data.Enumerate
-        Data.Canonical
-        Data.Domain 
 
     build-depends:
         base ==4.8.*,

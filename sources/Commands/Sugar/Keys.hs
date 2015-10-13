@@ -2,7 +2,7 @@
 module Commands.Sugar.Keys where  
 import           Commands.Etc
 import           Commands.Backends.OSX
-import           Commands.Mixins.DNS13OSX9 (EarleyEither,toEarleyEither)
+import           Commands.Mixins.DNS13OSX9.Types  (EarleyEither,toEarleyEither)
 
 import qualified Data.List.NonEmpty              as NonEmpty
 import Data.List.NonEmpty (NonEmpty)

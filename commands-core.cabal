@@ -50,6 +50,7 @@ library
         Commands.Servers.Servant.Types
         Commands.Servers.Servant.API
         Commands.Mixins.DNS13OSX9
+        Commands.Mixins.DNS13OSX9.Types 
         Commands.Sugar.Keys
         Commands.Etc
         Commands.Instances

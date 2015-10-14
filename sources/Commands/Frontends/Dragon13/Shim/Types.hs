@@ -7,6 +7,8 @@ import qualified Data.Text.Lazy                  as T
 import           Language.Python.Version2.Parser (parseModule)
 import           Language.Python.Common.ParseError (ParseError) 
 
+import Control.Exception (Exception)
+
 
 -- | "keyword arguments" for 'getShim'.
 data ShimR t = ShimR
@@ -23,6 +25,7 @@ newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord,Data,Generic)
 
 -- | an 'Exception'
 data PythonSyntaxError = PythonSyntaxError ParseError Text deriving (Show,Eq,Ord)
+instance Exception PythonSyntaxError
 
 -- | smart constructor for 'PythonFile'.
 --

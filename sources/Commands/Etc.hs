@@ -98,11 +98,11 @@ data GUI = GUI
  { _guiPackage    :: !Package
  , _guiModule     :: !Module
  , _guiIdentifier :: !Identifier
- } deriving (Show,Eq,Ord,Data,Generic,Hashable)
+ } deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
 
-newtype Package    = Package    String deriving (Show,Eq,Ord,Data,Generic,Hashable)
-newtype Module     = Module     String deriving (Show,Eq,Ord,Data,Generic,Hashable)
-newtype Identifier = Identifier String deriving (Show,Eq,Ord,Data,Generic,Hashable)
+newtype Package    = Package    String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
+newtype Module     = Module     String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
+newtype Identifier = Identifier String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
 
 -- | only 'NameG' is global, i.e. is unique modulo package and module.
 fromGlobalName :: Name -> Possibly GUI
@@ -265,10 +265,10 @@ snoc xs x = xs <> [x]
 data Address = Address
  { _host :: Host
  , _port :: Port
- } deriving (Show,Eq,Ord,Data,Generic)
+ } deriving (Show,Read,Eq,Ord,Data,Generic)
 
-newtype Host = Host String deriving (Show,Eq,Ord,Data,Generic)
-newtype Port = Port Int deriving (Show,Eq,Ord,Data,Generic)
+newtype Host = Host String deriving (Show,Read,Eq,Ord,Data,Generic)
+newtype Port = Port Int deriving (Show,Read,Eq,Ord,Data,Generic)
 
 -- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
 -- "http://localhost:8000"

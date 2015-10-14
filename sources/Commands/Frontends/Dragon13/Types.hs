@@ -317,6 +317,11 @@ data DNSLHS (l :: LHSKind) (s :: LHSSide) n where
 -- TODO enforce whether DNSLHS, well, whether it can be on the LHS rather than only in an RHS. this complicates everything! I forget why I even doing this.
 
 deriving instance (Show n) => Show (DNSLHS l s n)
+-- deriving instance (Read n) => Read (DNSLHS l s n)  -- ambiguous 
+-- deriving instance             Read (DNSLHS LHSRule LHSBuiltin n)
+-- deriving instance (Read n) => Read (DNSLHS LHSList LHSDefined n)
+-- deriving instance             Read (DNSLHS LHSRule LHSDefined n)
+-- deriving instance (Read n) => Read (DNSLHS LHSList LHSBuiltin n)
 instance (Eq n)  => Eq  (DNSLHS l s n) where (==)    = equalDNSLHS
 instance (Ord n) => Ord (DNSLHS l s n) where compare = compareDNSLHS
 -- deriving instance (Data n) => Data (DNSLHS l s n)
@@ -355,7 +360,7 @@ rankDNSLHS = \case
 -- | Builtin 'DNSProduction's: they have left-hand sides,
 -- but they don't have right-hand sides.
 data DNSBuiltinRule = DGNDictation | DGNWords | DGNLetters
- deriving (Show,Eq,Ord,Enum,Bounded,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinRule :: DNSBuiltinRule -> String
 displayDNSBuiltinRule = fmap toLower . show
@@ -364,7 +369,7 @@ displayDNSBuiltinRule = fmap toLower . show
 --
 -- (in the future, DNS better have more built-in lists.)
 data DNSBuiltinList = DNSEmptyList
- deriving (Show,Eq,Ord,Enum,Bounded,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinList :: DNSBuiltinList -> String
 displayDNSBuiltinList DNSEmptyList = "emptyList"
@@ -411,7 +416,7 @@ instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$>
 data DNSToken t
  = DNSToken t -- ^ e.g. @"word or phrase"@
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
- deriving (Show,Eq,Ord,Functor,Foldable,Traversable,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Functor,Foldable,Traversable,Data,Generic)
 
 -- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
@@ -458,7 +463,7 @@ data DNSInfo = DNSInfo
  { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
  , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'
  }
- deriving (Show,Eq,Ord,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Data,Generic)
 
 -- | no expansion and no inlining.
 defaultDNSInfo :: DNSInfo

@@ -35,7 +35,7 @@ data Sexp f a
  = Atom a
  | List   [Sexp f a]
  | Sexp f [Sexp f a]
- deriving (Show,Eq,Ord,Functor,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Functor,Data,Generic)
 
 -- | default from the 'Monad' subclass.
 instance Applicative (Sexp f) where
@@ -186,7 +186,7 @@ listSexp = List . map Atom
 data SexpF a r
  = AtomF a
  | ListF [r]
- deriving (Show,Eq,Ord,Functor,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Functor,Data,Generic)
 
 -- type Sexp' a = Fix (SexpF a)
 

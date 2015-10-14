@@ -10,7 +10,6 @@ import           Servant
 
 
 
-
 serveNatlink :: (Show a) => (forall r. RULED (VSettings m) r a) -> IO ()
 serveNatlink settings@VSettings{..} = do
  vSetup settings >>= \case

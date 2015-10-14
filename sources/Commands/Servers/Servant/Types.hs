@@ -7,7 +7,7 @@ import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Mixins.DNS13OSX9             (EarleyParser, RULED)
 
 import           Control.Monad.Trans.Either            (EitherT)
-import           Data.Aeson
+import           Data.Aeson (FromJSON) 
 import           Data.Text.Lazy                        (Text)
 import qualified Network.Wai.Handler.Warp              as Wai
 import           Servant
@@ -35,7 +35,8 @@ type NatlinkAPI = "recognition" :> ReqBody '[JSON] DGNRecognition :> Post '[JSON
 
 {- |
 -}
-newtype DGNRecognition = DGNRecognition [Text]  deriving (Show,Eq,Ord,Data,Generic,FromJSON)
+newtype DGNRecognition = DGNRecognition [Text]
+ deriving (Show,Read,Eq,Ord,Data,Generic,FromJSON)
 
 {- | read-only.
 "static" configuration
@@ -51,7 +52,7 @@ data VSettings m z a = VSettings
 {- |
 -}
 data VError = VError String
- deriving (Show,Eq,Ord,Data,Generic)
+ deriving (Show,Read,Eq,Ord,Data,Generic)
 
 {- | read-only.
 "dynamic" configuration

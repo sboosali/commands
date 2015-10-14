@@ -3,8 +3,8 @@
 {-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
 {-# LANGUAGE TemplateHaskell, TypeOperators                                 #-}
 -- | assorted functionality, imported by most modules in this package.  
-module Commands.Etc
- ( module Commands.Etc
+module Commands.Extra
+ ( module Commands.Extra
  , module Commands.Instances
  , module Data.Data
  , module GHC.Generics

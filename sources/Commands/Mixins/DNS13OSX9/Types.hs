@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 module Commands.Mixins.DNS13OSX9.Types where 
 
-import           Commands.Etc
+import           Commands.Extra
 import           Commands.Munging
 import           Commands.RHS.Types
 import qualified Data.HRefCache.Internal         as HRefCache

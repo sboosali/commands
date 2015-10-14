@@ -3,10 +3,10 @@
 {-# LANGUAGE ScopedTypeVariables, TupleSections, TypeFamilies #-}
 module Data.RefCache.Internal
  ( module Data.RefCache.Internal
- , module Data.RefCache.Etc
+ , module Data.RefCache.Extra
  ) where
 
-import           Data.RefCache.Etc
+import           Data.RefCache.Extra
 
 import           Control.Monad
 import           Control.Monad.ST

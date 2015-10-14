@@ -1,6 +1,6 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, RecordWildCards #-}
 module Commands.Frontends.Dragon13.Shim.Types where
-import           Commands.Etc
+import           Commands.Extra
 
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as T

@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TypeOperators  #-}
 module Commands.Servers.Servant.Types where
 import qualified Commands.Backends.OSX                 as OSX
-import           Commands.Etc
+import           Commands.Extra
 import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Mixins.DNS13OSX9             (EarleyParser, RULED)
 

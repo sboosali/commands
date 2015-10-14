@@ -2,10 +2,10 @@
 {-# LANGUAGE ScopedTypeVariables                                   #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unticked-promoted-constructors #-}
 module Commands.Test.Arbitrary where
-import           Commands.Etc
+import           Commands.Extra
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Types
-import           Commands.Test.Etc
+import           Commands.Test.Extra
 
 import           Data.List.NonEmpty                (NonEmpty (..))
 import qualified Data.Text.Lazy                    as T

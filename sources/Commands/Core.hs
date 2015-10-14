@@ -13,13 +13,13 @@ you can import this module to your "configuration" module, which should just def
 
 -}
 module Commands.Core
- ( module Commands.Etc
+ ( module Commands.Extra
  , module Commands.Munging
  , module Commands.LHS
  -- , module Commands.Parsers.Earley
  ) where
 
-import Commands.Etc
+import Commands.Extra
 import Commands.Instances      ()
 import Commands.LHS
 import Commands.Munging

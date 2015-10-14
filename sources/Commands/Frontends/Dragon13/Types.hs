@@ -3,7 +3,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
 module Commands.Frontends.Dragon13.Types where
-import Commands.Etc
+import Commands.Extra
 
 import Control.Lens.Plated   (Plated (..))
 import Data.Bifoldable

@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, GADTs, LambdaCase, ViewPatterns #-}
 module Commands.Frontends.Dragon13.Optimize where
-import           Commands.Etc
+import           Commands.Extra
 import           Commands.Frontends.Dragon13.Lens
 import           Commands.Frontends.Dragon13.Types
 import           Commands.LHS

@@ -2,10 +2,10 @@
 {-# LANGUAGE TypeFamilies, TypeOperators                               #-}
 module Data.HRefCache.Internal
  ( module Data.HRefCache.Internal
- , module Data.RefCache.Etc
+ , module Data.RefCache.Extra
  ) where
 
-import           Data.RefCache.Etc
+import           Data.RefCache.Extra
 
 import           Control.Arrow         ((>>>))
 import           Control.Monad         ((<=<))

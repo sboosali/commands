@@ -5,7 +5,6 @@
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators              #-}
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures -fno-warn-missing-signatures  #-}
 module Commands.RHS.Types where
--- import           Commands.Etc
 
 import           Control.Lens
 import           Data.List.NonEmpty  (NonEmpty (..))

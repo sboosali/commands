@@ -1,4 +1,4 @@
-module Commands.Test.Etc where
+module Commands.Test.Extra where
 import Test.QuickCheck
 
 

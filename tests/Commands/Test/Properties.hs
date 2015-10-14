@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module Commands.Test.Properties where
-import           Commands.Etc
+import           Commands.Extra
 import           Commands.Frontends.Dragon13
 import           Commands.Test.Arbitrary()
 

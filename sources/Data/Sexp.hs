@@ -1,7 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, DeriveGeneric        #-}
 {-# LANGUAGE LambdaCase, OverloadedLists, OverloadedStrings, TypeFamilies #-}
 module Data.Sexp where
-import Commands.Etc
+import Commands.Extra
 
 import Control.Lens
 import Data.Semigroup

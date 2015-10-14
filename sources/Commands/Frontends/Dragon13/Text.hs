@@ -18,7 +18,7 @@ module Commands.Frontends.Dragon13.Text
  -- * re-export
  , Text
  ) where
-import           Commands.Etc
+import           Commands.Extra
 
 import           Data.Char
 import           Data.Monoid    ((<>))

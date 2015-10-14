@@ -1,6 +1,6 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, RankNTypes #-}
 module Commands.LHS where
-import Commands.Etc
+import Commands.Extra
 
 import Data.Hashable
 

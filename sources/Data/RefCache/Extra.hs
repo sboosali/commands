@@ -1,4 +1,4 @@
-module Data.RefCache.Etc where
+module Data.RefCache.Extra where
 
 import Control.Exception     (evaluate)
 import System.Mem.StableName

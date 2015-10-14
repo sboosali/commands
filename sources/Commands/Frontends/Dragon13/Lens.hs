@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, GADTs, LambdaCase, TemplateHaskell #-}
 module Commands.Frontends.Dragon13.Lens where
-import Commands.Etc
+import Commands.Extra
 import Commands.Frontends.Dragon13.Types
 
 import Control.Lens

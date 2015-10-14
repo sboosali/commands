@@ -1,6 +1,6 @@
 {-# LANGUAGE RecursiveDo, PatternSynonyms, FlexibleContexts                                 #-}
 module Commands.Sugar.Keys where  
-import           Commands.Etc
+import           Commands.Extra
 import           Commands.Backends.OSX
 import           Commands.Mixins.DNS13OSX9.Types  (EarleyEither,toEarleyEither)
 

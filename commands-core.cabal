@@ -62,13 +62,13 @@ library
         Data.HRefCache
         Data.HRefCache.Internal
         Data.RefCache.Extra
-        Data.Sexp
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
 
     build-depends:
-        base ==4.8.*,
+
         workflow-osx ==0.0.1, 
+        s-expression ==0.0.0, 
 
         template-haskell >=2.10,
         containers >=0.5,
@@ -111,7 +111,9 @@ library
         async >=2.0,
         parallel >=3.2,
         hashable >=1.2, 
-        MemoTrie >=0.6
+        MemoTrie >=0.6, 
+        base ==4.8.*
+
     default-language: Haskell2010
     hs-source-dirs: sources
     ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors

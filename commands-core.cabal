@@ -115,6 +115,7 @@ library
         base ==4.8.*
 
     default-language: Haskell2010
+    default-extensions: AutoDeriveTypeable DeriveDataTypeable DeriveFunctor 
     hs-source-dirs: sources
     ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors
 

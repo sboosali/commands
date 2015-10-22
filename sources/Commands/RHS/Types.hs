@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
-{-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators              #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators, ConstraintKinds               #-}
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures -fno-warn-missing-signatures  #-}
 module Commands.RHS.Types where
 
@@ -35,6 +35,9 @@ data RHS n t f a where
 
 -- | @pattern Empty = Alter []@
 pattern Empty = Alter []
+
+-- | @ConstraintKinds@
+type Functor'RHS n t f = (Functor (n t f), Functor f)
 
 -- type RHSFunctorC n t f = (Functor f, Functor (n t f)) ConstraintKinds
 

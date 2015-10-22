@@ -246,7 +246,11 @@ properties:
 * when input a complete graph, the singleton list of (the list of) vertices is output
 
 TODO verify:
+
+@
 \as -> Set.fromList (map fst $ as) == Set.fromList (flattenSCCs . stronglyConnComp $ as)
+@
+
 i.e. it preserves the exact input nodes. which means that the partial 'find' can be safely assumed total.
 
 

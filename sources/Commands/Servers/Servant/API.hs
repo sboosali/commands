@@ -9,7 +9,6 @@ import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant
 
 
-
 serveNatlink :: (Show a) => (forall r. RULED (VSettings m) r a) -> IO ()
 serveNatlink settings@VSettings{..} = do
  vSetup settings >>= \case
@@ -33,3 +32,4 @@ natlinkHandlers = postRecognition
 postRecognition :: (Show a) => (forall r. RULED (VSettings m) r a) -> DGNRecognition -> Response ()
 -- postRecognition vSettings (DGNRecognition ws) = (vSettings&vInterpretRecognition) vSettings ws
 postRecognition vSettings (DGNRecognition ws) = (vInterpretRecognition vSettings) vSettings ws
+

@@ -4,7 +4,7 @@ module Test.DocTest.Discover where
 import CabalLenses.PackageDescription
 import Control.Lens
 import Distribution.InstalledPackageInfo     (PError)
-import Distribution.ModuleName
+import Distribution.ModuleName 
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse (ParseResult (..),
                                               parsePackageDescription)

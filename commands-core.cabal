@@ -51,6 +51,7 @@ library
         Commands.Servers.Servant.API
         Commands.Mixins.DNS13OSX9
         Commands.Mixins.DNS13OSX9.Types 
+        Commands.Mixins.DNS13OSX9.Derived
         Commands.Sugar.Keys
         Commands.Extra
         Commands.Instances

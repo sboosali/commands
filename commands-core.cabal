@@ -52,6 +52,9 @@ library
         Commands.Mixins.DNS13OSX9
         Commands.Mixins.DNS13OSX9.Types 
         Commands.Mixins.DNS13OSX9.Derived
+        Commands.Mixins.DNS13OSX9.Parser 
+        Commands.Mixins.DNS13OSX9.Frontend 
+        Commands.Mixins.DNS13OSX9.Reify
         Commands.Sugar.Keys
         Commands.Extra
         Commands.Instances

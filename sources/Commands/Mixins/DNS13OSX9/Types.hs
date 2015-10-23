@@ -6,6 +6,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+
+{-| 
+
+-}
 module Commands.Mixins.DNS13OSX9.Types where 
 
 import           Commands.RHS.Types

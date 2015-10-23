@@ -108,32 +108,37 @@ reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
     return()
    Just {} -> return()
 
-serializeDNSGrammar' :: DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
-serializeDNSGrammar' uG = do
- let oG = optimizeDNSInfoGrammar uG
+serializeDNSGrammar' :: DnsOptimizationSettings -> DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
+serializeDNSGrammar' settings uG = do
+ let oG = optimizeDNSInfoGrammar settings uG
  eG <- escapeDNSGrammar oG
  let sG = serializeGrammar eG
  return$ sG
 
 serializeRHSAsDNSGrammar
- :: RHS
+ :: DnsOptimizationSettings
+ -> RHS
                                     (DNSUniqueName String)
                                     Text
                                     (DNSEarleyFunc z (DNSUniqueName String) Text)
                                     a
  -> Either [SomeException] SerializedGrammar
-serializeRHSAsDNSGrammar = induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar'
+serializeRHSAsDNSGrammar settings
+ = induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar' settings 
 
-formatRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO (Either [SomeException] SerializedGrammar)
-formatRHS rawRhs = do
+formatRHS
+ :: DnsOptimizationSettings
+ -> RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a
+ -> IO (Either [SomeException] SerializedGrammar)
+formatRHS settings rawRhs = do
  renamer <- renameRHSToDNS
  reifiedRhs <- renamer rawRhs 
- let escapedGrammar = serializeRHSAsDNSGrammar reifiedRhs 
+ let escapedGrammar = serializeRHSAsDNSGrammar settings reifiedRhs 
  return$ escapedGrammar
 
 showRHS :: DNSEarleyRHS z a -> IO Text
 showRHS rawRhs = do
- escapedGrammar <- formatRHS rawRhs
+ escapedGrammar <- formatRHS defaultDnsOptimizationSettings rawRhs
  return$ either (T.pack . show) displaySerializedGrammar escapedGrammar
 
 {- | derive a grammar from a DNSEarleyRHS, by observing sharing. 
@@ -143,6 +148,6 @@ showRHS rawRhs = do
 throws 'DNSGrammarException' 
 
 -}
-de'deriveGrammarObservedSharing :: DNSEarleyRHS z a -> IO SerializedGrammar
-de'deriveGrammarObservedSharing rhs = formatRHS rhs >>= either (throwM . DNSGrammarException) return
+de'deriveGrammarObservedSharing :: DnsOptimizationSettings -> DNSEarleyRHS z a -> IO SerializedGrammar
+de'deriveGrammarObservedSharing settings rhs = formatRHS settings rhs >>= either (throwM . DNSGrammarException) return
 

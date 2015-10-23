@@ -53,22 +53,22 @@ inlining decreases depth by increasing breadth
 TODO prop> introduces no naming collisions
 
 -}
-optimizeGrammar' :: (Eq t) => DNSGrammar DNSInfo t LHS -> DNSGrammar DNSInfo t Text
-optimizeGrammar'
+optimizeGrammar' :: (Eq t) => DnsOptimizationSettings -> DNSGrammar DNSInfo t LHS -> DNSGrammar DNSInfo t Text
+optimizeGrammar' settings 
  = tidyupGrammar
  -- . expandGrammar
  . vocabularizeGrammar
- . inlineGrammar
+ . inlineGrammar settings 
  . simplifyGrammar
 
-optimizeDNSInfoGrammar :: (Eq t, Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
-optimizeDNSInfoGrammar
+optimizeDNSInfoGrammar :: (Eq t, Ord n) => DnsOptimizationSettings -> DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
+optimizeDNSInfoGrammar settings 
  = vocabularizeGrammar
- . inlineGrammar
+ . inlineGrammar settings 
  . simplifyGrammar
 
-optimizeAnyDNSGrammar :: (Eq t, Ord n) => DNSGrammar i t n -> DNSGrammar i t n
-optimizeAnyDNSGrammar
+optimizeAnyDNSGrammar :: (Eq t, Ord n) => DnsOptimizationSettings -> DNSGrammar i t n -> DNSGrammar i t n
+optimizeAnyDNSGrammar _settings 
  = vocabularizeGrammar
  . simplifyGrammar
 
@@ -105,9 +105,13 @@ expandProductionMaxDepth
 {-| inline any "small" productions. 
 
 -}
-inlineGrammar :: (Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
+inlineGrammar :: (Ord n) => DnsOptimizationSettings -> DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
 -- inlineGrammar = inlineGrammar' 
-inlineGrammar grammar = inlineGrammar' (grammar & over (dnsProductions.each) markInlinedIfSmall) 
+inlineGrammar settings grammar = inlineGrammar' grammar' 
+ where
+ grammar' = if settings^.dnsOptimizeInlineSmall
+  then (grammar & over (dnsProductions.each) markInlinedIfSmall) 
+  else grammar 
 -- NOTE markInlinedIfSmall doesn't need to be iterated, as inlining only increases the size of a right-hand side 
 
 {-| we don't inline away 'DNSVocabulary's because they:
@@ -151,9 +155,9 @@ partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
 markInlinedIfSmall :: DNSProduction DNSInfo t n -> DNSProduction DNSInfo t n
 markInlinedIfSmall (DNSProduction i l r) = DNSProduction i' l r
  where 
- i' = if   isDNSRHSSmall r
-      then i & set dnsInline True
-      else i
+ i' = if isDNSRHSSmall r
+  then i & set dnsInline True
+  else i
 
 {-| any right-hand side without non-singleton 'DNSSequence' or 'DNSAlternatives' is small, even nested 
 

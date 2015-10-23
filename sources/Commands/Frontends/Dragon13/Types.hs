@@ -1,5 +1,5 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DataKinds, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
-{-# LANGUAGE ExistentialQuantification, FlexibleInstances, GADTs         #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ExistentialQuantification, FlexibleInstances, DataKinds, GADTs         #-}
 {-# LANGUAGE KindSignatures, LambdaCase, NamedFieldPuns, PatternSynonyms #-}
 {-# LANGUAGE RankNTypes, StandaloneDeriving, ViewPatterns                #-}
 module Commands.Frontends.Dragon13.Types where
@@ -468,4 +468,17 @@ data DNSInfo = DNSInfo
 -- | no expansion and no inlining.
 defaultDNSInfo :: DNSInfo
 defaultDNSInfo = DNSInfo 0 False
+
+-- ================================================================ --
+
+data DnsOptimizationSettings = DnsOptimizationSettings
+ { _dnsOptimizeInlineSmall :: Bool 
+ -- , dnsOptimize :: 
+ } 
+ deriving (Show,Read,Eq,Ord,Data,Generic)
+
+defaultDnsOptimizationSettings :: DnsOptimizationSettings
+defaultDnsOptimizationSettings = DnsOptimizationSettings {..} 
+ where 
+ _dnsOptimizeInlineSmall = False 
 

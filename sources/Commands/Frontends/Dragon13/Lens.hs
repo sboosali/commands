@@ -15,6 +15,7 @@ makeLenses ''DNSProduction
 makePrisms ''DNSRHS
 
 makeLenses ''DNSInfo
+makeLenses ''DnsOptimizationSettings
 
 -- | equality projected 'on' the left-hand sides of productions.
 equalDNSProduction :: (Eq n) => DNSProduction i t n -> DNSProduction i t n -> Bool

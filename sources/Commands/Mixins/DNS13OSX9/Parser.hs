@@ -11,10 +11,10 @@ import           Commands.Extra
 import Commands.Mixins.DNS13OSX9.Types 
 import Commands.Mixins.DNS13OSX9.Reify
 import Commands.Frontends.Dragon13 -- TODO 
+import Commands.Parsers.Earley
 
 import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Text.Earley                     as E
-import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
 import qualified Data.Text.Lazy as T
 -- import Data.Text.Lazy (Text) 
@@ -22,7 +22,6 @@ import Data.Bifunctor(second)
 import Control.Monad.Catch (MonadThrow (..))
 
 import           Control.Monad.ST
-import           Data.STRef
 import           Data.Function                   ((&) )
 
 
@@ -41,10 +40,8 @@ renameRHSToEarley
                       (EarleyName (E.Rule s r) String) Text)
                       a)
          )
-renameRHSToEarley = renameDNSEarleyRHSST $ \_ (ConstName (_, n)) -> do
- conts <- newSTRef =<< newSTRef []
- null  <- newSTRef Nothing
- return$ EarleyName (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
+renameRHSToEarley = renameDNSEarleyRHSST $
+ \_ (ConstName (_, n)) -> EarleyName <$> buildEarleyNonTerminal n 
 
 induceEarley
  :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))  -- type equality only for documentation
@@ -63,14 +60,6 @@ induceEarley rhs = runRHSWith
  (getTerminalsDNSEarley rhs) 
  rhs 
 
-buildEarley
- :: E.Prod (E.Rule s a) n t a
- -> [t]
- -> ST s (E.Result s n [t] a)
-buildEarley p ts = do
-  s <- E.initialState p
-  E.parse [s] (E.emptyParseEnv ts)
-
 runEarley
  :: (forall r. RHS (ConstName (DNSInfo,String)) Text (DNSEarleyFunc (E.Rule s r) (ConstName (DNSInfo,String)) Text) a)
  -> [Text]
@@ -82,7 +71,7 @@ runEarley
 --  -> ST s (E.Result s String [t] a)
 runEarley r1 ts = do
  r2 <- renameRHSToEarley >>= ($ r1)
- buildEarley (induceEarley r2) ts
+ buildEarleyResult (induceEarley r2) ts
 
 parseRaw
  :: (forall r. RHS (ConstName (DNSInfo,String)) Text (DNSEarleyFunc r (ConstName (DNSInfo,String)) Text) a)
@@ -94,13 +83,13 @@ e'ParseBest :: (forall r. RULED EarleyParser r a) -> [Text] -> EarleyEither Stri
 e'ParseBest p ts = (p&pBest) <$> e'ParseAll (p&pProd) ts
 
 e'ParseAll :: (forall r. RULED EarleyProd r a) -> [Text] -> EarleyEither String Text (NonEmpty a)
-e'ParseAll p ts = toEarleyEither (E.fullParses (buildEarley p ts))
+e'ParseAll p ts = toEarleyEither (E.fullParses (buildEarleyResult p ts))
  -- where
  -- report = E.fullParses result
  -- result = buildEarley (p&pProd) ts
 
 e'ParseList :: (forall r. RULED EarleyProd r a) -> [Text] -> [a]
-e'ParseList p ts = fst (E.fullParses (buildEarley p ts))
+e'ParseList p ts = fst (E.fullParses (buildEarleyResult p ts))
 
 -- | may 'throwM' a @('E.Report' String Text)@
 parseThrow

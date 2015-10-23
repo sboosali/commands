@@ -39,7 +39,7 @@ renameDNSEarleyFunc u = \case
  go = renameDNSEarleyFunc u
 
 renameDNSEarleyRHSST
- :: forall z s n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
+ :: ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> ST s (    n2 t f2 x))
  -> ST s                   (RHS n1 t f1 a -> ST s (RHS n2 t f2 a))
 renameDNSEarleyRHSST u = unsafeIOToST$ do
@@ -100,5 +100,4 @@ renameRHSST u = unsafeIOToST$ do
     _ <- atomicModifyIORef' c ((,()) . HRefCache.insertRef k v)
     return y
 -- renaming recursive RHS doesn't terminate because: in renaming/traversing the non-terminal, the name is decoupled from the body. the natural transformation should return a pair, and the name and the rhs are both cached. makes sense, as we are caching on the non-terminal (isomorphic to a pair) pointer.
-
 

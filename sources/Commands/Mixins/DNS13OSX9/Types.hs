@@ -78,13 +78,11 @@ data EarleyParser z a = EarleyParser
  { pProd :: E.Prod z String Text a
  , pBest :: NonEmpty a -> a 
  }
-
+ 
 data EarleyName z n t (f :: * -> *) a = EarleyName
  { unEarleyName :: E.Prod z n t a -> E.Prod z n t a
  }
 -- not a Functor
-
-type EarleyEither e t = Either (E.Report e [t])
 
 
 -- ================================================================ --
@@ -157,14 +155,4 @@ getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
  getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
  getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc z n t) a), (RHS n t (DNSEarleyFunc z n t) a)) -> [t])
  getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
-
--- | refine an 'E.Report', forcing the results.
--- 'Right' when there is at least one parse that has consumed the whole input.
-toEarleyEither
- :: ([a], E.Report e [t])
- -> EarleyEither e t (NonEmpty a)
-toEarleyEither = \case
- ([],   e)               -> Left  e
- (x:xs, E.Report _ _ []) -> Right (x:|xs)
- (_,    e)               -> Left  e
 

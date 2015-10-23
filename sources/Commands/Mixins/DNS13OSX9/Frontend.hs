@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, LambdaCase, EmptyCase #-}
-{-# LANGUAGE ScopedTypeVariables, LiberalTypeSynonyms, TypeFamilies   #-}
+{-# LANGUAGE ScopedTypeVariables, LiberalTypeSynonyms, TypeFamilies, TemplateHaskell   #-}
 
 {-| 
 
@@ -29,22 +29,30 @@ import Control.Exception (SomeException (..))
 import qualified Data.List as List
 
 
-renameRHSToDNS :: IO (RHS (DNSEarleyName n) t (DNSEarleyFunc z (DNSEarleyName n) t) a -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a))
+renameRHSToDNS
+ :: IO (      RHS (DNSEarleyName n) t (DNSEarleyFunc z (DNSEarleyName n) t) a
+       -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a))
 renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
  k <- hashUnique <$> newUnique
  return$ DNSUniqueName i n k
 
+{-| 
+
+-}
 induceDNS
  :: (Eq t)
  => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
  -> Cofree (DNSRHS t) (DNSInfo, String)
 induceDNS = induceDNS' >>> \case
  SomeDNSNonTerminal (DNSRule ((i,n) :< r)) -> (i,n)         :< r
- r                                         -> defaultDNSLHS :< r
+ r                                         -> defaultDNSLHS :< r -- use a dummy left hand side when needed 
 
-defaultDNSLHS :: (DNSInfo,String)
-defaultDNSLHS = (defaultDNSInfo,"defaultDNSLHS") -- TODO should be unique; quote it?
+defaultDNSLHS :: (DNSInfo,String) -- TODO IO (DNSInfo,String) ? to be extra safe.  
+defaultDNSLHS = (defaultDNSInfo, showName 'defaultDNSLHS)
 
+{-| the core glue between an 'RHS' and a 'DNSGrammar'
+
+-}
 induceDNS' -- TODO doesn't terminate on cyclic data
  -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a
  :: (Eq t)
@@ -101,32 +109,39 @@ reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
 
 serializeDNSGrammar' :: DNSGrammar DNSInfo Text Text -> Either [SomeException] SerializedGrammar
 serializeDNSGrammar' uG = do
- let oG = optimizeDNSInfoGrammar uG                    -- optimizeDNSInfoGrammar
+ let oG = optimizeDNSInfoGrammar uG
  eG <- escapeDNSGrammar oG
  let sG = serializeGrammar eG
  return$ sG
 
-formatRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO (Either [SomeException] SerializedGrammar)
-formatRHS r = do
- renamer <- renameRHSToDNS
- let serializeRHS = (induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar')
- eG <- renamer r >>= (serializeRHS >>> return)
- return$ eG
+serializeRHSAsDNSGrammar
+ :: RHS
+                                    (DNSUniqueName String)
+                                    Text
+                                    (DNSEarleyFunc z (DNSUniqueName String) Text)
+                                    a
+ -> Either [SomeException] SerializedGrammar
+serializeRHSAsDNSGrammar = induceDNS >>> reifyDNSRHS >>> defaultDNSGrammar >>> second T.pack >>> serializeDNSGrammar'
 
-showRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO Text
-showRHS r = do
- eG <- formatRHS r
- return$ either (T.pack . show) displaySerializedGrammar eG
+formatRHS :: RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a -> IO (Either [SomeException] SerializedGrammar)
+formatRHS rawRhs = do
+ renamer <- renameRHSToDNS
+ reifiedRhs <- renamer rawRhs 
+ let escapedGrammar = serializeRHSAsDNSGrammar reifiedRhs 
+ return$ escapedGrammar
+
+showRHS :: DNSEarleyRHS z a -> IO Text
+showRHS rawRhs = do
+ escapedGrammar <- formatRHS rawRhs
+ return$ either (T.pack . show) displaySerializedGrammar escapedGrammar
 
 {- | derive a grammar from a DNSEarleyRHS, by observing sharing. 
 
 ("d" for DNS, "e" for Earley).
 
+throws 'DNSGrammarException' 
+
 -}
 de'deriveGrammarObservedSharing :: DNSEarleyRHS z a -> IO SerializedGrammar
-de'deriveGrammarObservedSharing rhs = do --TODO may throw exception 
- g <- formatRHS rhs >>= \case
-  Right g  -> return g
-  Left  es -> throwM$ DNSGrammarException es
- return g
+de'deriveGrammarObservedSharing rhs = formatRHS rhs >>= either (throwM . DNSGrammarException) return
 

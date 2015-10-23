@@ -18,6 +18,8 @@ type EarleyEither e t = Either (E.Report e [t])
 
 {-| 
 
+(warning: uses "Text.Earley.Internal") 
+
 -}
 buildEarleyResult
  :: E.Prod (E.Rule s a) n t a
@@ -28,6 +30,8 @@ buildEarleyResult p ts = do
   E.parse [s] (E.emptyParseEnv ts)
 
 {-| 
+
+(warning: uses "Text.Earley.Internal") 
 
 -}
 buildEarleyNonTerminal

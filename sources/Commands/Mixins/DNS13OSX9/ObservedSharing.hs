@@ -4,7 +4,7 @@
 {-| 
 
 -}
-module Commands.Mixins.DNS13OSX9.Reify where 
+module Commands.Mixins.DNS13OSX9.ObservedSharing where 
 
 import Commands.RHS.Types 
 import           Commands.Extra

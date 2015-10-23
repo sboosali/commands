@@ -9,7 +9,7 @@ module Commands.Mixins.DNS13OSX9.Parser where
 import Commands.RHS.Types 
 import           Commands.Extra
 import Commands.Mixins.DNS13OSX9.Types 
-import Commands.Mixins.DNS13OSX9.Reify
+import Commands.Mixins.DNS13OSX9.ObservedSharing 
 import Commands.Frontends.Dragon13 -- TODO 
 import Commands.Parsers.Earley
 

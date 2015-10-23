@@ -10,7 +10,7 @@ import Commands.RHS.Types
 import Commands.Frontends.Dragon13
 import           Commands.Extra
 import Commands.Mixins.DNS13OSX9.Types 
-import Commands.Mixins.DNS13OSX9.Reify
+import Commands.Mixins.DNS13OSX9.ObservedSharing 
 
 import qualified Data.Text.Lazy as T
 import Data.Bifunctor(second, bimap)

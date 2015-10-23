@@ -42,16 +42,17 @@ type DNSVocabularized n = Map n (DNSLHS LHSList LHSDefined n)
 
 -- ================================================================ --
 
--- | transforms a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts:
---
--- * grammars with recursive productions crash Dragon
--- NaturallySpeaking (no cycle detection I guess?)
--- * grammars that are "too complex" (by some opaque metric) throw a
--- @BadGrammar@ exception:
--- inlining decreases depth by increasing breadth
---
--- TODO prop> introduces no naming collisions
---
+{-| transforms a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts:
+
+* grammars with recursive productions crash Dragon
+NaturallySpeaking (no cycle detection I guess?)
+* grammars that are "too complex" (by some opaque metric) throw a
+@BadGrammar@ exception:
+inlining decreases depth by increasing breadth
+
+TODO prop> introduces no naming collisions
+
+-}
 optimizeGrammar' :: (Eq t) => DNSGrammar DNSInfo t LHS -> DNSGrammar DNSInfo t Text
 optimizeGrammar'
  = tidyupGrammar
@@ -98,35 +99,44 @@ expandProductionMaxDepth
  . fmap (\p -> p ^. dnsProductionInfo.dnsExpand)
 
 
+
 -- ================================================================ --
 
--- | we don't inline away 'DNSVocabulary's because they:
---
--- * have simple names, for easy debugging.
--- * are "cheap" or even "free", wrt Dragon NaturallySpeaking's opaque grammar-complexity measure.
---
--- the 'dnsExport' is never inlined away.
---
---
+{-| inline any "small" productions. 
+
+-}
 inlineGrammar :: (Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
-inlineGrammar (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
+-- inlineGrammar = inlineGrammar' 
+inlineGrammar grammar = inlineGrammar' (grammar & over (dnsProductions.each) markInlinedIfSmall) 
+-- NOTE markInlinedIfSmall doesn't need to be iterated, as inlining only increases the size of a right-hand side 
+
+{-| we don't inline away 'DNSVocabulary's because they:
+
+* have simple names, for easy debugging.
+* are "cheap" wrt Dragon NaturallySpeaking's opaque grammar-complexity measure.
+
+the 'dnsExport' is never inlined away. 
+
+-}
+inlineGrammar' :: (Ord n) => DNSGrammar DNSInfo t n -> DNSGrammar DNSInfo t n
+inlineGrammar' (DNSGrammar (_e:|_ps) _vs _is) = DNSGrammar (e:|ps) _vs _is
  where
  e = inlineProduction theInlined $ _e
  ps = inlineProduction theInlined <$> notInlined
  theInlined = yesInlined -- TODO  rewriteOn each other?
  (yesInlined, notInlined) = partitionInlined _ps
 
--- | assumes the 'DNSInlined' are acyclic wrt each other: otherwise, doesn't terminate.
-inlineAway :: (Ord n) => DNSInlined t n -> [DNSProduction DNSInfo t n] -> [DNSProduction DNSInfo t n]
-inlineAway = undefined -- TODO  rewriteOn?
+-- -- | assumes the 'DNSInlined' are acyclic wrt each other: otherwise, doesn't terminate.
+-- inlineAway :: (Ord n) => DNSInlined t n -> [DNSProduction DNSInfo t n] -> [DNSProduction DNSInfo t n]
+-- inlineAway = undefined -- TODO  rewriteOn?
 
 inlineProduction :: (Ord n) => DNSInlined t n -> DNSProduction DNSInfo t n -> DNSProduction DNSInfo t n
 inlineProduction lrs = rewriteOn dnsProductionRHS $ \case
- DNSNonTerminal l -> shouldInline lrs l
+ DNSNonTerminal l -> shouldInlineLHS lrs l
  _ -> Nothing
 
-shouldInline :: (Ord n) => DNSInlined t n -> SomeDNSLHS n -> Maybe (DNSRHS t n)
-shouldInline lrs l = Map.lookup l lrs
+shouldInlineLHS :: (Ord n) => DNSInlined t n -> SomeDNSLHS n -> Maybe (DNSRHS t n)
+shouldInlineLHS lrs l = Map.lookup l lrs
 
 partitionInlined
  :: (Ord n)
@@ -136,6 +146,27 @@ partitionInlined ps = (yesInlined, notInlined)  -- TODO don't in-line cycles
  where
  yesInlined = Map.fromList . fmap (\(DNSProduction _ l r) -> (SomeDNSLHS l, r)) $ _yesInlined
  (_yesInlined, notInlined) = List.partition (view (dnsProductionInfo.dnsInline)) ps
+
+
+markInlinedIfSmall :: DNSProduction DNSInfo t n -> DNSProduction DNSInfo t n
+markInlinedIfSmall (DNSProduction i l r) = DNSProduction i' l r
+ where 
+ i' = if   isDNSRHSSmall r
+      then i & set dnsInline True
+      else i
+
+{-| any right-hand side without non-singleton 'DNSSequence' or 'DNSAlternatives' is small, even nested 
+
+-}
+isDNSRHSSmall :: DNSRHS t n -> Bool 
+isDNSRHSSmall = \case 
+ DNSTerminal     {} -> True 
+ DNSNonTerminal  {} -> True 
+ DNSOptional     r  -> isDNSRHSSmall r 
+ DNSMultiple     r  -> isDNSRHSSmall r 
+ DNSSequence     (r :| []) -> isDNSRHSSmall r
+ DNSAlternatives (r :| []) -> isDNSRHSSmall r 
+ _ -> False 
 
 
 
@@ -211,18 +242,23 @@ tidyupGrammar = second (T.pack . showLHS . tidyupLHS)
 
 -- |
 tidyupLHS :: LHS -> LHS
-tidyupLHS (LHS (GUI (Package _) (Module _) (Identifier occ))) = LHS (GUI (Package "") (Module "") (Identifier occ))
-tidyupLHS (l `LHSApp` ls) = tidyupLHS l `LHSApp` fmap tidyupLHS ls
-tidyupLHS l = l
--- TODO safely tidyup i.e. unambiguously. compare each against all, with getNames. Build a Trie?
+tidyupLHS = bimapLHS fGUI fInt
+ where
+ fGUI (GUI (Package _) (Module _) (Identifier occ)) = GUI (Package "") (Module "") (Identifier occ)
+ fInt = id
+ -- TODO safely tidyup i.e. unambiguously. compare each against all, with getNames. Build a Trie?
 
 
 -- ================================================================ --
 
 simplifyGrammar :: (Eq t, Eq n) => DNSGrammar i t n -> DNSGrammar i t n
-simplifyGrammar = over (dnsProductions.each.dnsProductionRHS) simplifyRHS
+simplifyGrammar = over (dnsProductions.each.dnsProductionRHS) (simplifyRHS)
 
--- | all simplifications are "inductive" (I think that's the word), i.e. they structurally reduce the input. Thus, we know 'rewrite' terminates.
+{- | 
+
+all simplifications are "inductive" (I think that's the word), i.e. they structurally reduce the input. Thus, we know 'rewrite' terminates.
+
+-} 
 simplifyRHS :: (Eq t, Eq n) => DNSRHS t n -> DNSRHS t n
 simplifyRHS = rewrite $ \case
  -- singleton
@@ -253,6 +289,7 @@ fromJust (filterAway p xs) < (length xs)
 True
 
 "inductive"
+
 case filterAway p xs of
  Nothing -> True
  Just ys  -> length ys < length xs

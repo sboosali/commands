@@ -22,7 +22,7 @@ import qualified Data.List.NonEmpty              as NonEmpty
 
 import Data.Void
 import Data.Monoid              ((<>))
-import           Data.Unique
+-- import           Data.Unique
 import           Data.Function                   (on)
 import Control.Monad.Trans.State
 import Control.Exception (SomeException (..))
@@ -33,7 +33,8 @@ renameRHSToDNS
  :: IO (      RHS (DNSEarleyName n) t (DNSEarleyFunc z (DNSEarleyName n) t) a
        -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a))
 renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
- k <- hashUnique <$> newUnique
+ -- k <- hashUnique <$> newUnique
+ let k = 0                      -- TODO assumes user given names are unique 
  return$ DNSUniqueName i n k
 
 {-| 

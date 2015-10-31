@@ -27,9 +27,12 @@ natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
 natlinkHandlers :: (Show a) => (forall r. RULED (VSettings m) r a) -> Server NatlinkAPI
-natlinkHandlers = postRecognition
+natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings
 
 postRecognition :: (Show a) => (forall r. RULED (VSettings m) r a) -> DGNRecognition -> Response ()
 -- postRecognition vSettings (DGNRecognition ws) = (vSettings&vInterpretRecognition) vSettings ws
 postRecognition vSettings (DGNRecognition ws) = (vInterpretRecognition vSettings) vSettings ws
+
+postHypotheses :: (Show a) => (forall r. RULED (VSettings m) r a) -> HypothesesRequest -> Response ()
+postHypotheses vSettings (HypothesesRequest hs) = (vInterpretHypotheses vSettings) vSettings hs
 

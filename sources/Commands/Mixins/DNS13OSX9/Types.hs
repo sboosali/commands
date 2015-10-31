@@ -12,6 +12,7 @@
 -}
 module Commands.Mixins.DNS13OSX9.Types where 
 
+import           Commands.Extra 
 import           Commands.RHS.Types
 import Commands.Frontends.Dragon13
 import qualified Commands.Backends.OSX as OSX
@@ -26,6 +27,7 @@ import Control.Comonad.Cofree (Cofree)
 import           Data.Char
 import Data.Void
 import Control.Exception (Exception, SomeException)
+import Control.Applicative
 
 
 -- ================================================================ --
@@ -128,6 +130,28 @@ anyWord = E.Terminal (const True) (pure id)
 
 anyLetter :: E.Prod z String Text Text
 anyLetter = (E.satisfy (T.all isUpper)) E.<?> "letter"
+
+{-| comes from Dragon as:  
+
+@
+['spell', 'a', 'b', 'c']
+@ 
+
+(after being munged from:) 
+
+@
+['spell', 'a\\spelling-letter\\A', 'b\\spelling-letter\\B', 'c\\spelling-letter\\C']
+@ 
+
+
+
+-}
+anyLetters :: E.Prod z String Text Text
+anyLetters = T.concat <$> some (E.satisfy isSingleLetter) E.<?> "letters"
+ where
+ isSingleLetter = T.uncons >>> \case
+  Nothing -> False 
+  Just (c, _) -> isAlphaNum c 
 
 _RHSInfo :: Traversal' (RHS (DNSEarleyName String) t f a) DNSInfo
 _RHSInfo = _NonTerminal._1.unConstName._1

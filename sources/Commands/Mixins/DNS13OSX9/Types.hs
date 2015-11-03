@@ -21,7 +21,7 @@ import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
 import qualified Data.Text.Lazy as T
 import           Data.List.NonEmpty              (NonEmpty (..))
-import Control.Lens (Traversal',_1) 
+import Control.Lens (Traversal',_1,_2) 
 import Control.Comonad.Cofree (Cofree) 
 
 import           Data.Char
@@ -70,6 +70,11 @@ type DNSEarleyCommand z = Command
  (DNSEarleyFunc z (DNSEarleyName String) Text)
  OSX.Application
  OSX.CWorkflow_
+
+{-| existentially-quantified right hand side.  
+
+-}
+data SomeDNSEarleyRHS = forall z x. SomeDNSEarleyRHS { unSomeDNSEarleyRHS :: DNSEarleyRHS z x } 
 
 
 -- ================================================================ --
@@ -153,8 +158,11 @@ anyLetters = T.concat <$> some (E.satisfy isSingleLetter) E.<?> "letters"
   Nothing -> False 
   Just (c, _) -> isAlphaNum c 
 
-_RHSInfo :: Traversal' (RHS (DNSEarleyName String) t f a) DNSInfo
-_RHSInfo = _NonTerminal._1.unConstName._1
+_DNSEarleyRHSInfo :: Traversal' (RHS (DNSEarleyName n) t f a) DNSInfo
+_DNSEarleyRHSInfo = _RHSName.unConstName._1
+
+_DNSEarleyRHSName :: Traversal' (RHS (DNSEarleyName String) t f a) String 
+_DNSEarleyRHSName = _RHSName.unConstName._2
 
 projectDNSEarleyFunc :: forall (t :: * -> * -> * -> *)
                                      (t1 :: * -> (* -> *) -> * -> *)
@@ -167,16 +175,4 @@ projectDNSEarleyFunc :: forall (t :: * -> * -> * -> *)
 projectDNSEarleyFunc = \case
  LeafRHS{} -> Nothing 
  TreeRHS pRHS gRHS -> Just (pRHS, gRHS) 
-
--- | reach into the func (mutually recursive with the rhs).  
-getTerminalsDNSEarley
- :: forall z t n a. (Eq t)
- => (RHS n t (DNSEarleyFunc z n t) a)
- -> [t] 
-getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
- where                          -- TODO explicit signatures necessary. no let-generalization?
- getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc z n t a -> [t])
- getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
- getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc z n t) a), (RHS n t (DNSEarleyFunc z n t) a)) -> [t])
- getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
 

@@ -167,15 +167,20 @@ guiOf
 hashAlphanumeric :: (Hashable a) => a -> String
 hashAlphanumeric = flip showHex "" . abs . hash
 
--- | existentially-quantify any unary type-constructor
---
--- >>> :t Exists Nothing
--- Exists Nothing :: Exists Maybe
---
--- >>> case Exists [] of Exists xs -> length xs
--- 0
---
-data Exists f = Exists {unExists :: forall x. (f x)}
+{-| existentially-quantify any unary type-constructor
+
+>>> :t Exists Nothing
+Exists Nothing :: Exists Maybe
+
+>>> case Exists [] of Exists xs -> length xs
+0
+
+-}
+data Exists f = forall x. Exists { unExists :: f x }
+
+{-| eliminator -}
+exists ::  (forall x. f x -> a) -> (Exists f -> a)
+exists g (Exists f) = g f
 
 nonemptyHead :: Lens' (NonEmpty a) a
 nonemptyHead = lens
@@ -377,6 +382,28 @@ filterBlanks :: (IsString k, Eq k) => [(k, v)] -> [(k, v)]
 filterBlanks = filter $ \case
  ("",_) -> False
  (_, _) -> True
+
+{- | n-ary (homogeneous) depth-first cross-product. 
+
+>>> let xss = [[1,2,3],[4,5,6]] 
+>>> cross xss 
+[[1,4],[1,5],[1,6],[2,4],[2,5],[2,6],[3,4],[3,5],[3,6]]
+>>> length (cross xss)
+9
+>>> map length (cross xss)
+[2,2,2,2,2,2,2,2,2]
+>>> length xss
+2
+
+@cross = 'sequence'@ 
+
+prop> length (cross xss) == product (map length xss) 
+
+prop> all (\ys -> length xss == length ys) (cross xss)
+
+-}
+cross :: [[a]] -> [[a]] 
+cross = sequence 
 
 
 -- ================================================================ --

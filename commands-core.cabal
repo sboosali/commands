@@ -31,7 +31,9 @@ library
         buildable: False
     exposed-modules:
         Commands.Core
+        Commands.RHS
         Commands.RHS.Types
+        Commands.RHS.Finite 
         Commands.Frontends.Dragon13
         Commands.Frontends.Dragon13.Types
         Commands.Frontends.Dragon13.Lens
@@ -65,9 +67,10 @@ library
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
     build-depends:
-        -- cabal sandbox add-source 
+        -- cabal sandbox add-source ../
         workflow-osx ==0.0.1, 
         s-expression ==0.0.0,  
+        derive-monoid ==0.0.0,  
 
         template-haskell >=2.10.0.0 && <2.11,
         containers >=0.5.6.2 && <0.6,

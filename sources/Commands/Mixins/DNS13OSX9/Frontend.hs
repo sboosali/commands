@@ -6,10 +6,11 @@
 -}
 module Commands.Mixins.DNS13OSX9.Frontend where  
 
-import Commands.RHS.Types 
+import Commands.RHS
 import Commands.Frontends.Dragon13
 import           Commands.Extra
 import Commands.Mixins.DNS13OSX9.Types 
+import Commands.Mixins.DNS13OSX9.Derived 
 import Commands.Mixins.DNS13OSX9.ObservedSharing 
 
 import qualified Data.Text.Lazy as T
@@ -17,9 +18,10 @@ import Data.Bifunctor(second, bimap)
 import Data.Bitraversable(bitraverse) 
 import Control.Comonad.Cofree (Cofree(..)) 
 import Control.Monad.Catch (MonadThrow (..))
-import           Data.List.NonEmpty              (NonEmpty (..))
+import           Data.List.NonEmpty              (NonEmpty (..), nonEmpty)
 import qualified Data.List.NonEmpty              as NonEmpty
 
+import Data.Maybe (catMaybes) 
 import Data.Void
 import Data.Monoid              ((<>))
 -- import           Data.Unique
@@ -150,4 +152,25 @@ throws 'DNSGrammarException'
 -}
 de'deriveGrammarObservedSharing :: DnsOptimizationSettings -> DNSEarleyRHS z a -> IO SerializedGrammar
 de'deriveGrammarObservedSharing settings rhs = formatRHS settings rhs >>= either (throwM . DNSGrammarException) return
+
+{-| 
+
+-}
+isFiniteDNSRHS :: DNSRHS t n -> IsFiniteGrammar t
+isFiniteDNSRHS = \case 
+ DNSMultiple{}        -> abortIsFiniteGrammar
+ DNSNonTerminal{}     -> ignoreIsFiniteGrammar
+ DNSTerminal t      -> (keepIsFiniteGrammar FiniteTerminal) (fromDNSToken t)
+ DNSSequence rs     -> (when2_ FiniteSequence)     <$> (traverse go rs)
+ DNSAlternatives rs -> (whenN_ FiniteAlternatives) <$> (traverse go rs)
+ DNSOptional r      -> (when1_ FiniteOptional)     <$> (go r)
+
+ where 
+ go = isFiniteDNSRHS
+ when1_ f = fmap f 
+ when2_ f = whenN_ (foldl1 f)   -- TODO partial function, safe because of whenN_
+ whenN_ f rs = (f . NonEmpty.toList) <$> nonEmpty (catMaybes (NonEmpty.toList rs))
+ fromDNSToken = \case 
+  DNSToken t -> t 
+  DNSPronounced t _ -> t     -- TODO pass around a IsFiniteGrammarConfig, chooses between written (e.g. to preload the cached parser) or spoken (e.g. homophone detection, if possible in any utterance)
 

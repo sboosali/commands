@@ -56,7 +56,7 @@ defaultDNSLHS = (defaultDNSInfo, showName 'defaultDNSLHS)
 {-| the core glue between an 'RHS' and a 'DNSGrammar'
 
 -}
-induceDNS' -- TODO doesn't terminate on cyclic data
+induceDNS'
  -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a
  :: (Eq t)
  => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
@@ -74,7 +74,7 @@ induceDNS' rhs = foldRHSWith
   (DNSOptional)
   (DNSOptional . DNSMultiple)
   (DNSMultiple)
-  (getTerminalsDNSEarley rhs)
+  (getTerminalsDNSEarley rhs) -- TODO doesn't terminate on cyclic data
   rhs 
 
 unVoidDNSRHS :: DNSRHS t Void -> DNSRHS t n

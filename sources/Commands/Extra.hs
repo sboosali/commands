@@ -48,6 +48,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 import           GHC.Exts                          (IsString (..))
 import Data.Data (Data) 
 import           Data.Foldable                   (traverse_)
+-- TODO import Data.Functor.Classes
 
 
 -- | generalized 'Maybe':
@@ -177,6 +178,10 @@ Exists Nothing :: Exists Maybe
 
 -}
 data Exists f = forall x. Exists { unExists :: f x }
+
+-- instance (Ord1 f) => Ord (Exists f) where -- TODO the other lifted instances 
+--  compare (Exists f) (Exists g) = compare1 f g -- TODO must be homogeneous. maybe Typeable 
+
 
 {-| eliminator -}
 exists ::  (forall x. f x -> a) -> (Exists f -> a)

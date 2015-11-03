@@ -3,6 +3,7 @@
 module Commands.RHS.Finite where
 import Commands.Extra 
 import Commands.RHS.Types
+-- import Commands.RHS.Derived 
 
 -- import Derive.List 
 

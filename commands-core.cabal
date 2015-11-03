@@ -33,6 +33,7 @@ library
         Commands.Core
         Commands.RHS
         Commands.RHS.Types
+        Commands.RHS.Derived 
         Commands.RHS.Finite 
         Commands.Frontends.Dragon13
         Commands.Frontends.Dragon13.Types

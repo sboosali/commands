@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell, TypeFamilies, TypeOperators, ConstraintKinds               #-}
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures -fno-warn-missing-signatures  #-}
 module Commands.RHS.Types where
+import Commands.Extra (Exists) 
 
 import           Control.Lens
 import           Data.List.NonEmpty  (NonEmpty (..))
@@ -99,11 +100,6 @@ instance (Functor f, Functor (n t f)) => Alternative (RHS n t f) where
  some = fmap NonEmpty.toList . Some id
  {-# INLINE some #-}
 
-toRHSList :: RHS n t f a -> [RHS n t f a]
-toRHSList (Alter xs) = xs
-toRHSList x = [x]
-{-# INLINE toRHSList #-}
-
 {- | both token and result must be an (instance of) 'IsString'.
 
 (see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
@@ -126,9 +122,19 @@ instance IsList (RHS n t f a) where
  fromList = Alter             -- the constructor (rather than a method like "asum") avoids the (Functor f) constraint
  toList = toRHSList
 
+{-| a "lowered" (existentially-quantified) right hand side.  
+
+-}
+type RHS0 n t f = Exists (RHS n t f)
+
 
 
 -- ================================================================ --
+
+toRHSList :: RHS n t f a -> [RHS n t f a]
+toRHSList (Alter xs) = xs
+toRHSList x = [x]
+{-# INLINE toRHSList #-}
 
 terminal :: t -> RHS n t f t
 terminal = Terminal id

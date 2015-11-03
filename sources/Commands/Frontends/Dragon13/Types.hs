@@ -81,9 +81,9 @@ defaultDNSGrammar ps = DNSGrammar ps [] dnsHeader
 
 -- ================================================================ --
 
--- | you can only import 'LHSRule's, but of either 'LHSSide'dness.
---
---
+{-| you can only import 'LHSRule's, but of either 'LHSSide'dness. 
+
+-}
 data DNSImport n = forall s. DNSImport (DNSLHS LHSRule s n)
 -- deriving instance (Data n) => Data (DNSImport n)
 
@@ -109,9 +109,9 @@ dnsHeader = (DNSImport . DNSBuiltinRule) <$> constructors
 
 -- ================================================================ --
 
--- |
---
---
+{-| 
+
+-}
 data DNSProduction i t n = DNSProduction
  { _dnsProductionInfo :: i
  , _dnsProductionLHS  :: (DNSLHS LHSRule LHSDefined n)
@@ -128,10 +128,9 @@ instance Bitraversable (DNSProduction i) where
 
 -- ================================================================ --
 
--- |
---
---
---
+{-| 
+
+-}
 data DNSVocabulary i t n = DNSVocabulary
  { _dnsVocabularyInfo   :: i
  , _dnsVocabularyLHS    :: (DNSLHS LHSList LHSDefined n)
@@ -148,11 +147,13 @@ instance Bitraversable (DNSVocabulary i) where
 
 -- ================================================================ --
 
--- | the
--- <https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form EBNF>-like
--- grammar specification.
---
--- 'Eq' instance is manual because a constructor ('DNSNonTerminal') is existentially-quantified.
+{-| the
+<https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form EBNF>-like
+grammar specification.
+
+'Eq' instance is manual because a constructor ('DNSNonTerminal') is existentially-quantified.
+
+-}
 data DNSRHS t n
  = DNSTerminal    (DNSToken t) -- ^ e.g. @"terminal"@
  | DNSNonTerminal (SomeDNSLHS n) -- ^ e.g. @\<non_terminal>@ or @{non_terminal}@
@@ -192,81 +193,81 @@ instance Monoid (DNSRHS t n) where
  x `mappend` UnitDNSRHS = x
  x `mappend` y = DNSSequence (asDNSSequence x <> asDNSSequence y)
 
--- | the "additive identity" i.e.:
---
--- * pseudo-identity to 'DNSAlternatives'
--- * pseudo-annihilator to 'DNSSequence'
---
--- ("pseudo" because the differences are "observable" in Haskell, and thus aren't relied upon by this package. but "verified" (by experimenting) with at least one external system (Dragon NaturallySpeaking). should hold in any reasonable interpretation of a BNF-like grammar.)
---
--- pattern ZeroDNSRHS = 'DNSNonTerminal' ('SomeDNSLHS' ('DNSBuiltinList' 'DNSEmptyList'))
---
+{-| the "additive identity" i.e.:
+
+* pseudo-identity to 'DNSAlternatives'
+* pseudo-annihilator to 'DNSSequence'
+
+("pseudo" because the differences are "observable" in Haskell, and thus aren't relied upon by this package. but "verified" (by experimenting) with at least one external system (Dragon NaturallySpeaking). should hold in any reasonable interpretation of a BNF-like grammar.)
+
+pattern ZeroDNSRHS = 'DNSNonTerminal' ('SomeDNSLHS' ('DNSBuiltinList' 'DNSEmptyList'))
+
+-}
 pattern ZeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
--- On the Implementation:
---
--- these properties are used at different stages of building the
--- grammar (e.g. "Commands.Frontends.Dragon13.Render" and
--- "Commands.Frontends.Dragon13.Optimize"). these stages use different
--- name types (i.e. the @n@ in @DNSRHS t n@): not the same one, and
--- not just Strings. Thus, we need a parametrically polymorphic
--- 'ZeroDNSRHS':
---
--- @
--- DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS t n
--- @
---
--- rather than the simple but non-@n@-polymorphic:
---
---
--- @
--- DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t
--- @
---
---
+
+{- On the Implementation:
+
+these properties are used at different stages of building the
+grammar (e.g. "Commands.Frontends.Dragon13.Render" and
+"Commands.Frontends.Dragon13.Optimize"). these stages use different
+name types (i.e. the @n@ in @DNSRHS t n@): not the same one, and
+not just Strings. Thus, we need a parametrically polymorphic
+'ZeroDNSRHS':
+
+@
+DNSNonTerminal (SomeDNSLHS (DNSBuiltinList 'DNSEmptyList')) :: DNSRHS t n
+@
+
+rather than the simple but non-@n@-polymorphic:
+
+@
+DNSNonTerminal (SomeDNSLHS (DNSList "emptyList")) :: DNSRHS String t
+@
+
+-}
 
 asDNSAlternatives :: DNSRHS t n -> NonEmpty (DNSRHS t n)
 asDNSAlternatives = \case
  DNSAlternatives rs -> rs
  r -> r :| []
 
--- | the "multiplicative identity":
---
--- * pseudo-identity to 'DNSSequence'
---
---
---
---  Dragon NaturallySpeaking's grammatical format is EBNF-like, but there's no "epsilon production" (i.e. the production that matches the empty string, always succeeding). I tried @'DNSToken' ""@, but that raised an error. with a "epsilon" primitive, it seems to me easy to implement the Multiple:
---
--- @\<multiple_x> = \<eps> | x \<multiple_x>@
---
--- and Optional:
---
--- @\<optional_x> = \<eps> | x@
---
--- productions. abusing notation, let's rewrite the higher-order
--- 'DNSOptional' production as:
---
--- @optional(x) = 1 + x@
---
--- and the 'ZeroDNSRHS' as:
---
--- @0@
---
--- we want @1@, we only have @0@ and @optional(x)@. so:
---
--- @1 = 1 + 0 = optional(0)@
---
--- by:
---
--- * additive identity of @0@ and
--- * the definition of @optional(x)@.
---
--- thus:
---
--- @pattern UnitDNSRHS = 'DNSOptional' 'ZeroDNSRHS'@
---
--- "denotationally", we have the above equational reasoning. "operationally", I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (failing), but then the option is matched (always succeeding).
---
+{-| the "multiplicative identity":
+
+* pseudo-identity to 'DNSSequence'
+
+Dragon NaturallySpeaking's grammatical format is EBNF-like, but there's no "epsilon production" (i.e. the production that matches the empty string, always succeeding). I tried @'DNSToken' ""@, but that raised an error. with a "epsilon" primitive, it seems to me easy to implement the Multiple:
+
+@\<multiple_x> = \<eps> | x \<multiple_x>@
+
+and Optional:
+
+@\<optional_x> = \<eps> | x@
+
+productions. abusing notation, let's rewrite the higher-order
+'DNSOptional' production as:
+
+@optional(x) = 1 + x@
+
+and the 'ZeroDNSRHS' as:
+
+@0@
+
+we want @1@, we only have @0@ and @optional(x)@. so:
+
+@1 = 1 + 0 = optional(0)@
+
+by:
+
+* additive identity of @0@ and
+* the definition of @optional(x)@.
+
+thus:
+
+@pattern UnitDNSRHS = 'DNSOptional' 'ZeroDNSRHS'@
+
+"denotationally", we have the above equational reasoning. "operationally", I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (failing), but then the option is matched (always succeeding).
+
+-}
 pattern UnitDNSRHS = DNSOptional ZeroDNSRHS
 
 asDNSSequence :: DNSRHS t n -> NonEmpty (DNSRHS t n)
@@ -281,33 +282,32 @@ pattern SomeDNSNonTerminal l = DNSNonTerminal (SomeDNSLHS l)
 
 -- ================================================================ --
 
--- |
---
--- in the type @DNSLHS l s n@, you can read:
---
--- * @l@ as @leftHandSide@
--- * @n@ as @name@ or @nonTerminal@
---
--- in relation to NatLink's concrete syntax:
---
--- * @"\<rule>"@ is a 'DNSRule'
--- * @"\<dgndictation>"@ is a 'DNSBuiltinRule'
--- * @"{list}@ is a 'DNSList'
---
--- a @GADT@ to distinguish 'LHSRule's from 'LHSList's, which behave
--- differently. without @GADT@s, we would need sacrifice
--- either safety (by not distinguishing things that are distinct)
--- or readability (by wrapping each distinction in its own type).
---
--- the instances are manual because of the error:
---
--- @
--- Can't make a derived instance of ...:
--- Constructor ... must not have existential arguments
--- @
---
--- (see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
---
+{-| in the type @DNSLHS l s n@, you can read:
+
+* @l@ as @leftHandSide@
+* @n@ as @name@ or @nonTerminal@
+
+in relation to NatLink's concrete syntax:
+
+* @"\<rule>"@ is a 'DNSRule'
+* @"\<dgndictation>"@ is a 'DNSBuiltinRule'
+* @"{list}@ is a 'DNSList'
+
+a @GADT@ to distinguish 'LHSRule's from 'LHSList's, which behave
+differently. without @GADT@s, we would need sacrifice
+either safety (by not distinguishing things that are distinct)
+or readability (by wrapping each distinction in its own type).
+
+the instances are manual because of the error:
+
+@
+Can't make a derived instance of ...:
+Constructor ... must not have existential arguments
+@
+
+(see <https://ghc.haskell.org/trac/ghc/ticket/8678>)
+
+-}
 data DNSLHS (l :: LHSKind) (s :: LHSSide) n where
  DNSRule        :: n              -> DNSLHS LHSRule LHSDefined n
  DNSBuiltinRule :: DNSBuiltinRule -> DNSLHS LHSRule LHSBuiltin x
@@ -357,37 +357,44 @@ rankDNSLHS = \case
  DNSList        {} -> 2
  DNSBuiltinList {} -> 3
 
--- | Builtin 'DNSProduction's: they have left-hand sides,
--- but they don't have right-hand sides.
+{-| Builtin 'DNSProduction's: they have left-hand sides,
+but they don't have right-hand sides.
+
+-}
 data DNSBuiltinRule = DGNDictation | DGNWords | DGNLetters
  deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinRule :: DNSBuiltinRule -> String
 displayDNSBuiltinRule = fmap toLower . show
 
--- | Builtin 'DNSVocabulary's.
---
--- (in the future, DNS better have more built-in lists.)
+{-| Builtin 'DNSVocabulary's.
+
+(in the future, DNS better have more built-in lists.)
+
+-}
 data DNSBuiltinList = DNSEmptyList
  deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
 
 displayDNSBuiltinList :: DNSBuiltinList -> String
 displayDNSBuiltinList DNSEmptyList = "emptyList"
 
--- |
--- 'LHSRule's and 'LHSList's inhabit distinct namespaces,
--- in Dragon NaturallySpeaking.
---
--- for promotion by @DataKinds@.
+{-| 'LHSRule's and 'LHSList's inhabit distinct namespaces,
+in Dragon NaturallySpeaking.
+
+for promotion by @DataKinds@.
+
+-}
 data LHSKind = LHSRule | LHSList
 
--- |
--- whether the 'DNSLHS' has a corresponding right-hand side or not (e.g. for inlining):
---
--- * most productions are 'LHSDefined', i.e. they have both a left-hand side and a right-hand side
--- * builtins are 'LHSBuiltin', they can be used, but are never defined
---
--- for promotion by @DataKinds@.
+
+{-| whether the 'DNSLHS' has a corresponding right-hand side or not (e.g. for inlining):
+
+* most productions are 'LHSDefined', i.e. they have both a left-hand side and a right-hand side
+* builtins are 'LHSBuiltin', they can be used, but are never defined
+
+for promotion by @DataKinds@.
+
+-}
 data LHSSide = LHSDefined | LHSBuiltin
 
 -- | for readable @doctest@s
@@ -428,37 +435,33 @@ instance (IsString t) => (IsString (DNSToken t)) where
 {- | get all the names in the left-hand sides of the grammar, without duplicates.
 Works on different levels of the grammar.
 
-e.g. @getNames :: (Eq t) => DNSGrammar n t -> [t]@
+e.g. @getNames :: (Eq n) => DNSGrammar t n -> [n]@
 
 >>> map unDNSName $ getNames grammar
 ["root","command","subcommand","flag"]
 
-@getNames = 'getLefts'@
-
 -}
-getNames :: (Eq n, Bifoldable p) => p n t -> [n]
-getNames = getLefts
+getNames :: (Eq n, Bifoldable p) => p t n -> [n]
+getNames = getRights
 
 {- | get all the words in the terminals of the grammar, without duplicates.
 Works on different levels of the grammar.
 
-e.g. @getWords :: (Eq t) => DNSGrammar n t -> [t]@
+e.g. @getWords :: (Eq t) => DNSGrammar t n -> [t]@
 
 >>> map unDNSText $ getWords grammar
 ["ls","status","git","rm","-f","force","-r","recursive","-a","all","-i","interactive"]
 
-@getWords = 'getRights'@
-
 -}
-getWords :: (Eq t, Bifoldable p) => p n t -> [t]
-getWords = getRights
+getWords :: (Eq t, Bifoldable p) => p t n -> [t]
+getWords = getLefts
 
 
 -- ================================================================ --
 
--- | metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts.
---
---
+{-| metadata to properly transform a 'DNSGrammar' into one that Dragon NaturallySpeaking accepts. 
+
+-}
 data DNSInfo = DNSInfo
  { _dnsExpand :: !Natural -- ^ how many times to expand a recursive 'DNSProduction'
  , _dnsInline :: !Bool    -- ^ whether or not to inline a 'DNSProduction'

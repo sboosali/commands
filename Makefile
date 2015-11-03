@@ -43,6 +43,10 @@ document:
 	cabal haddock
 	open dist/doc/html/$(PACKAGE)/index.html
 
+hyperlink: 
+	cabal haddock --with-haddock="$(HOME)/haddock/.cabal-sandbox/bin/haddock" --haddock-options="--hyperlinked-source"
+	open dist/doc/html/$(PACKAGE)/index.html
+
 style:
 	hlint --hint=HLint.hs  *.hs $(CODE)
 

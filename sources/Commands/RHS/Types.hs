@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveFunctor, FlexibleContexts, FlexibleInstances, GADTs #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, GADTs #-}
 {-# LANGUAGE KindSignatures, LambdaCase, LiberalTypeSynonyms           #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms, PostfixOperators      #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, StandaloneDeriving       #-}
@@ -15,6 +15,7 @@ import           Control.Applicative
 import           Data.Foldable       (asum)
 import           Data.Monoid
 import           GHC.Exts            (IsList (..), IsString (..))
+-- import Text.Printf
 
 
 data RHS n t f a where
@@ -103,11 +104,6 @@ toRHSList (Alter xs) = xs
 toRHSList x = [x]
 {-# INLINE toRHSList #-}
 
--- |
-liftRHS :: f a -> RHS n t f a
-liftRHS f = Pure id `Apply` f
-{-# INLINE liftRHS #-}
-
 {- | both token and result must be an (instance of) 'IsString'.
 
 (see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)
@@ -122,6 +118,7 @@ instance (IsString t, Show t, a ~ t) => IsString (RHS n t f a) where --TODO remo
 -- instance (IsString t, Show t) => IsString (RHS n t f String) where fromString = Terminal show . fromString
 -- instance (IsString t) => IsString (RHS n String f t) where fromString = Terminal fromString
 -- instance (IsString t, Show t) => IsString (RHS n t f t) where fromString = Terminal id . fromString
+ {-# INLINEABLE fromString #-}
 
 -- | @([r1,r2,r3] :: RHS n t f a)@ is @('mconcat' [r1,r2,r3])@ is @('asum' [r1,r2,r3])@ is @(r1 '<|>' r2 '<|>' r3)@
 instance IsList (RHS n t f a) where
@@ -135,30 +132,45 @@ instance IsList (RHS n t f a) where
 
 terminal :: t -> RHS n t f t
 terminal = Terminal id
+{-# INLINE terminal #-}
 
 terminals :: RHS n t f t
 terminals = Terminals id
+{-# INLINE terminals #-}
+
+-- |
+liftRHS :: f a -> RHS n t f a
+liftRHS f = Pure id `Apply` f
+{-# INLINE liftRHS #-}
 
 -- | zero or one. @(-?) = 'optionalRHS'@
 (-?), optionalRHS :: RHS n t f a -> RHS n t f (Maybe a)
 (-?) = optionalRHS
 optionalRHS = Opt id -- NOTE constructors (rather than methods) avoid Functor constraint 
+{-# INLINEABLE (-?) #-}
+{-# INLINEABLE optionalRHS #-}
 
 -- | zero or one. @(-?-) = 'flip' 'optionRHS'@
 (-?-) :: RHS n t f a -> a -> RHS n t f a
 (-?-) = flip optionRHS
 optionRHS :: a -> RHS n t f a -> RHS n t f a
 optionRHS x = Opt (maybe x id) -- NOTE constructors (rather than methods) avoid Functor constraint 
+{-# INLINEABLE (-?-) #-}
+{-# INLINEABLE optionRHS #-}
 
 -- | zero or more. @(-*) = 'manyRHS'@
 (-*), manyRHS :: RHS n t f a -> RHS n t f [a]
 (-*) = manyRHS
 manyRHS = Many id -- NOTE constructors (rather than methods) avoid Functor constraint 
+{-# INLINEABLE (-*) #-}
+{-# INLINEABLE manyRHS #-}
 
 -- | one or more. @(-+) = 'someRHS'@
 (-+), someRHS :: RHS n t f a -> RHS n t f (NonEmpty a)
 (-+) = someRHS
 someRHS = Some id -- NOTE constructors (rather than methods) avoid Functor constraint 
+{-# INLINEABLE (-+) #-}
+{-# INLINEABLE someRHS #-}
 
 -- | one or more. @(-++) = 'many1RHS'@
 --
@@ -166,6 +178,8 @@ someRHS = Some id -- NOTE constructors (rather than methods) avoid Functor const
 (-++), many1RHS :: RHS n t f a -> RHS n t f [a]
 (-++) = many1RHS
 many1RHS = Some NonEmpty.toList -- NOTE constructors (rather than methods) avoid Functor constraint 
+{-# INLINEABLE (-++) #-}
+{-# INLINEABLE many1RHS #-}
 
 -- | @(-|-) = 'eitherRHS'@
 --
@@ -174,6 +188,8 @@ many1RHS = Some NonEmpty.toList -- NOTE constructors (rather than methods) avoid
 (-|-) = eitherRHS
 eitherRHS l r = Alter [Pure Left :<*> l, Pure Right :<*> r] -- NOTE constructors (rather than methods) avoid Functor constraint
 -- thanks to quasi-lawfulness, about the same as {{eitherRHS l r = (Left <$> l) <|> (Right <$> r)}} 
+{-# INLINEABLE (-|-) #-}
+{-# INLINEABLE eitherRHS #-}
 
 -- (-#-) :: (Functor f, Functor (n t f)) => Int -> RHS n t f a -> RHS n t f [a]
 -- (-#-) k = traverse id . replicate k -- TODO what is this
@@ -374,6 +390,7 @@ renameRHS u = \case
 data ConstName n t (f :: * -> *) a = ConstName { _unConstName :: !n } deriving (Functor)
 -- KindSignatures because: f being phantom, it's kind is inferred to be nullary (I think)
 -- TODO is PolyKinds better? (f :: k)
+deriving instance Show n => Show (ConstName n t f a)
 
 data SomeRHS n t f = SomeRHS { _unSomeRHS :: forall x. RHS n t f x }
 
@@ -400,15 +417,45 @@ data Command n t f c b a = Command
 --   type ToRHS (Command n t f c b a) = a
 --   toRHS = _cRHS
 
+-- displayRhs :: () -> () -> () -> () -> RHS n t f a -> String 
+-- displayRhs = 
+
+{- 
+showRhs                         -- TODO IfConstrained https://hackage.haskell.org/package/ifcxt
+ :: forall n t f a. (Show t, Show1 (n t f), Show1 f, Show a)
+ => RHS n t f a
+ -> String 
+showRhs = \case
+ Terminals _ -> "Terminals _" 
+ Terminal _ t -> printf "Terminal _ (%s)" (show t) 
+ NonTerminal n r -> printf "NonTerminal (%s) (%s)" (show1 n) (go r) 
+
+ Opt  _ r -> printf "Opt  _ %s" (go r)
+ Many _ r -> printf "Many _ %s" (go r)
+ Some _ r -> printf "Some _ %s" (go r)
+
+ Pure a      -> printf "Pure %s" (show a) 
+ r `Apply` f -> printf "%s `Apply` %s" (go r) (show f) 
+ r1 :<*>  r2 -> printf "%s :<*> %s" (go r1) (go r2) 
+ Alter fs  -> printf "Alter %s" (go `map` fs) -- TODO 
+
+ where
+ go :: forall x. RHS n t f x -> String
+ go = runRHS' fromN fromT fromF aTerminal 
+-}
 
 
 -- ================================================================ --
 -- lenses
 
+_RHSName :: Traversal' (RHS n t f a) (n t f a)
+_RHSName = _NonTerminal._1
+
 _NonTerminal :: Prism' (RHS n t f a) (n t f a, RHS n t f a)
 _NonTerminal = prism (uncurry NonTerminal) $ \case
  NonTerminal l r -> Right (l, r)
  r -> Left r
+
 -- makePrisms ''RHS
 makeLenses ''ConstName
 makeLenses ''SomeRHS

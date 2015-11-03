@@ -419,7 +419,12 @@ instance Traversable SomeDNSLHS where traverse f (SomeDNSLHS l) = SomeDNSLHS <$>
 
 -- ================================================================ --
 
--- | the "leaves" of the grammar.
+{-| the "leaves" of the grammar. 
+
+given @DNSPronounced written spoken@, the speech recognition engine 
+recognizes @spoken@ and transcribes it as @written@. 
+
+-}
 data DNSToken t
  = DNSToken t -- ^ e.g. @"word or phrase"@
  | DNSPronounced t t -- ^ e.g. @written\\spoken@
@@ -428,6 +433,13 @@ data DNSToken t
 -- | for readable @doctest@s
 instance (IsString t) => (IsString (DNSToken t)) where
  fromString = DNSToken . fromString
+
+{- NOTE the user should choose whether they want the written form or the spoken form 
+fromDNSToken :: DNSToken t -> t 
+fromDNSToken = \case 
+ DNSToken t -> t 
+ DNSPronounced _ _ -> t 
+-}
 
 
 -- ================================================================ --

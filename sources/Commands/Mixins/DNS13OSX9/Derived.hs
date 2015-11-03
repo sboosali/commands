@@ -1,10 +1,10 @@
-{-# LANGUAGE TemplateHaskell, RankNTypes, ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell, RankNTypes, ScopedTypeVariables, LambdaCase #-}
 module Commands.Mixins.DNS13OSX9.Derived where 
 import           Commands.Extra
 import           Commands.Munging
 import Commands.Mixins.DNS13OSX9.Types 
 import Commands.Frontends.Dragon13
-import Commands.RHS.Types 
+import Commands.RHS
 import Commands.Parsers.Earley
 
 import qualified Text.Earley                     as E
@@ -21,6 +21,18 @@ import Data.Foldable (asum)
 
 
 infix 2 <=>
+
+-- | reach into the func (mutually recursive with the rhs).  
+getTerminalsDNSEarley
+ :: forall z t n a. (Eq t)
+ => (RHS n t (DNSEarleyFunc z n t) a)
+ -> [t] 
+getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
+ where                          -- TODO explicit signatures
+ getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc z n t a -> [t])
+ getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
+ getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc z n t) a), (RHS n t (DNSEarleyFunc z n t) a)) -> [t])
+ getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
 
 {-| @(<=>) = 'genericGrammar'@ 
 
@@ -76,7 +88,7 @@ sets 'dnsInline' to true.
 -}
 dragonGrammar :: Name -> (E.Prod z String Text a) -> DNSBuiltinRule -> DNSEarleyRHS z a
 dragonGrammar name p r = simpleGrammar name p (SomeDNSNonTerminal (DNSBuiltinRule r))
- & set (_RHSInfo.dnsInline) True
+ & set (_DNSEarleyRHSInfo.dnsInline) True
 
 {-| a default 'Grammar' for 'Enum's.
 
@@ -239,4 +251,7 @@ vocab
 -}
 tokens :: (IsString t, Show t, Functor'RHS n t f) => [String] -> RHS n t f t
 tokens = foldMap token
+
+getRhsName :: DNSEarleyRHS z a -> Maybe String 
+getRhsName r = r ^? _DNSEarleyRHSName
 

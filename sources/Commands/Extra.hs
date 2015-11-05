@@ -26,6 +26,7 @@ import           Data.Text.Lazy               (Text)
 import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
+import Servant.Common.BaseUrl (BaseUrl(..), Scheme(..)) 
 
 import           Control.Applicative
 import           Control.Arrow                ((>>>))
@@ -282,12 +283,18 @@ data Address = Address
  } deriving (Show,Read,Eq,Ord,Data,Generic)
 
 newtype Host = Host String deriving (Show,Read,Eq,Ord,Data,Generic)
-newtype Port = Port Int deriving (Show,Read,Eq,Ord,Data,Generic)
+newtype Port = Port Int    deriving (Show,Read,Eq,Ord,Data,Generic)
+
+localhost :: Host 
+localhost = Host "localhost" 
 
 -- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
 -- "http://localhost:8000"
 displayAddress :: Address -> Text
 displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown) h p
+
+address2baseurl :: Address -> BaseUrl
+address2baseurl (Address (Host h) (Port p)) = BaseUrl Http h p 
 
 -- | a natural transformation
 type (:~>:) f g = forall x. f x -> g x

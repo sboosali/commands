@@ -1,11 +1,10 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DataKinds, DeriveAnyClass, DeriveFunctor, DeriveGeneric #-}
-{-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TypeOperators  #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TypeOperators, TemplateHaskell   #-}
 {-| 
 
 > -- for doctests 
 >>> :set -XOverloadedStrings  
 >>> import Data.Aeson
-
 
 -}
 module Commands.Servers.Servant.Types where
@@ -14,12 +13,15 @@ import           Commands.Extra
 import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Mixins.DNS13OSX9             (EarleyParser, RULED)
 
+import Control.Lens
 import           Control.Monad.Trans.Either            (EitherT)
 import           Data.Aeson (ToJSON,FromJSON) 
 import           Data.Text.Lazy                        (Text)
 import qualified Network.Wai.Handler.Warp              as Wai
 import           Servant
 import           Servant.Client (ServantError) 
+
+import Control.Concurrent.STM
 
 
 {-| a response, when Haskell is the server. 
@@ -37,7 +39,7 @@ type ClientResponse = EitherT ServantError IO ()
 -}
 type NatlinkAPI = RecognitionAPI :<|> HypothesesAPI :<|> CorrectionAPI
 
-{- |
+{- | the API for a successful recognition. 
 
 @
 POST /recognition
@@ -52,10 +54,13 @@ $ python -c 'import sys,os,json,urllib2; print (urllib2.urlopen(urllib2.Request(
 @
 
 -}
-type RecognitionAPI = "recognition" :> ReqBody '[JSON] RecognitionRequest :> Post '[JSON] ()
--- type RecognitionAPI = "recognition" :> ReqBody RecognitionRequest :> Post (DGNUpdate String)
+type RecognitionAPI = "recognition" :> ReqBody '[JSON] RecognitionRequest :> Post '[JSON] (DNSResponse) 
 
-{-| 
+type HypothesesAPI = HypothesesAPIOf (DNSResponse)
+
+type HypothesesClientAPI = HypothesesAPIOf () 
+
+{-| the API for correcting recognition, given Dragon's hypotheses. 
 
 * derive a Haskell __client__ and a UI __server__. 
 * derive a Haskell __server__ (that forwards to the UI server) 
@@ -75,23 +80,22 @@ as we assume the front-end can't embed a server. e.g. the Dragon NaturallySpeaki
 is single-threaded and callback-driven. thus, most of our http responses are @()@, 
 and we pack their responses into a single @Update@.  
 
+-}
+type HypothesesAPIOf a = "hypotheses" :> ReqBody '[JSON] HypothesesRequest :> Post '[JSON] a 
+
+{-| the API for TODO 
 
 -}
-type HypothesesAPI = "hypotheses" :> ReqBody '[JSON] HypothesesRequest :> Post '[JSON] () 
+type CorrectionAPI = "correction" :> ReqBody '[JSON] CorrectionRequest :> Post '[JSON] (DNSResponse) 
 
-{-| 
-
--}
-type CorrectionAPI = "correction" :> ReqBody '[JSON] CorrectionRequest :> Post '[JSON] () 
-
-{- | 
+{- | a successful recognition of an utterance. 
 
 >>> 'decode' "[\"hello\",\"world\"]" :: Maybe RecognitionRequest
 Just (RecognitionRequest ["hello","world"])
 
 -}
 newtype RecognitionRequest = RecognitionRequest [Text]
- deriving (Show,Read,Eq,Ord,Data,Generic,FromJSON)
+ deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON)
 
 {-| the hypotheses of the previous recognition. 
 
@@ -101,7 +105,6 @@ its length is between one and ten.
 "[[\"hello\",\"world\"],[\"below\",\"furled\"]]"
 >>> 'decode' "[[\"hello\",\"world\"],[\"below\",\"furled\"]]" :: Maybe HypothesesRequest
 Just (HypothesesRequest [["hello","world"],["below","furled"]])
-
 
 -}
 newtype HypothesesRequest = HypothesesRequest [Hypothesis] -- TODO vinyl-vector: Vector 10 Maybe Hypothesis
@@ -118,6 +121,23 @@ data CorrectionRequest = CorrectionRequest [Text]
  -- }
  deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON)
 
+{-| a correction for the given recognition. 
+
+>>> 'encode' (CorrectionResponse (ForeignResultsObject 0, ["the", "correction", "response"]))
+"[0,[\"the\",\"correction\",\"response\"]]"
+
+-}
+data CorrectionResponse = CorrectionResponse (ForeignResultsObject, [Text]) 
+ deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON)
+
+{-| a "pointer" to a `ResObj` kept by the natlink client. 
+
+(actually, an identifier, currently unmanaged and non-opaque, and may or may not exist). 
+
+-}
+data ForeignResultsObject = ForeignResultsObject Integer 
+ deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON)
+
 {- | read-only.
 
 "static" configuration.
@@ -126,11 +146,12 @@ data CorrectionRequest = CorrectionRequest [Text]
 data VSettings m z a = VSettings
  { vPort                 :: Wai.Port
  , vSetup                :: VSettings m z a -> IO (Either VError ())
- , vInterpretRecognition :: (forall r. RULED (VSettings m) r a) -> RecognitionRequest -> Response ()
- , vInterpretHypotheses  :: (forall r. RULED (VSettings m) r a) -> HypothesesRequest  -> Response () 
- , vInterpretCorrection  :: (forall r. RULED (VSettings m) r a) -> CorrectionRequest  -> Response ()
+ , vInterpretRecognition :: (forall r. RULED (VSettings m) r a) -> RecognitionRequest -> Response DNSResponse
+ , vInterpretHypotheses  :: (forall r. RULED (VSettings m) r a) -> HypothesesRequest  -> Response DNSResponse
+ , vInterpretCorrection  :: (forall r. RULED (VSettings m) r a) -> CorrectionRequest  -> Response DNSResponse
  , vConfig               :: VConfig m z a
  , vUIAddress            :: Address 
+ , vGlobals              :: VGlobals 
  -- , vUpdateConfig   :: VPlugin z :~>: VConfig z
  }
 
@@ -148,6 +169,38 @@ data VConfig m z a = VConfig
 data VError = VError String
  deriving (Show,Read,Eq,Ord,Data,Generic)
 
+data VGlobals = VGlobals 
+ { vResponse :: TVar DNSResponse -- ^ 
+ } 
+ -- TODO deriving (Generic)
+
+{-| each Nothing means it's been already read by a handler, which should have updated the client.  
+
+>>> encode $ DNSResponse Nothing Nothing Nothing 
+"{\"_responseCorrection\":null,\"_responseMicrophoneState\":null,\"_responseDNSMode\":null}"
+
+-}
+data DNSResponse = DNSResponse -- TODO Rec Maybe [] 
+ { _responseCorrection      :: Maybe CorrectionResponse
+ , _responseDNSMode         :: Maybe DNSMode 
+ , _responseMicrophoneState :: Maybe MicrophoneState 
+-- , response :: Maybe 
+ } 
+ deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON) -- TODO Monoid 
+
+data DNSMode 
+ = CommandsMode
+ | DictationMode
+ | SpellingMode
+ | NumberMode
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)
+
+data MicrophoneState 
+ = MicrophoneOn 
+ | MicrophoneAsleep 
+ | MicrophoneOff 
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)
+
 natlinkAPI :: Proxy NatlinkAPI
 natlinkAPI = Proxy
 
@@ -157,6 +210,19 @@ recognitionAPI = Proxy
 hypothesesAPI :: Proxy HypothesesAPI
 hypothesesAPI = Proxy 
 
+hypothesesClientAPI :: Proxy HypothesesClientAPI
+hypothesesClientAPI = Proxy 
+
 correctionAPI :: Proxy CorrectionAPI
 correctionAPI = Proxy 
 
+emptyDNSResponse :: DNSResponse
+emptyDNSResponse = DNSResponse Nothing Nothing Nothing 
+
+
+-- ================================================================ --
+
+makeLenses ''DNSResponse
+makeLenses ''CorrectionResponse 
+makePrisms ''DNSMode
+makePrisms ''MicrophoneState 

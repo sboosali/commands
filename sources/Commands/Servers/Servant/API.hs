@@ -10,6 +10,10 @@ import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant
 import           Servant.Client (client)
 
+import           Control.Monad.IO.Class        (liftIO)
+import Control.Concurrent.STM
+import Data.Function ((&)) 
+
 
 serveNatlink :: (Show a) => (forall r. RULED (VSettings m) r a) -> IO ()
 serveNatlink settings@VSettings{..} = do
@@ -28,22 +32,26 @@ natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
 natlinkHandlers :: (Show a) => (forall r. RULED (VSettings m) r a) -> Server NatlinkAPI
 natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings -- TODO ReaderT
 
-postRecognition :: (Show a) => (forall r. RULED (VSettings m) r a) -> RecognitionRequest -> Response ()
+postRecognition :: (Show a) => (forall r. RULED (VSettings m) r a) -> RecognitionRequest -> Response DNSResponse
 -- postRecognition vSettings (RecognitionRequest ws) = (vSettings&vInterpretRecognition) vSettings ws
 postRecognition vSettings = (vInterpretRecognition vSettings) vSettings 
 
 {-| handle a hypothesis request, as a server  
 
 -}
-postHypotheses :: (Show a) => (forall r. RULED (VSettings m) r a) -> HypothesesRequest -> Response ()
+postHypotheses :: (Show a) => (forall r. RULED (VSettings m) r a) -> HypothesesRequest -> Response DNSResponse
 postHypotheses vSettings = (vInterpretHypotheses vSettings) vSettings 
 
-postCorrection :: (Show a) => (forall r. RULED (VSettings m) r a) -> CorrectionRequest -> Response () 
+postCorrection :: (Show a) => (forall r. RULED (VSettings m) r a) -> CorrectionRequest -> Response DNSResponse 
 postCorrection vSettings = (vInterpretCorrection vSettings) vSettings 
 
 {-| forward a hypothesis request, as a client  
 
 -}
 postHypothesesTo :: Address -> HypothesesRequest -> ClientResponse
-postHypothesesTo address = client hypothesesAPI (address2baseurl address) 
+postHypothesesTo address = client hypothesesClientAPI (address2baseurl address) 
+
+dnsRespond :: (forall r. RULED (VSettings m) r a) -> Response DNSResponse
+dnsRespond vSettings = do
+ liftIO $ atomically (readTVar (vSettings&vGlobals&vResponse))
 

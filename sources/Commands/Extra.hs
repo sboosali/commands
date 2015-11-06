@@ -28,6 +28,7 @@ import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 import Servant.Common.BaseUrl (BaseUrl(..), Scheme(..)) 
 
+-- TODO import Data.Functor.Classes
 import           Control.Applicative
 import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
@@ -49,7 +50,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
 import           GHC.Exts                          (IsString (..))
 import Data.Data (Data) 
 import           Data.Foldable                   (traverse_)
--- TODO import Data.Functor.Classes
+import Control.Concurrent.STM(swapTVar,TVar,STM) 
 
 
 -- | generalized 'Maybe':
@@ -416,6 +417,12 @@ prop> all (\ys -> length xss == length ys) (cross xss)
 -}
 cross :: [[a]] -> [[a]] 
 cross = sequence 
+
+{-| "dirty" the cache.
+
+-}
+takeTVar :: TVar (Maybe a) -> STM (Maybe a)
+takeTVar var = swapTVar var Nothing 
 
 
 -- ================================================================ --

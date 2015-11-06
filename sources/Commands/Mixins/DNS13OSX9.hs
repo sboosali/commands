@@ -2,6 +2,10 @@
 
 {-| (re-exports) 
 
+@
+:m +Commands.Mixins.DNS13OSX9
+@
+
 -}
 module Commands.Mixins.DNS13OSX9
  ( module Commands.Mixins.DNS13OSX9

@@ -73,6 +73,7 @@ library
         s-expression ==0.0.0,  
         derive-monoid ==0.0.0,  
 
+        stm ==2.4.*,  
         template-haskell >=2.10.0.0 && <2.11,
         containers >=0.5.6.2 && <0.6,
         mtl >=2.2.1 && <2.3,

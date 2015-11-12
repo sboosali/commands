@@ -10,9 +10,9 @@ import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant
 import           Servant.Client (client)
 
-import           Control.Monad.IO.Class        (liftIO)
-import Control.Concurrent.STM
-import Data.Function ((&)) 
+-- import           Control.Monad.IO.Class        (liftIO)
+-- import Control.Concurrent.STM
+-- import Data.Function ((&)) 
 
 
 serveNatlink :: (Show a) => (forall r. RULED (VSettings m) r a) -> IO ()
@@ -50,8 +50,4 @@ postCorrection vSettings = (vInterpretCorrection vSettings) vSettings
 -}
 postHypothesesTo :: Address -> HypothesesRequest -> ClientResponse
 postHypothesesTo address = client hypothesesClientAPI (address2baseurl address) 
-
-dnsRespond :: (forall r. RULED (VSettings m) r a) -> Response DNSResponse
-dnsRespond vSettings = do
- liftIO $ atomically (readTVar (vSettings&vGlobals&vResponse))
 

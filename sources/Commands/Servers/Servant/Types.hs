@@ -171,6 +171,7 @@ data VError = VError String
 
 data VGlobals = VGlobals 
  { vResponse :: TVar DNSResponse -- ^ 
+ , vMode :: TVar VMode 
  } 
  -- TODO deriving (Generic)
 
@@ -187,6 +188,11 @@ data DNSResponse = DNSResponse -- TODO Rec Maybe []
 -- , response :: Maybe 
  } 
  deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON) -- TODO Monoid 
+
+data VMode
+ = RecognitionMode 
+ | CorrectionMode 
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)
 
 data DNSMode 
  = CommandsMode

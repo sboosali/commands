@@ -17,17 +17,27 @@ import           Data.STRef
 import           Data.Char
 import Control.Applicative
 import Control.Arrow ((>>>))
+import           Data.Function                   ((&) )
 
 
 type EarleyEither e t = Either (E.Report e [t])
 
+data EarleyParser s r e t a = EarleyParser
+ { pProd :: (E.ProdR s r e t a)
+ , pBest :: NonEmpty a -> a 
+ -- , pRank :: a -> Int TODO law: pBest = argmax pRank , but can be optimized e.g. parallelized , with default record 
+ }
+
+
+-- ================================================================ --
+
 {-| 
 
-(warning: uses "Text.Earley.Internal") 
+warning: uses "Text.Earley.Internal" 
 
 -}
 buildEarleyResult
- :: E.Prod (E.Rule s a) n t a
+ :: E.ProdR s a n t a
  -> [t]
  -> ST s (E.Result s n [t] a)
 buildEarleyResult p ts = do
@@ -36,29 +46,29 @@ buildEarleyResult p ts = do
 
 {-| 
 
-(warning: uses "Text.Earley.Internal") 
+warning: uses "Text.Earley.Internal" 
 
 -}
 buildEarleyNonTerminal
  :: n
- -> ST s (  E.Prod (E.Rule s r) n t a
-         -> E.Prod (E.Rule s r) n t a
+ -> ST s (  E.ProdR s r n t a
+         -> E.ProdR s r n t a
          )
 buildEarleyNonTerminal n = do
  conts <- newSTRef =<< newSTRef []
  null  <- newSTRef Nothing
  return$ (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
 
-{-| 
+{-| wraps 'E.fullParses' 
 
 -}
-parseEarley 
+fullParsesE
  :: (forall r. E.Grammar r e (E.Prod r e t a)) 
  -> [t] 
  -> EarleyEither e t (NonEmpty a)
-parseEarley g = \ts ->
+fullParsesE g = \ts ->
  toEarleyEither (E.fullParses (E.parser g ts))
-{-# INLINEABLE parseEarley #-}
+{-# INLINEABLE fullParsesE #-}
 
 {-| refine an 'E.Report', forcing the results.
 
@@ -72,6 +82,12 @@ toEarleyEither = \case
  ([],   e)               -> Left  e
  (x:xs, E.Report _ _ []) -> Right (x:|xs)
  (_,    e)               -> Left  e
+
+bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
+bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
+
+eachParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t (NonEmpty a)
+eachParse p ts = toEarleyEither (E.fullParses (buildEarleyResult p ts))
 
 
 
@@ -92,7 +108,7 @@ anyLetter = (E.satisfy (T.all isUpper)) E.<?> "letter"
 {-| comes from Dragon as:  
 
 @
-['spell', 'a', 'b', 'c']
+['spell', 'a', 'b', 'c'] TODO 
 @ 
 
 (after being munged from:) 

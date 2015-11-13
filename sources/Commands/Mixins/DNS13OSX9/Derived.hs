@@ -7,7 +7,6 @@ import Commands.Frontends.Dragon13
 import Commands.RHS
 import Commands.Parsers.Earley
 
-import qualified Text.Earley                     as E
 import Control.Lens hiding (snoc) 
 
 import Data.Void
@@ -24,20 +23,20 @@ infix 2 <=>
 
 -- | reach into the func (mutually recursive with the rhs).  
 getTerminalsDNSEarley
- :: forall z t n a. (Eq t)
- => (RHS n t (DNSEarleyFunc z n t) a)
+ :: forall t n a. (Eq t)
+ => (RHS n t (DNSEarleyFunc n t) a)
  -> [t] 
 getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
  where                          -- TODO explicit signatures
- getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc z n t a -> [t])
+ getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc n t a -> [t])
  getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
- getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc z n t) a), (RHS n t (DNSEarleyFunc z n t) a)) -> [t])
+ getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc n t) a), (RHS n t (DNSEarleyFunc n t) a)) -> [t])
  getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
 
 {-| @(<=>) = 'genericGrammar'@ 
 
 -}
-(<=>) :: Name -> DNSEarleyRHS z a -> DNSEarleyRHS z a
+(<=>) :: Name -> DNSEarleyRHS a -> DNSEarleyRHS a
 (<=>) = genericGrammar
 -- NOTE specialized type signature is for type inference, disambiguates:
 --  "No instance for (Data.String.IsString _)" and "No instance for (Functor _)"
@@ -45,13 +44,13 @@ getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
 {-| construct a 'NonTerminal'.
 
 -}
-nonterminalGrammar :: String -> DNSEarleyRHS z a -> DNSEarleyRHS z a
+nonterminalGrammar :: String -> DNSEarleyRHS a -> DNSEarleyRHS a
 nonterminalGrammar l r = NonTerminal (ConstName (defaultDNSInfo, l)) r
 
 {-| construct a 'NonTerminal'.
 
 -}
-genericGrammar :: Name -> DNSEarleyRHS z a -> DNSEarleyRHS z a
+genericGrammar :: Name -> DNSEarleyRHS a -> DNSEarleyRHS a
 genericGrammar name r = nonterminalGrammar (gui^.(guiIdentifier._Identifier)) r
  where
  Just gui = fromGlobalName name  -- TODO GHC 7.10.2 https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/other-type-extensions.html#special-implicit-params
@@ -59,7 +58,7 @@ genericGrammar name r = nonterminalGrammar (gui^.(guiIdentifier._Identifier)) r
 {-| manually construct a special rule, with primitives. 
 
 -}
-simpleGrammar :: Name -> (E.Prod z String Text a) -> (DNSRHS Text Void) -> DNSEarleyRHS z a
+simpleGrammar :: Name -> (DNSEarleyProd a) -> (DNSRHS Text Void) -> DNSEarleyRHS a
 simpleGrammar n p r = genericGrammar n $ liftLeaf p r
 
 {-| manually construct a special rule, with separate recognizer and parser. 
@@ -67,7 +66,7 @@ simpleGrammar n p r = genericGrammar n $ liftLeaf p r
 it has two independent right-hand sides: one for recognizing and one for parsing.
 
 -}
-complexGrammar :: Name -> DNSEarleyRHS z a -> DNSEarleyRHS z a -> DNSEarleyRHS z a
+complexGrammar :: Name -> DNSEarleyRHS a -> DNSEarleyRHS a -> DNSEarleyRHS a
 complexGrammar n p r = genericGrammar n $ liftTree p r
 
 {-| automatically generate a grammar from a type.
@@ -76,7 +75,7 @@ the left-hand side comes from the type,
 and the right-hand side comes from the 'Show'n and transformed 'constructors'. 
 
 -}
-transformedGrammar :: forall z a. (Typeable a, Enum a, Show a) => (String -> String) -> DNSEarleyRHS z a
+transformedGrammar :: forall a. (Typeable a, Enum a, Show a) => (String -> String) -> DNSEarleyRHS a
 transformedGrammar f = nonterminalGrammar
  (guiOf(Proxy :: Proxy a) ^. (guiIdentifier._Identifier))  -- TODO Haskell type sections, whenever
  (asum . fmap (transformedCon f) $ constructors)
@@ -86,7 +85,7 @@ transformedGrammar f = nonterminalGrammar
 sets 'dnsInline' to true. 
 
 -}
-dragonGrammar :: Name -> (E.Prod z String Text a) -> DNSBuiltinRule -> DNSEarleyRHS z a
+dragonGrammar :: Name -> (DNSEarleyProd a) -> DNSBuiltinRule -> DNSEarleyRHS a
 dragonGrammar name p r = simpleGrammar name p (SomeDNSNonTerminal (DNSBuiltinRule r))
  & set (_DNSEarleyRHSInfo.dnsInline) True
 
@@ -97,7 +96,7 @@ with 'Enum's, we can get the "edit only once" property: edit the @data@ definiti
 the 'LHS' comes from the type, not the term (avoiding TemplateHaskell). other 'Grammar's can always be defined with an LHS that comes from the term, e.g. with '<=>' (as Haskell values' names are disjoint from Haskell types').
 
 -}
-enumGrammar :: (Typeable a, Enum a, Show a) => DNSEarleyRHS z a
+enumGrammar :: (Typeable a, Enum a, Show a) => DNSEarleyRHS a
 enumGrammar = transformedGrammar (overCamelCase id)
 
 {-| a default 'Grammar' for simple ADTs.
@@ -124,7 +123,7 @@ we didn't define @data Button = Left | Middle | Right@ because it
 conflicts with 'Either', but the derived grammar is identical.
 
 -}
-qualifiedGrammar :: forall z a. (Typeable a, Enum a, Show a) => DNSEarleyRHS z a
+qualifiedGrammar :: forall a. (Typeable a, Enum a, Show a) => DNSEarleyRHS a
 qualifiedGrammar = qualifiedGrammarWith occ
  where
  occ = guiOf(Proxy :: Proxy a) ^. (guiIdentifier._Identifier)
@@ -141,7 +140,7 @@ e.g. avoids naming conflicts with @Either@. without making either the data type 
 ["up","down","left","right"]
 
 -}
-qualifiedGrammarWith :: (Typeable a, Enum a, Show a) => String -> DNSEarleyRHS z a
+qualifiedGrammarWith :: (Typeable a, Enum a, Show a) => String -> DNSEarleyRHS a
 qualifiedGrammarWith affix = transformedGrammar (overCamelCase (filter (/= fmap toLower affix)))
 
 {-| strips out data typename like 'qualifiedGrammar', along with @_@'s and numbers.
@@ -150,7 +149,7 @@ makes it easy to generate generic terminals (like @"left"@),
 without conflicting with.common symbols (like 'Left').
 
 -}
-tidyGrammar :: forall z a. (Typeable a, Enum a, Show a) => DNSEarleyRHS z a
+tidyGrammar :: forall a. (Typeable a, Enum a, Show a) => DNSEarleyRHS a
 tidyGrammar = transformedGrammar f 
  where
  f = filter (/= '_') >>> overCamelCase (filter (/= fmap toLower occ))
@@ -176,7 +175,7 @@ instance IsString Place where fromString = Place
 @
 
 -}
-vocabularyGrammar :: [String] -> DNSEarleyRHS z Text
+vocabularyGrammar :: [String] -> DNSEarleyRHS Text
 vocabularyGrammar = tokens
 
 {-| the empty grammar. 
@@ -185,8 +184,8 @@ See 'UnitDNSRHS' (which always matches, recognizing nothing)
 and 'unitEarleyParser' (which always succeeds, parsing nothing). 
 
 -}
-epsilon :: DNSEarleyRHS z ()
-epsilon = simpleGrammar 'epsilon unitEarleyParser UnitDNSRHS
+epsilon :: DNSEarleyRHS ()
+epsilon = simpleGrammar 'epsilon (UnsafeEarleyProduction unitEarleyParser) UnitDNSRHS
 
 --TODO generalize these introducers to any RHS, and use Text
 
@@ -202,13 +201,13 @@ specialized for type inference.
 (with @OverloadedStrings@, string literals are 'IsString'-constrained polymorphic types)
  
 -}
-str :: String -> DNSEarleyRHS z Text
+str :: String -> DNSEarleyRHS Text
 str = token
 
 {-| inject a character. 
 
 -}
-chr :: Char -> DNSEarleyRHS z Char
+chr :: Char -> DNSEarleyRHS Char
 chr c = c <$ token [c]
 
 {-| @int = 'con'@
@@ -217,23 +216,23 @@ specialized for type inference.
 (integer literals are 'Num'-constrained polymorphic types).
 
 -}
-int :: Int -> DNSEarleyRHS z Int
+int :: Int -> DNSEarleyRHS Int
 int = con
 
 {-| inject a constructor. 
 
 -}
-con :: (Show a) => a -> DNSEarleyRHS z a
+con :: (Show a) => a -> DNSEarleyRHS a
 con = transformedCon (List.intercalate " " . unCamelCase)
 
 {-| make a 'Terminal' from the @transformed@ 'Show'n constructor, returning the constructor. 
 
 -}
-transformedCon :: (Show a) => (String -> String) -> a -> DNSEarleyRHS z a
+transformedCon :: (Show a) => (String -> String) -> a -> DNSEarleyRHS a
 transformedCon f x = x <$ (token . f . show $ x)
 
 -- | @= 'optionRHS' 'enumDefault' ...@
-optionalEnum :: (Enum a) => DNSEarleyRHS z a -> DNSEarleyRHS z a
+optionalEnum :: (Enum a) => DNSEarleyRHS a -> DNSEarleyRHS a
 optionalEnum = optionRHS enumDefault
 
 {-| inject a mapping.
@@ -252,6 +251,6 @@ vocab
 tokens :: (IsString t, Show t, Functor'RHS n t f) => [String] -> RHS n t f t
 tokens = foldMap token
 
-getRhsName :: DNSEarleyRHS z a -> Maybe String 
+getRhsName :: DNSEarleyRHS a -> Maybe String 
 getRhsName r = r ^? _DNSEarleyRHSName
 

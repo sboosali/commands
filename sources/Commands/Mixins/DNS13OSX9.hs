@@ -25,17 +25,18 @@ import Commands.RHS
 import Commands.Sugar.Keys
 
 
-{-| only uses the dragon grammar, as the earley parser's Terminal is a predicate (not a token).  
-
--}
-isFiniteDNSEarleyFunc :: DNSEarleyFunc z n t a -> IsFiniteGrammar t
-isFiniteDNSEarleyFunc = \case
- LeafRHS _ g -> isFiniteDNSRHS g 
- TreeRHS _ gRHS -> isFiniteDNSEarleyGrammar gRHS
-
 {-| 
 
 -}
-isFiniteDNSEarleyGrammar :: RHS n t (DNSEarleyFunc z n t) a -> IsFiniteGrammar t
+isFiniteDNSEarleyGrammar :: RHS n t (DNSEarleyFunc n t) a -> IsFiniteGrammar t
 isFiniteDNSEarleyGrammar = isFiniteGrammar isFiniteDNSEarleyFunc 
+
+{-| only uses the dragon grammar (which stores exact tokens), 
+as the earley parser's Terminal is a predicate (not a token).  
+
+-}
+isFiniteDNSEarleyFunc :: DNSEarleyFunc n t a -> IsFiniteGrammar t
+isFiniteDNSEarleyFunc = \case
+ LeafRHS _ g -> isFiniteDNSRHS g 
+ TreeRHS _ gRHS -> isFiniteDNSEarleyGrammar gRHS
 

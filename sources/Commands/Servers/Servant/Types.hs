@@ -11,7 +11,7 @@ module Commands.Servers.Servant.Types where
 import qualified Commands.Backends.OSX                 as OSX
 import           Commands.Extra
 import qualified Commands.Frontends.Dragon13.Serialize as DNS
-import           Commands.Mixins.DNS13OSX9             (EarleyParser, RULED)
+import           Commands.Parsers.Earley              (EarleyParser)
 
 import Control.Lens
 import           Control.Monad.Trans.Either            (EitherT)
@@ -143,24 +143,24 @@ data ForeignResultsObject = ForeignResultsObject Integer
 "static" configuration.
 
 -}
-data VSettings m z a = VSettings
+data VSettings m a = VSettings
  { vPort                 :: Wai.Port
- , vSetup                :: VSettings m z a -> IO (Either VError ())
- , vInterpretRecognition :: (forall r. RULED (VSettings m) r a) -> RecognitionRequest -> Response DNSResponse
- , vInterpretHypotheses  :: (forall r. RULED (VSettings m) r a) -> HypothesesRequest  -> Response DNSResponse
- , vInterpretCorrection  :: (forall r. RULED (VSettings m) r a) -> CorrectionRequest  -> Response DNSResponse
- , vConfig               :: VConfig m z a
+ , vSetup                :: VSettings m a -> IO (Either VError ())
+ , vInterpretRecognition :: VSettings m a -> RecognitionRequest -> Response DNSResponse
+ , vInterpretHypotheses  :: VSettings m a -> HypothesesRequest  -> Response DNSResponse
+ , vInterpretCorrection  :: VSettings m a -> CorrectionRequest  -> Response DNSResponse
+ , vConfig               :: VConfig m a
  , vUIAddress            :: Address 
  , vGlobals              :: VGlobals 
- -- , vUpdateConfig   :: VPlugin z :~>: VConfig z
+ -- , vUpdateConfig   :: VPlugin :~>: VConfig
  }
 
 {- | read-only.
 "dynamic" configuration
 -}
-data VConfig m z a = VConfig
+data VConfig m a = VConfig
  { vGrammar :: DNS.SerializedGrammar
- , vParser  :: EarleyParser z a
+ , vParser  :: (forall s r. EarleyParser s r String Text a) 
  , vDesugar :: OSX.Application -> a -> m ()
  }
 

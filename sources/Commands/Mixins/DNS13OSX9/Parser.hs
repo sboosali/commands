@@ -10,24 +10,47 @@ import Commands.RHS.Types
 import Commands.Mixins.DNS13OSX9.Types 
 import Commands.Mixins.DNS13OSX9.Derived 
 import Commands.Mixins.DNS13OSX9.ObservedSharing 
-import Commands.Frontends.Dragon13 (DNSInfo(..)) 
 import Commands.Parsers.Earley
 
-import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Internal            as E
 import Data.Text.Lazy (Text) 
 
 import           Control.Monad.ST
-import           Data.Function                   ((&) )
+
+-- unsafe 
+import Unsafe.Coerce 
+import           Control.Monad.ST.Unsafe
+import           System.IO.Unsafe
 
 
+{-| 
+
+NOTE unsafe: both @s1@ and @r1@ are phantom:
+
+* @s1@ is used as a "state thread" in @ST s1@
+* @r1@ is used similarly in the types of "Text.Earley.Internal"
+
+being phantom, and not "reflected" into values (by the uses above), an improper coercion shouldn't segfault. 
+however, it may violate referential transparency. 
+
+@unsafeCoerceEarleyProd = 'unsafeCoerce'@
+
+TODO verify safety conditions 
+
+-}
+unsafeCoerceEarleyProd :: E.Prod (E.Rule s1 r1) e t a -> E.Prod (E.Rule s2 r2) e t a 
+unsafeCoerceEarleyProd = unsafeCoerce
+
+
+-- ================================================================ --
+
+-- | NOTE unsafe: can violate referential transparency.   
 renameRHSToEarley
- :: ST s (        DNSEarleyRHS (E.Rule s r) a
-         -> ST s (RHS (EarleyName (E.Rule s r) String)
+ :: ST s (        DNSEarleyRHS a
+         -> ST s (RHS (EarleyName s r String)
                       Text
-                      (DNSEarleyFunc (E.Rule s r)
-                      (EarleyName (E.Rule s r) String) Text)
+                      (DNSEarleyFunc (EarleyName s r String) Text)
                       a)
          )
 renameRHSToEarley = renameDNSEarleyRHSST $
@@ -37,48 +60,42 @@ renameRHSToEarley = renameDNSEarleyRHSST $
 
 -}
 induceEarley
- :: forall s r n t a z. ((z ~ E.Rule s r), (n ~ String))  -- type equality only for documentation
- => (Eq t)
- => RHS (EarleyName z n)
+ :: (Eq t)
+ => RHS (EarleyName s r String)
         t
-        (DNSEarleyFunc z (EarleyName z n) t)
+        (DNSEarleyFunc (EarleyName s r String) t)
         a
- -> E.Prod z n t a
+ -> E.ProdR s r String t a
 induceEarley rhs = runRHSWith
- (\n r -> (unEarleyName n) (induceEarley r))  -- accessor (not pattern match) for polymorphic z (Rank2 elsewhere)
+ (\n r -> (unEarleyName n) (induceEarley r))
+  -- NOTE "state thread" type variables (i.e. 's') are coerced 
+  -- use accessor (unEarleyName) (not pattern match) for polymorphic z (Rank2 elsewhere)
  E.symbol
  (\case
-  LeafRHS p    _ -> p
+  LeafRHS (UnsafeEarleyProduction p)    _ -> unsafeCoerceEarleyProd p
   TreeRHS pRHS _ -> induceEarley pRHS)
  (getTerminalsDNSEarley rhs) 
  rhs 
-
-runEarley
- :: (forall r. RHS (ConstName (DNSInfo,String)) Text (DNSEarleyFunc (E.Rule s r) (ConstName (DNSInfo,String)) Text) a)
- -> [Text]
- -> ST s (E.Result s String [Text] a)
-runEarley r1 ts = do
- r2 <- renameRHSToEarley >>= ($ r1)
- buildEarleyResult (induceEarley r2) ts
-
-e'ParseBest :: (forall r. RULED EarleyParser r a) -> [Text] -> EarleyEither String Text a
-e'ParseBest p ts = (p&pBest) <$> e'ParseAll (p&pProd) ts
-
-e'ParseAll :: (forall r. RULED EarleyProd r a) -> [Text] -> EarleyEither String Text (NonEmpty a)
-e'ParseAll p ts = toEarleyEither (E.fullParses (buildEarleyResult p ts))
-
-e'ParseList :: (forall r. RULED EarleyProd r a) -> [Text] -> [a]
-e'ParseList p ts = fst (E.fullParses (buildEarleyResult p ts))
 
 {- | derive a parser from a DNSEarleyRHS, by observing sharing. 
 
 ("d" for DNS, "e" for Earley).
 
-TODO safe with 'unsafePerformIO'?
+TODO safety conditions 
+
 -}
 -- de'deriveParserObservedSharing :: RULED DNSEarleyRHS s a -> ST s (E.Prod (E.Rule s a) String Text a)
-de'deriveParserObservedSharing :: RULED DNSEarleyRHS s a -> ST s (RULED EarleyProd s a)
+de'deriveParserObservedSharing :: DNSEarleyRHS a -> ST s (E.ProdR s r String Text a)
 de'deriveParserObservedSharing r1 = do
  r2 <- renameRHSToEarley >>= ($ r1)
  return$ induceEarley r2
+
+{-| 
+
+NOTE unsafe: calls 'unsafeSTToIO'. 
+
+-}
+unsafeEarleyProd :: DNSEarleyRHS a -> (E.ProdR s r String Text a)
+unsafeEarleyProd r = unsafePerformIO$ unsafeSTToIO$ de'deriveParserObservedSharing r  -- TODO lol 
+{-# NOINLINE unsafeEarleyProd #-}
 

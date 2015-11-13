@@ -17,7 +17,7 @@ import           Data.IORef
 
 
 renameDNSEarleyFunc
- :: forall z m n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
+ :: forall m n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc n1 t), (f2 ~ DNSEarleyFunc n2 t))
  => (Applicative m)
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> m (    n2 t f2 x))
  -> (                       RHS n1 t f1 a -> m (RHS n2 t f2 a))
@@ -39,7 +39,7 @@ renameDNSEarleyFunc u = \case
  go = renameDNSEarleyFunc u
 
 renameDNSEarleyRHSST
- :: ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
+ :: ((f1 ~ DNSEarleyFunc n1 t), (f2 ~ DNSEarleyFunc n2 t))
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> ST s (    n2 t f2 x))
  -> ST s                   (RHS n1 t f1 a -> ST s (RHS n2 t f2 a))
 renameDNSEarleyRHSST u = unsafeIOToST$ do
@@ -56,7 +56,7 @@ renameDNSEarleyRHSST u = unsafeIOToST$ do
     return y
 
 renameDNSEarleyRHSIO
- :: ((f1 ~ DNSEarleyFunc z n1 t), (f2 ~ DNSEarleyFunc z n2 t))
+ :: ((f1 ~ DNSEarleyFunc n1 t), (f2 ~ DNSEarleyFunc n2 t))
  => (forall x. RHS n1 t f1 x -> n1 t f1 x -> IO (    n2 t f2 x))
  -> IO                   (RHS n1 t f1 a -> IO (RHS n2 t f2 a))
 renameDNSEarleyRHSIO u = do

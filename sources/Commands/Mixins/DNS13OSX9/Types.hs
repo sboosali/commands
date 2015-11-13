@@ -6,99 +6,86 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures #-}
 
 {-| 
 
 -}
 module Commands.Mixins.DNS13OSX9.Types where 
 
-import           Commands.Extra 
+-- import           Commands.Extra
 import           Commands.RHS.Types
 import Commands.Frontends.Dragon13
 import qualified Commands.Backends.OSX as OSX
 
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
-import qualified Data.Text.Lazy as T
-import           Data.List.NonEmpty              (NonEmpty (..))
 import Control.Lens (Traversal',_1,_2) 
 import Control.Comonad.Cofree (Cofree) 
 
-import           Data.Char
 import Data.Void
 import Control.Exception (Exception, SomeException)
-import Control.Applicative
 
 
 -- ================================================================ --
 
--- | the Earley parse function takes a Rank2 type (forall r. E.Prod r ...) that it instantiates to (forall s. (E.Rule s a)); then runST takes a Rank2 type (forall s. ...s...). this package exposes the internals of Earley, but of course not of ST. this type synonym is for convenience.
-type RULED f s a = f (E.Rule s a) a
--- needs LiberalTypeSynonyms when f is a type synonym, I think.
+type R a = DNSEarleyRHS a
 
-type EarleyProd r = E.Prod r String Text
-
-type R z a = DNSEarleyRHS z a
-
-type R_ a = forall z. DNSEarleyRHS z a
-
-type C z a = DNSEarleyCommand z a
-
-type C_ a = forall z. DNSEarleyCommand z a
+type C a = DNSEarleyCommand a
 
 
 -- ================================================================ --
 
-type DNSEarleyRHS z = RHS
+type DNSEarleyRHS = RHS
  (DNSEarleyName String)
  Text
- (DNSEarleyFunc z (DNSEarleyName String) Text)
+ (DNSEarleyFunc (DNSEarleyName String) Text)
 
 type DNSEarleyName n = ConstName (DNSInfo, n)
 
-data DNSEarleyFunc z n t a
- = LeafRHS (E.Prod z String t a) (DNSRHS t Void)
- | TreeRHS (RHS n t (DNSEarleyFunc z n t) a) (RHS n t (DNSEarleyFunc z n t) a)
+data DNSEarleyFunc n t a -- TODO redistribute the sums 
+ = LeafRHS (UnsafeEarleyProduction String t a) (DNSRHS t Void)
+ | TreeRHS (RHS n t (DNSEarleyFunc n t) a) (RHS n t (DNSEarleyFunc n t) a)
 -- couples parser (E.Prod) with format (DNSRHS) with (ConstName) :-(
 
-deriving instance (Functor (n t (DNSEarleyFunc z n t))) => Functor (DNSEarleyFunc z n t) --TODO UndecidableInstances
+deriving instance (Functor (n t (DNSEarleyFunc n t))) => Functor (DNSEarleyFunc n t) --TODO UndecidableInstances
 -- Variables ‘n, t’ occur more often than in the instance head in the constraint
-
-type DNSEarleyCommand z = Command
- (DNSEarleyName String)
- Text
- (DNSEarleyFunc z (DNSEarleyName String) Text)
- OSX.Application
- OSX.CWorkflow_
 
 {-| existentially-quantified right hand side.  
 
 -}
-data SomeDNSEarleyRHS = forall z x. SomeDNSEarleyRHS { unSomeDNSEarleyRHS :: DNSEarleyRHS z x } 
+data SomeDNSEarleyRHS = forall x. -- TODO use RHS0 
+ SomeDNSEarleyRHS { unSomeDNSEarleyRHS :: DNSEarleyRHS x } 
+
+type DNSEarleyCommand = Command -- TODO remove 
+ (DNSEarleyName String)
+ Text
+ (DNSEarleyFunc (DNSEarleyName String) Text)
+ OSX.Application
+ OSX.CWorkflow_
 
 
 -- ================================================================ --
 
-type EarleyParser_ a = forall r. RULED EarleyParser r a
+type DNSEarleyProd = UnsafeEarleyProduction String Text 
 
-data EarleyParser z a = EarleyParser
- { pProd :: E.Prod z String Text a
- , pBest :: NonEmpty a -> a 
- }
- 
-data EarleyName z n t (f :: * -> *) a = EarleyName
- { unEarleyName :: E.Prod z n t a -> E.Prod z n t a
+data UnsafeEarleyProduction e t a = forall s r. UnsafeEarleyProduction (E.Prod (E.Rule s r) e t a)
+deriving instance Functor (UnsafeEarleyProduction e t)
+
+data EarleyName s r n t (f :: * -> *) a = EarleyName
+ { unEarleyName :: E.Prod (E.Rule s r) n t a -> E.Prod (E.Rule s r) n t a
  }
 -- not a Functor
 
 
--- ================================================================ --
 
-data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t) --TODO newtype
+-- ================================================================ --
 
 -- | a directly-recursive right-hand side, with a left-hand side annotation; like a production.
 type DNSRHSRec i t n = Cofree (DNSRHS t) (i, n)
 -- DNSRHS t (Cofree (DNSRHS t) (i, n))
+
+data DNSFixName t = DNSFixName (DNSProduction DNSInfo (DNSFixName t) t) --TODO newtype
 
 data DNSUniqueName n t (f :: * -> *) a = DNSUniqueName DNSInfo n Int
 
@@ -109,54 +96,9 @@ deriving instance Exception DNSGrammarException
 
 -- ================================================================ --
 
-liftLeaf :: forall a
-                         (n :: * -> (* -> *) -> * -> *)
-                         t
-                         (z :: * -> * -> * -> *)
-                         (n1 :: * -> (* -> *) -> * -> *)
-                         t1.
-                  E.Prod z String t1 a
-                  -> DNSRHS t1 Void -> RHS n t (DNSEarleyFunc z n1 t1) a
 liftLeaf p r = liftRHS (LeafRHS p r)
 
-liftTree :: forall a
-                         (n :: * -> (* -> *) -> * -> *)
-                         t
-                         (z :: * -> * -> * -> *)
-                         (n1 :: * -> (* -> *) -> * -> *)
-                         t1. 
-                     RHS n1 t1 (DNSEarleyFunc z n1 t1) a
-                  -> RHS n1 t1 (DNSEarleyFunc z n1 t1) a
-                  -> RHS n  t  (DNSEarleyFunc z n1 t1) a
 liftTree p r = liftRHS (TreeRHS p r)
-
-anyWord :: E.Prod z String Text Text --TODO  t t
-anyWord = E.Terminal (const True) (pure id)
-
-anyLetter :: E.Prod z String Text Text
-anyLetter = (E.satisfy (T.all isUpper)) E.<?> "letter"
-
-{-| comes from Dragon as:  
-
-@
-['spell', 'a', 'b', 'c']
-@ 
-
-(after being munged from:) 
-
-@
-['spell', 'a\\spelling-letter\\A', 'b\\spelling-letter\\B', 'c\\spelling-letter\\C']
-@ 
-
-
-
--}
-anyLetters :: E.Prod z String Text Text
-anyLetters = T.concat <$> some (E.satisfy isSingleLetter) E.<?> "letters"
- where
- isSingleLetter = T.uncons >>> \case
-  Nothing -> False 
-  Just (c, _) -> isAlphaNum c 
 
 _DNSEarleyRHSInfo :: Traversal' (RHS (DNSEarleyName n) t f a) DNSInfo
 _DNSEarleyRHSInfo = _RHSName.unConstName._1
@@ -164,14 +106,6 @@ _DNSEarleyRHSInfo = _RHSName.unConstName._1
 _DNSEarleyRHSName :: Traversal' (RHS (DNSEarleyName String) t f a) String 
 _DNSEarleyRHSName = _RHSName.unConstName._2
 
-projectDNSEarleyFunc :: forall (t :: * -> * -> * -> *)
-                                     (t1 :: * -> (* -> *) -> * -> *)
-                                     t2
-                                     t3.
-                              DNSEarleyFunc t t1 t2 t3
-                              -> Maybe
-                                   (RHS t1 t2 (DNSEarleyFunc t t1 t2) t3,
-                                    RHS t1 t2 (DNSEarleyFunc t t1 t2) t3)
 projectDNSEarleyFunc = \case
  LeafRHS{} -> Nothing 
  TreeRHS pRHS gRHS -> Just (pRHS, gRHS) 

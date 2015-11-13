@@ -30,10 +30,40 @@ import Control.Monad.Trans.State
 import Control.Exception (SomeException (..))
 import qualified Data.List as List
 
+-- unsafe 
+import           System.IO.Unsafe
+
+
+-- ================================================================ --
+
+{-| 
+
+-}
+isFiniteDNSRHS :: DNSRHS t n -> IsFiniteGrammar t
+isFiniteDNSRHS = \case 
+ DNSMultiple{}        -> abortIsFiniteGrammar
+ DNSNonTerminal{}     -> ignoreIsFiniteGrammar
+ DNSTerminal t      -> (keepIsFiniteGrammar FiniteTerminal) (fromDNSToken t)
+ DNSSequence rs     -> (when2_ FiniteSequence)     <$> (traverse go rs)
+ DNSAlternatives rs -> (whenN_ FiniteAlternatives) <$> (traverse go rs)
+ DNSOptional r      -> (when1_ FiniteOptional)     <$> (go r)
+
+ where 
+ go = isFiniteDNSRHS
+ when1_ f = fmap f 
+ when2_ f = whenN_ (foldl1 f)   -- TODO partial function, safe because of whenN_
+ whenN_ f rs = (f . NonEmpty.toList) <$> nonEmpty (catMaybes (NonEmpty.toList rs))
+ fromDNSToken = \case 
+  DNSToken t -> t 
+  DNSPronounced t _ -> t     -- TODO pass around a IsFiniteGrammarConfig, chooses between written (e.g. to preload the cached parser) or spoken (e.g. homophone detection, if possible in any utterance)
+
+
+
+-- ================================================================ --
 
 renameRHSToDNS
- :: IO (      RHS (DNSEarleyName n) t (DNSEarleyFunc z (DNSEarleyName n) t) a
-       -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a))
+ :: IO (      RHS (DNSEarleyName n) t (DNSEarleyFunc (DNSEarleyName n) t) a
+       -> IO (RHS (DNSUniqueName n) t (DNSEarleyFunc (DNSUniqueName n) t) a))
 renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
  -- k <- hashUnique <$> newUnique
  let k = 0                      -- TODO assumes user given names are unique 
@@ -44,7 +74,7 @@ renameRHSToDNS = renameDNSEarleyRHSIO $ \_ (ConstName (i, n)) -> do
 -}
 induceDNS
  :: (Eq t)
- => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
+ => RHS (DNSUniqueName String) t (DNSEarleyFunc (DNSUniqueName String) t) a
  -> Cofree (DNSRHS t) (DNSInfo, String)
 induceDNS = induceDNS' >>> \case
  SomeDNSNonTerminal (DNSRule ((i,n) :< r)) -> (i,n)         :< r
@@ -57,9 +87,9 @@ defaultDNSLHS = (defaultDNSInfo, showName 'defaultDNSLHS)
 
 -}
 induceDNS'
- -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc z (DNSUniqueName n) t) a
+ -- :: RHS (DNSUniqueName n) t (DNSEarleyFunc (DNSUniqueName n) t) a
  :: (Eq t)
- => RHS (DNSUniqueName String) t (DNSEarleyFunc z (DNSUniqueName String) t) a
+ => RHS (DNSUniqueName String) t (DNSEarleyFunc (DNSUniqueName String) t) a
  -- -> (Cofree (DNSRHS t) (Maybe (i,n)))
  -> DNSRHS t (Cofree (DNSRHS t) (DNSInfo, String))
 induceDNS' rhs = foldRHSWith
@@ -122,7 +152,7 @@ serializeRHSAsDNSGrammar
  -> RHS
                                     (DNSUniqueName String)
                                     Text
-                                    (DNSEarleyFunc z (DNSUniqueName String) Text)
+                                    (DNSEarleyFunc (DNSUniqueName String) Text)
                                     a
  -> Either [SomeException] SerializedGrammar
 serializeRHSAsDNSGrammar settings
@@ -130,7 +160,7 @@ serializeRHSAsDNSGrammar settings
 
 formatRHS
  :: DnsOptimizationSettings
- -> RHS (DNSEarleyName String) Text (DNSEarleyFunc z (DNSEarleyName String) Text) a
+ -> RHS (DNSEarleyName String) Text (DNSEarleyFunc (DNSEarleyName String) Text) a
  -> IO (Either [SomeException] SerializedGrammar)
 formatRHS settings rawRhs = do
  renamer <- renameRHSToDNS
@@ -138,7 +168,7 @@ formatRHS settings rawRhs = do
  let escapedGrammar = serializeRHSAsDNSGrammar settings reifiedRhs 
  return$ escapedGrammar
 
-showRHS :: DNSEarleyRHS z a -> IO Text
+showRHS :: DNSEarleyRHS a -> IO Text
 showRHS rawRhs = do
  escapedGrammar <- formatRHS defaultDnsOptimizationSettings rawRhs
  return$ either (T.pack . show) displaySerializedGrammar escapedGrammar
@@ -150,27 +180,15 @@ showRHS rawRhs = do
 throws 'DNSGrammarException' 
 
 -}
-de'deriveGrammarObservedSharing :: DnsOptimizationSettings -> DNSEarleyRHS z a -> IO SerializedGrammar
+de'deriveGrammarObservedSharing :: DnsOptimizationSettings -> DNSEarleyRHS a -> IO SerializedGrammar
 de'deriveGrammarObservedSharing settings rhs = formatRHS settings rhs >>= either (throwM . DNSGrammarException) return
 
 {-| 
 
--}
-isFiniteDNSRHS :: DNSRHS t n -> IsFiniteGrammar t
-isFiniteDNSRHS = \case 
- DNSMultiple{}        -> abortIsFiniteGrammar
- DNSNonTerminal{}     -> ignoreIsFiniteGrammar
- DNSTerminal t      -> (keepIsFiniteGrammar FiniteTerminal) (fromDNSToken t)
- DNSSequence rs     -> (when2_ FiniteSequence)     <$> (traverse go rs)
- DNSAlternatives rs -> (whenN_ FiniteAlternatives) <$> (traverse go rs)
- DNSOptional r      -> (when1_ FiniteOptional)     <$> (go r)
+NOTE unsafe: calls 'unsafeSTToIO'. 
 
- where 
- go = isFiniteDNSRHS
- when1_ f = fmap f 
- when2_ f = whenN_ (foldl1 f)   -- TODO partial function, safe because of whenN_
- whenN_ f rs = (f . NonEmpty.toList) <$> nonEmpty (catMaybes (NonEmpty.toList rs))
- fromDNSToken = \case 
-  DNSToken t -> t 
-  DNSPronounced t _ -> t     -- TODO pass around a IsFiniteGrammarConfig, chooses between written (e.g. to preload the cached parser) or spoken (e.g. homophone detection, if possible in any utterance)
+-}
+unsafeDNSGrammar :: DnsOptimizationSettings -> DNSEarleyRHS a -> SerializedGrammar
+unsafeDNSGrammar settings r = unsafePerformIO$ de'deriveGrammarObservedSharing settings r  -- TODO lol 
+{-# NOINLINE unsafeDNSGrammar #-}
 

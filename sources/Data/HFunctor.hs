@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, RankNTypes, TypeOperators #-}
+{-# LANGUAGE KindSignatures, RankNTypes, TypeOperators, LambdaCase #-}
 module Data.HFunctor where 
 
 import Data.Functor.Product
@@ -19,6 +19,13 @@ type (f :. g) a = f (g a)
 
 type f :+: g = Sum f g 
 
+{-| eliminate a sum.  
+
+-}
+(.|||.) :: (f1 :~> g) -> (f2 :~> g) -> ((f1 :+: f2) :~> g)
+(.|||.) u1 u2 = \case 
+ InL f -> u1 f 
+ InR f -> u2 f 
 
 type f :*: g = Product f g 
 
@@ -28,6 +35,9 @@ getFirst (Pair f _) = f
 getSecond :: Product f g a -> g a 
 getSecond (Pair _ g) = g 
 
+{-| introduce a product. 
+
+-}
 (.&&&.) :: (f :~> g1) -> (f :~> g2) -> (f :~> (g1 :*: g2))
 (.&&&.) u1 u2 = \f -> Pair (u1 f) (u2 f) 
 

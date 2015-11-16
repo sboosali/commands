@@ -68,7 +68,14 @@ type HCoAlgebra h f = f :~> h f
 {-| 
 
 -}
-hana :: HFunctor h => HCoAlgebra h f -> (f :~> HFix h)
+hana :: (HFunctor h) => (f :~> h f) -> (f :~> HFix h)
 hana coalgebra = HFix . hfmap (hana coalgebra) . coalgebra
+
+
+{-| 
+
+-}
+hapo :: (HFunctor h) => (f :~> h (HFix h :+: f)) -> (f :~> HFix h)
+hapo coalgebra = HFix . hfmap (id .|||. hapo coalgebra) . coalgebra
 
 

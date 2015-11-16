@@ -13,11 +13,14 @@ module Data.HFix
 import Data.HFunctor 
 import Data.HFoldable
 
+-- import Data.Functor.Product
+-- import Data.Functor.Sum
+
 
 {-| 
 
 -}
-newtype HFix h a = HFix { unHFix :: h (HFix h) a }
+newtype HFix (h :: (* -> *) -> (* -> *)) a = HFix { unHFix :: h (HFix h) a }
 
 
 -- ================================================================ --
@@ -41,8 +44,15 @@ e.g. expanding the type aliases:
 
 
 -}
-hcata :: HFunctor h => HAlgebra h f -> (HFix h :~> f)
+hcata :: (HFunctor h) => HAlgebra h f -> (HFix h :~> f)
 hcata algebra = algebra . hfmap (hcata algebra) . unHFix
+
+
+{-| 
+
+-}
+hpara :: (HFunctor h) => (h (HFix h :*: f) :~> f) -> (HFix h :~> f)
+hpara algebra = algebra . hfmap (id .&&&. hpara algebra) . unHFix 
 
 
 

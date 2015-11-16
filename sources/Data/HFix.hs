@@ -15,6 +15,7 @@ import Data.HFoldable
 
 -- import Data.Functor.Product
 -- import Data.Functor.Sum
+-- TODO import Control.Arrow ((>>>), (<<<)) 
 
 
 {-| 
@@ -77,5 +78,28 @@ hana coalgebra = HFix . hfmap (hana coalgebra) . coalgebra
 -}
 hapo :: (HFunctor h) => (f :~> h (HFix h :+: f)) -> (f :~> HFix h)
 hapo coalgebra = HFix . hfmap (id .|||. hapo coalgebra) . coalgebra
+
+
+-- ================================================================ --
+
+
+{-| 
+
+-}
+type HCoAlgebraM m h f = f :~> (m :. h f)
+
+
+{-| 
+
+-}
+hanaM :: (HFunctor h) => (f :~> (m :. h f)) -> (f :~> (m :. HFix h))
+hanaM coalgebra = HFix . hfmap (hanaM coalgebra) . coalgebra
+
+
+-- {-| 
+
+-- -}
+-- hapoM :: (HFunctor h) => (f :~> m (h :. (HFix h :+: f)) -> (f :~> (m :. HFix h))
+-- hapoM coalgebra = HFix . hfmap (id .|||. hapoM coalgebra) . coalgebra
 
 

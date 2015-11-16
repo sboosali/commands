@@ -35,6 +35,7 @@ library
         Commands.RHS.Types
         Commands.RHS.Derived 
         Commands.RHS.Finite 
+        Commands.Command.Types
         Commands.Frontends.Dragon13
         Commands.Frontends.Dragon13.Types
         Commands.Frontends.Dragon13.Lens

@@ -14,7 +14,8 @@
 module Commands.Mixins.DNS13OSX9.Types where 
 
 -- import           Commands.Extra
-import           Commands.RHS.Types
+import           Commands.RHS
+import           Commands.Command.Types
 import Commands.Frontends.Dragon13
 import qualified Commands.Backends.OSX as OSX
 

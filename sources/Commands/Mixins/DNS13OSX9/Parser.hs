@@ -6,7 +6,7 @@
 -}
 module Commands.Mixins.DNS13OSX9.Parser where 
 
-import Commands.RHS.Types 
+import Commands.RHS
 import Commands.Mixins.DNS13OSX9.Types 
 import Commands.Mixins.DNS13OSX9.Derived 
 import Commands.Mixins.DNS13OSX9.ObservedSharing 

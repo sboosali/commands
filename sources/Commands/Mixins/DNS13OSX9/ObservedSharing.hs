@@ -6,7 +6,7 @@
 -}
 module Commands.Mixins.DNS13OSX9.ObservedSharing where 
 
-import Commands.RHS.Types 
+import Commands.RHS 
 import           Commands.Extra
 import qualified Data.HRefCache.Internal         as HRefCache
 import Commands.Mixins.DNS13OSX9.Types 

@@ -14,6 +14,7 @@ module Commands.Mixins.DNS13OSX9
  , module Commands.Mixins.DNS13OSX9.Frontend 
  , module Commands.Mixins.DNS13OSX9.Parser 
  , module Commands.RHS
+ , module Commands.Command.Types 
  , module Commands.Sugar.Keys
  ) where
 
@@ -22,6 +23,7 @@ import Commands.Mixins.DNS13OSX9.Derived
 import Commands.Mixins.DNS13OSX9.Frontend 
 import Commands.Mixins.DNS13OSX9.Parser 
 import Commands.RHS
+import Commands.Command.Types 
 import Commands.Sugar.Keys
 
 

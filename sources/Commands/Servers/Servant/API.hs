@@ -14,7 +14,7 @@ import           Servant.Client (client)
 -- import Data.Function ((&)) 
 
 
-serveNatlink :: (Show a) => (VSettings m a) -> IO ()
+serveNatlink :: (Show a) => (VSettings m c a) -> IO ()
 serveNatlink settings@VSettings{..} = do
  vSetup settings >>= \case
   Left e  -> do
@@ -25,23 +25,23 @@ serveNatlink settings@VSettings{..} = do
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
-natlinkApplication :: (Show a) => (VSettings m a) -> Wai.Application
+natlinkApplication :: (Show a) => (VSettings m c a) -> Wai.Application
 natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
 
-natlinkHandlers :: (Show a) => (VSettings m a) -> Server NatlinkAPI
+natlinkHandlers :: (Show a) => (VSettings m c a) -> Server NatlinkAPI
 natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings -- TODO ReaderT
 
-postRecognition :: (Show a) => (VSettings m a) -> RecognitionRequest -> Response DNSResponse
+postRecognition :: (Show a) => (VSettings m c a) -> RecognitionRequest -> Response DNSResponse
 -- postRecognition vSettings (RecognitionRequest ws) = (vSettings&vInterpretRecognition) vSettings ws
 postRecognition vSettings = (vInterpretRecognition vSettings) vSettings 
 
 {-| handle a hypothesis request, as a server  
 
 -}
-postHypotheses :: (Show a) => (VSettings m a) -> HypothesesRequest -> Response DNSResponse
+postHypotheses :: (Show a) => (VSettings m c a) -> HypothesesRequest -> Response DNSResponse
 postHypotheses vSettings = (vInterpretHypotheses vSettings) vSettings 
 
-postCorrection :: (Show a) => (VSettings m a) -> CorrectionRequest -> Response DNSResponse 
+postCorrection :: (Show a) => (VSettings m c a) -> CorrectionRequest -> Response DNSResponse 
 postCorrection vSettings = (vInterpretCorrection vSettings) vSettings 
 
 {-| forward a hypothesis request, as a client  

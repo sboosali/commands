@@ -143,15 +143,15 @@ data ForeignResultsObject = ForeignResultsObject Integer
 "static" configuration.
 
 -}
-data VSettings m a = VSettings
+data VSettings m c a = VSettings
  { vPort                 :: Wai.Port
- , vSetup                :: VSettings m a -> IO (Either VError ())
- , vInterpretRecognition :: VSettings m a -> RecognitionRequest -> Response DNSResponse
- , vInterpretHypotheses  :: VSettings m a -> HypothesesRequest  -> Response DNSResponse
- , vInterpretCorrection  :: VSettings m a -> CorrectionRequest  -> Response DNSResponse
+ , vSetup                :: VSettings m c a -> IO (Either VError ())
+ , vInterpretRecognition :: VSettings m c a -> RecognitionRequest -> Response DNSResponse
+ , vInterpretHypotheses  :: VSettings m c a -> HypothesesRequest  -> Response DNSResponse
+ , vInterpretCorrection  :: VSettings m c a -> CorrectionRequest  -> Response DNSResponse
  , vConfig               :: VConfig m a
  , vUIAddress            :: Address 
- , vGlobals              :: VGlobals 
+ , vGlobals              :: VGlobals c 
  -- , vUpdateConfig   :: VPlugin :~>: VConfig
  }
 
@@ -169,9 +169,17 @@ data VConfig m a = VConfig
 data VError = VError String
  deriving (Show,Read,Eq,Ord,Data,Generic)
 
-data VGlobals = VGlobals 
+{-| 
+
+naming: 
+
+* @c@ for "context". a type parameter, for extensibility. 
+
+-}
+data VGlobals c = VGlobals 
  { vResponse :: TVar DNSResponse -- ^ 
  , vMode :: TVar VMode 
+ , vContext :: TVar c 
  } 
  -- TODO deriving (Generic)
 

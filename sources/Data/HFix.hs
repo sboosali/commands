@@ -1,22 +1,31 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GADTs, KindSignatures, StandaloneDeriving, RankNTypes, TypeOperators #-}
-
+{-# LANGUAGE KindSignatures, StandaloneDeriving, RankNTypes, TypeOperators #-}
 
 {-| higher-order type-constructor fixed-point. 
 
 see <http://www.timphilipwilliams.com/posts/2013-01-16-fixing-gadts.html>  
 
 -}
-module Data.HFix where  
+module Data.HFix
+ ( module Data.HFix
+ , module Data.HFunctor 
+ ) where  
+import Data.HFunctor 
 
 
+{-| 
+
+-}
 newtype HFix h a = HFix { unHFix :: h (HFix h) a }
 
-type f :~> g = forall x. f x -> g x
 
-class HFunctor (h :: (* -> *) -> * -> *) where
-  hfmap :: (f :~> g) -> (h f :~> h g)
+-- ================================================================ --
 
+
+{-| 
+
+-}
 type HAlgebra h f = h f :~> f 
+
 
 {-| 
 
@@ -28,20 +37,26 @@ e.g. expanding the type aliases:
 :: (forall x. ExprF (K String) x  -> (K String) x) -> (forall x. HFix ExprF x  -> (K String) x)
 @
 
+
 -}
 hcata :: HFunctor h => HAlgebra h f -> (HFix h :~> f)
-hcata alg = alg . hfmap (hcata alg) . unHFix
+hcata algebra = algebra . hfmap (hcata algebra) . unHFix
 
-{-| a higher-order constant-functor. 
 
-trivially "lifts" a "lower-order functor" into a "higher-order functor".
 
-@
-'Const'  ::  *       ->  (* -> *) 
-'HConst' :: (* -> *) -> ((* -> *) -> (* -> *)) 
-@
+-- ================================================================ --
 
+
+{-| 
 
 -}
-newtype HConst f (g :: * -> *) a = HConst { unHConst :: f a }
+type HCoAlgebra h f = f :~> h f 
+
+
+{-| 
+
+-}
+hana :: HFunctor h => HCoAlgebra h f -> (f :~> HFix h)
+hana coalgebra = HFix . hfmap (hana coalgebra) . coalgebra
+
 

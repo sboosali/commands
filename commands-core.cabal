@@ -62,13 +62,19 @@ library
         Commands.LHS
         Commands.Munging
         Commands.Main
+
+        Data.HFix 
+        Data.HFunctor
+
         Data.RefCache
         Data.RefCache.Internal
         Data.HRefCache
         Data.HRefCache.Internal
         Data.RefCache.Extra
+
         CabalLenses.PackageDescription
         CabalLenses.PackageDescription.TH
+
     build-depends:
         -- cabal sandbox add-source ../
         workflow-osx ==0.0.1, 

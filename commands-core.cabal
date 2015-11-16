@@ -65,6 +65,7 @@ library
 
         Data.HFix 
         Data.HFunctor
+        Data.HFoldable 
 
         Data.RefCache
         Data.RefCache.Internal

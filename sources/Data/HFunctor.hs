@@ -8,7 +8,7 @@ module Data.HFunctor where
 type f :~> g = forall x. f x -> g x
 
 
-{-| 
+{-| higher-order Functor. 
 
 -}
 class HFunctor (h :: (* -> *) -> * -> *) where

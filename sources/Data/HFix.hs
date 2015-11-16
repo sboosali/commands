@@ -8,8 +8,10 @@ see <http://www.timphilipwilliams.com/posts/2013-01-16-fixing-gadts.html>
 module Data.HFix
  ( module Data.HFix
  , module Data.HFunctor 
+ , module Data.HFoldable 
  ) where  
 import Data.HFunctor 
+import Data.HFoldable
 
 
 {-| 

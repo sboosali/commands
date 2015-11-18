@@ -89,11 +89,11 @@ hapo coalgebra = HFix . hfmap (id .|||. hapo coalgebra) . coalgebra
 type HCoAlgebraM m h f = f :~> (m :. h f)
 
 
-{-| 
+-- {-| 
 
--}
-hanaM :: (HFunctor h) => (f :~> (m :. h f)) -> (f :~> (m :. HFix h))
-hanaM coalgebra = HFix . hfmap (hanaM coalgebra) . coalgebra
+-- -}
+-- hanaM :: (HFunctor h) => (f :~> (m :. h f)) -> (f :~> (m :. HFix h))
+-- hanaM coalgebra = HFix . hfmap (hanaM coalgebra) . coalgebra
 
 
 -- {-| 

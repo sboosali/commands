@@ -63,6 +63,7 @@ check:
 default: Haskell
 
 clean:
+	cabal clean 
 	rm -f Main *.{o,hi,dyn_o,dyn_hi}
 
 fresh: clean

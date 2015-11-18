@@ -2,7 +2,7 @@
 module Commands.Sugar.Keys where  
 import           Commands.Extra
 import           Commands.Backends.OSX
-import           Commands.Parsers.Earley (EarleyEither,toEarleyEither)
+import           Commands.Parsers.Earley (EarleyEither,fullParsesE)
 
 import qualified Data.List.NonEmpty              as NonEmpty
 import Data.List.NonEmpty (NonEmpty)
@@ -53,7 +53,7 @@ kbd cs = either (error.(("(Commands.Sugar.Keys.kbd "++(show cs)++")") ++).show) 
 
 -- | like @kbd@, but a total function 
 safeKbd :: [Char] -> EarleyEither String Char (NonEmpty KeyRiff)
-safeKbd cs = toEarleyEither $ E.fullParses (E.parser gKeychords (strip cs))
+safeKbd cs = fullParsesE gKeychords (strip cs)
 -- bimapEither toException .
  where
  strip :: String -> String
@@ -70,7 +70,7 @@ follows (a subset of) <http://emacswiki.org/emacs/EmacsKeyNotation Emacs keybind
 * e.g. @"C-<tab>"@, not @"C-TAB"@. see the source (the parser combinators are readable) for other differences.
 
 -}
-gKeychords :: E.Grammar r String (E.Prod r String Char KeyRiff)
+gKeychords :: E.Grammar r (E.Prod r String Char KeyRiff)
 gKeychords = mdo
 
  pKeychords <- E.rule$ (:) <$> pKeychord <*> many (some (E.symbol ' ') *> pKeychord)

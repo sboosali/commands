@@ -13,7 +13,6 @@ import qualified Data.Text.Lazy as T
 import           Data.Text.Lazy (Text) 
 
 import           Control.Monad.ST
-import           Data.STRef
 import           Data.Char
 import Control.Applicative
 import Control.Arrow ((>>>))
@@ -31,6 +30,14 @@ data EarleyParser s r e t a = EarleyParser
 
 -- ================================================================ --
 
+bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
+bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
+{-# INLINEABLE bestParse #-} 
+
+eachParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t (NonEmpty a)
+eachParse p = toEarleyEither . (E.fullParses (buildEarleyResult p))
+{-# INLINEABLE eachParse #-} 
+
 {-| 
 
 warning: uses "Text.Earley.Internal" 
@@ -38,11 +45,11 @@ warning: uses "Text.Earley.Internal"
 -}
 buildEarleyResult
  :: E.ProdR s a n t a
- -> [t]
- -> ST s (E.Result s n [t] a)
-buildEarleyResult p ts = do
-  s <- E.initialState p
-  E.parse [s] (E.emptyParseEnv ts)
+ -> ST s ([t] -> ST s (E.Result s n [t] a))
+buildEarleyResult p1 = do
+  p2 <- pureNonTerminal <$> E.mkRule p1 
+  s <- E.initialState p2
+  return $ E.parse [s] . E.emptyParseEnv 
 
 {-| 
 
@@ -51,23 +58,20 @@ warning: uses "Text.Earley.Internal"
 -}
 buildEarleyNonTerminal
  :: n
- -> ST s (  E.ProdR s r n t a
-         -> E.ProdR s r n t a
-         )
-buildEarleyNonTerminal n = do
- conts <- newSTRef =<< newSTRef []
- null  <- newSTRef Nothing
- return$ (\p -> E.NonTerminal (E.Rule p null conts) (E.Pure id) E.<?> n)
+ -> E.ProdR s r n t a
+ -> ST s (E.ProdR s r n t a)
+buildEarleyNonTerminal n p = do
+ r_ <- E.mkRule p 
+ return$ pureNonTerminal r_ E.<?> n
 
 {-| wraps 'E.fullParses' 
 
 -}
 fullParsesE
- :: (forall r. E.Grammar r e (E.Prod r e t a)) 
+ :: (forall r. E.Grammar r (E.Prod r e t a)) 
  -> [t] 
  -> EarleyEither e t (NonEmpty a)
-fullParsesE g = \ts ->
- toEarleyEither (E.fullParses (E.parser g ts))
+fullParsesE g = toEarleyEither . (E.fullParses (E.parser g))
 {-# INLINEABLE fullParsesE #-}
 
 {-| refine an 'E.Report', forcing the results.
@@ -82,12 +86,10 @@ toEarleyEither = \case
  ([],   e)               -> Left  e
  (x:xs, E.Report _ _ []) -> Right (x:|xs)
  (_,    e)               -> Left  e
+{-# INLINEABLE toEarleyEither #-} 
 
-bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
-bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
-
-eachParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t (NonEmpty a)
-eachParse p ts = toEarleyEither (E.fullParses (buildEarleyResult p ts))
+pureNonTerminal :: r e t a -> E.Prod r e t a 
+pureNonTerminal x = E.NonTerminal x (E.Pure id)
 
 
 

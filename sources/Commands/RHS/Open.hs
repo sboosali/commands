@@ -53,23 +53,22 @@ instance (Functor (h (RHS n t h))) => Applicative (RHS n t h) where
  RHS (Pure xa) <*> RHS rx                = RHS$ fmap xa rx        -- Functor
  -- Pure {id} <*> x            = fmap {id} x     = x              -- Identity
  -- Pure f <*> Pure x          = fmap f (Pure x) = Pure (f x)     -- Homomorphism
- RHS rxa     <*> RHS (Pure x)            = RHS$ fmap ($ x) rxa    -- Interchange
 
  RHS Empty    <*> _                  = RHS Empty                            -- left-Annihilation (?)
  _            <*> RHS Empty          = RHS Empty                            -- right-Annihilation
 
- rxa <*> rx = RHS$ case rx of
-
-  RHS (ryx `Apply` hy) -> ((.) <$> rxa <*> ryx) `Apply` hy -- Composition
-  RHS (ryx :<*>    ry) -> ((.) <$> rxa <*> ryx) :<*>    ry -- Composition
-  RHS (Alter _rxs)     -> rxa :<*> rx                      -- NO left-Distributivity
+ RHS rxa <*> rx = RHS$ case rx of
+  RHS (Pure x)         -> fmap ($ x) rxa                       -- Interchange
+  RHS (ryx `Apply` hy) -> ((.) <$> RHS rxa <*> ryx) `Apply` hy -- Composition
+  RHS (ryx :<*>    ry) -> ((.) <$> RHS rxa <*> ryx) :<*>    ry -- Composition
+  RHS (Alter _rxs)     -> RHS rxa :<*> rx                      -- NO left-Distributivity
 
  --  r@(Opt  _ysa _ty)     = RHS$ txa :<*> RHS r    -- NOTE intentionally doesn't distribute
  --  r@(Many _ysa _ty)     = RHS$ txa :<*> RHS r    -- NOTE intentionally doesn't distribute
  --  r@(Some _ysa _ty)     = RHS$ txa :<*> RHS r    -- NOTE intentionally doesn't distribute
 
-  RHS (NonTerminal{}) -> rxa :<*> rx -- NOTE preserving sharing is critical for the observers sharing interface 
-  RHS (Terminal   {}) -> rxa :<*> rx 
+  RHS (NonTerminal{}) -> RHS rxa :<*> rx -- NOTE preserving sharing is critical for the observers sharing interface 
+  RHS (Terminal   {}) -> RHS rxa :<*> rx 
  -- txa     <*> r@(Terminals _i)      = RHS$ txa :<*> r -- NOTE greatly simplifies "self-referential" grammars (self-recursive grammars are already simple)
 
 -- | @pattern EmptyRHS = RHS ('Alter' [])@

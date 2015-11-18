@@ -26,6 +26,7 @@ import Control.Comonad.Cofree (Cofree)
 
 import Data.Void
 import Control.Exception (Exception, SomeException)
+import           Control.Monad.ST (ST) 
 
 
 -- ================================================================ --
@@ -74,7 +75,7 @@ data UnsafeEarleyProduction e t a = forall s r. UnsafeEarleyProduction (E.Prod (
 deriving instance Functor (UnsafeEarleyProduction e t)
 
 data EarleyName s r n t (f :: * -> *) a = EarleyName
- { unEarleyName :: E.Prod (E.Rule s r) n t a -> E.Prod (E.Rule s r) n t a
+ { unEarleyName :: E.ProdR s r n t a -> ST s (E.ProdR s r n t a)
  }
 -- not a Functor
 

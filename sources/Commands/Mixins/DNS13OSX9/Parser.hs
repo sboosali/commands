@@ -26,15 +26,15 @@ import           System.IO.Unsafe
 
 {-| 
 
-NOTE unsafe: both @s1@ and @r1@ are phantom:
+NOTE unsafe: @unsafeCoerceEarleyProd = 'unsafeCoerce'@
+
+both @s1@ and @r1@ are phantom:
 
 * @s1@ is used as a "state thread" in @ST s1@
 * @r1@ is used similarly in the types of "Text.Earley.Internal"
 
 being phantom, and not "reflected" into values (by the uses above), an improper coercion shouldn't segfault. 
 however, it may violate referential transparency. 
-
-@unsafeCoerceEarleyProd = 'unsafeCoerce'@
 
 TODO verify safety conditions 
 
@@ -47,14 +47,11 @@ unsafeCoerceEarleyProd = unsafeCoerce
 
 -- | NOTE unsafe: can violate referential transparency.   
 renameRHSToEarley
- :: ST s (        DNSEarleyRHS a
-         -> ST s (RHS (EarleyName s r String)
-                      Text
-                      (DNSEarleyFunc (EarleyName s r String) Text)
-                      a)
+ :: ST s (        DNSEarleyRHS a 
+         -> ST s (RHS (EarleyName s r String) Text (DNSEarleyFunc (EarleyName s r String) Text) a)
          )
 renameRHSToEarley = renameDNSEarleyRHSST $
- \_ (ConstName (_, n)) -> EarleyName <$> buildEarleyNonTerminal n 
+ \_ (ConstName (_, n)) -> pure$ EarleyName (buildEarleyNonTerminal n) -- TODO maybe the delay is bad 
 
 {-| the core glue between an 'RHS' and an Earley 'E.Prod'uction. 
 
@@ -65,14 +62,14 @@ induceEarley
         t
         (DNSEarleyFunc (EarleyName s r String) t)
         a
- -> E.ProdR s r String t a
-induceEarley rhs = runRHSWith
- (\n r -> (unEarleyName n) (induceEarley r))
+ -> ST s (E.ProdR s r String t a)
+induceEarley rhs = runRHSWithM 
+ (\n r -> (unEarleyName n) =<< (induceEarley r))
   -- NOTE "state thread" type variables (i.e. 's') are coerced 
   -- use accessor (unEarleyName) (not pattern match) for polymorphic z (Rank2 elsewhere)
- E.symbol
+ (pure . E.symbol)
  (\case
-  LeafRHS (UnsafeEarleyProduction p)    _ -> unsafeCoerceEarleyProd p
+  LeafRHS (UnsafeEarleyProduction p)    _ -> pure$ unsafeCoerceEarleyProd p
   TreeRHS pRHS _ -> induceEarley pRHS)
  (getTerminalsDNSEarley rhs) 
  rhs 
@@ -88,7 +85,7 @@ TODO safety conditions
 de'deriveParserObservedSharing :: DNSEarleyRHS a -> ST s (E.ProdR s r String Text a)
 de'deriveParserObservedSharing r1 = do
  r2 <- renameRHSToEarley >>= ($ r1)
- return$ induceEarley r2
+ induceEarley r2
 
 {-| 
 

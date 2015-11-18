@@ -164,6 +164,17 @@ runRHS
 runRHS fromN fromT fromF rhs 
  = runRHSWith fromN fromT fromF (getTerminals rhs) rhs -- TODO loops on recursive grammars 
 
+runRHSWithM 
+ :: forall n t f m g a. (Applicative m, Alternative g, Eq t)
+ => (forall x. n t f x -> RHS n t f x -> m (g x))
+ -> (          t                      -> m (g t))
+ -> (forall x. f x                    -> m (g x))
+ -> [t]
+ -> RHS n t f a
+ -> m (g a)
+runRHSWithM fromN fromT fromF ts rhs 
+ = runRHSM' fromN fromT fromF ((fmap asum . traverse fromT) ts) rhs -- TODO loops on recursive grammars 
+
 runRHSWith
  :: forall n t f g a. (Alternative g, Eq t)
  => (forall x. n t f x -> RHS n t f x -> g x)
@@ -174,7 +185,33 @@ runRHSWith
  -> RHS n t f a
  -> g a
 runRHSWith fromN fromT fromF ts rhs
- = runRHS' fromN fromT fromF ((asum . map fromT) ts) rhs -- TODO loops on recursive grammars 
+ = runRHS' fromN fromT fromF ((asum . fmap fromT) ts) rhs -- TODO loops on recursive grammars 
+
+runRHSM' 
+ :: forall n t f m g a. (Applicative m, Alternative g, Eq t)
+ => (forall x. n t f x -> RHS n t f x -> m (g x))
+ -> (          t                      -> m (g t))
+ -> (forall x. f x                    -> m (g x))
+ -> m (g t) -- TODO
+ -> RHS n t f a
+ -> m (g a)
+runRHSM' fromN fromT fromF aTerminal = \case
+ Terminals i -> (\t_ -> i <$> t_) <$> aTerminal 
+ Terminal    i t -> (\t_ -> i <$> t_) <$> fromT t
+ NonTerminal n r ->       fromN n r
+
+ Opt  i x  -> (\y -> i  <$> optional y)   <$> (go x)
+ Many i x  -> (\y -> i  <$> many y)   <$> (go x)
+ Some i x  -> (\y -> i' <$> some y )  <$>  (go x) where i' = i . NonEmpty.fromList
+
+ Pure a      -> pure$ pure a
+ f `Apply` x -> (\f_ x_ -> f_ <*> x_) <$> go f <*> fromF x
+ f :<*>    g -> (\f_ g_ -> f_ <*> g_) <$> go f <*> go g
+ Alter fs  -> asum <$> (go `traverse` fs)
+
+ where
+ go :: forall x. RHS n t f x -> m (g x)
+ go = runRHSM' fromN fromT fromF aTerminal 
 
 runRHS'
  :: forall n t f g a. (Alternative g, Eq t)

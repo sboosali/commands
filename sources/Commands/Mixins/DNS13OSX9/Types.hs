@@ -33,7 +33,7 @@ import           Control.Monad.ST (ST)
 
 type R a = DNSEarleyRHS a
 
-type C a = DNSEarleyCommand a
+type C c a = DNSEarleyCommand c a
 
 
 -- ================================================================ --
@@ -59,11 +59,11 @@ deriving instance (Functor (n t (DNSEarleyFunc n t))) => Functor (DNSEarleyFunc 
 data SomeDNSEarleyRHS = forall x. -- TODO use RHS0 
  SomeDNSEarleyRHS { unSomeDNSEarleyRHS :: DNSEarleyRHS x } 
 
-type DNSEarleyCommand = Command -- TODO remove 
+type DNSEarleyCommand c = Command -- TODO remove 
  (DNSEarleyName String)
  Text
  (DNSEarleyFunc (DNSEarleyName String) Text)
- OSX.Application
+ c
  OSX.CWorkflow_
 
 

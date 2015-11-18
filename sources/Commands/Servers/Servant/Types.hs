@@ -8,7 +8,6 @@
 
 -}
 module Commands.Servers.Servant.Types where
-import qualified Commands.Backends.OSX                 as OSX
 import           Commands.Extra
 import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Parsers.Earley              (EarleyParser)
@@ -149,7 +148,7 @@ data VSettings m c a = VSettings
  , vInterpretRecognition :: VSettings m c a -> RecognitionRequest -> Response DNSResponse
  , vInterpretHypotheses  :: VSettings m c a -> HypothesesRequest  -> Response DNSResponse
  , vInterpretCorrection  :: VSettings m c a -> CorrectionRequest  -> Response DNSResponse
- , vConfig               :: VConfig m a
+ , vConfig               :: VConfig m c a
  , vUIAddress            :: Address 
  , vGlobals              :: VGlobals c 
  -- , vUpdateConfig   :: VPlugin :~>: VConfig
@@ -158,10 +157,10 @@ data VSettings m c a = VSettings
 {- | read-only.
 "dynamic" configuration
 -}
-data VConfig m a = VConfig
+data VConfig m c a = VConfig
  { vGrammar :: DNS.SerializedGrammar
  , vParser  :: (forall s r. EarleyParser s r String Text a) 
- , vDesugar :: OSX.Application -> a -> m ()
+ , vDesugar :: c -> a -> m ()
  }
 
 {- |

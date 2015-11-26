@@ -1,6 +1,5 @@
 {-# LANGUAGE KindSignatures, RankNTypes #-}
 module Data.HFoldable where 
--- import Data.HFunctor 
 
 
 {-| higher-order Foldable. 
@@ -8,7 +7,6 @@ module Data.HFoldable where
 -}
 class HFoldable (h :: (* -> *) -> (* -> *)) where
   hfoldMap :: Monoid m => (forall b. f b -> m) -> h f a -> m
-
 
 
 -- ================================================================ --

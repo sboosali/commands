@@ -10,14 +10,14 @@ import Data.Functor.Sum
 -}
 type f :~> g = forall x. f x -> g x
 
-
 {-| 
 
 -}
 type (f :. g) a = f (g a)
 
-
 type f :+: g = Sum f g 
+
+type f :*: g = Product f g 
 
 {-| eliminate a sum.  
 
@@ -27,7 +27,10 @@ type f :+: g = Sum f g
  InL f -> u1 f 
  InR f -> u2 f 
 
-type f :*: g = Product f g 
+(<|||>) :: (f1 :~> (m :. g)) -> (f2 :~> (m :. g)) -> ((f1 :+: f2) :~> (m :. g))
+(<|||>) u1 u2 = \case 
+ InL f -> u1 f 
+ InR f -> u2 f 
 
 getFirst :: Product f g a -> f a 
 getFirst (Pair f _) = f 
@@ -40,6 +43,9 @@ getSecond (Pair _ g) = g
 -}
 (.&&&.) :: (f :~> g1) -> (f :~> g2) -> (f :~> (g1 :*: g2))
 (.&&&.) u1 u2 = \f -> Pair (u1 f) (u2 f) 
+
+(<&&&>) :: (Applicative m) => (f :~> (m :. g1)) -> (f :~> (m :. g2)) -> (f :~> (m :. (g1 :*: g2)))
+(<&&&>) u1 u2 = \f -> Pair <$> (u1 f) <*> (u2 f) 
 
 
 {-| higher-order Functor. 

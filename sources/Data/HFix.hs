@@ -12,10 +12,12 @@ module Data.HFix
  ) where  
 import Data.HFunctor 
 import Data.HFoldable
+import Data.HTraversable
 
 -- import Data.Functor.Product
 -- import Data.Functor.Sum
--- TODO import Control.Arrow ((>>>), (<<<)) 
+import Control.Category ((>>>), (<<<)) 
+import Control.Monad((<=<), (>=>))     -- 
 
 
 {-| 
@@ -26,8 +28,7 @@ newtype HFix (h :: (* -> *) -> (* -> *)) a = HFix { unHFix :: h (HFix h) a }
 
 -- ================================================================ --
 
-
-{-| 
+{-| "higher-order algebra" 
 
 -}
 type HAlgebra h f = h f :~> f 
@@ -56,11 +57,30 @@ hpara :: (HFunctor h) => (h (HFix h :*: f) :~> f) -> (HFix h :~> f)
 hpara algebra = algebra . hfmap (id .&&&. hpara algebra) . unHFix 
 
 
-
 -- ================================================================ --
+
+{-| "higher-order algebra, monadic".  
+
+-}
+type HAlgebraM m h f = h f :~> (m :. f)
+
+{-| 
+
+-}
+hcataM :: (Monad m, HTraversable h) => HAlgebraM m h f -> (HFix h :~> (m :. f))
+hcataM algebra = (unHFix >>> return) >=> htraverse (hcataM algebra) >=> algebra 
 
 
 {-| 
+
+-}
+hparaM :: (Monad m, HTraversable h) => (h (HFix h :*: f) :~> (m :. f)) -> (HFix h :~> (m :. f))
+hparaM algebra = (unHFix >>> return) >=> htraverse (return <&&&> hparaM algebra) >=> algebra 
+
+
+-- ================================================================ --
+
+{-| "higher-order coalgebra". 
 
 -}
 type HCoAlgebra h f = f :~> h f 
@@ -82,24 +102,25 @@ hapo coalgebra = HFix . hfmap (id .|||. hapo coalgebra) . coalgebra
 
 -- ================================================================ --
 
-
-{-| 
+{-| "higher-order coalgebra, monadic".  
 
 -}
 type HCoAlgebraM m h f = f :~> (m :. h f)
 
 
--- {-| 
+{-| 
 
--- -}
--- hanaM :: (HFunctor h) => (f :~> (m :. h f)) -> (f :~> (m :. HFix h))
--- hanaM coalgebra = HFix . hfmap (hanaM coalgebra) . coalgebra
+-}
+hanaM :: (Monad m, HTraversable h) => (f :~> (m :. h f)) -> (f :~> (m :. HFix h))
+hanaM coalgebra = (return <<< HFix) <=< htraverse (hanaM coalgebra) <=< coalgebra
 
 
--- {-| 
+{-| 
 
--- -}
--- hapoM :: (HFunctor h) => (f :~> m (h :. (HFix h :+: f)) -> (f :~> (m :. HFix h))
--- hapoM coalgebra = HFix . hfmap (id .|||. hapoM coalgebra) . coalgebra
+-}
+hapoM :: (Monad m, HTraversable h) => (f :~> (m :. h (HFix h :+: f))) -> (f :~> (m :. HFix h))
+hapoM coalgebra = (return <<< HFix) <=< htraverse (return <|||> hapoM coalgebra) <=< coalgebra
 
+
+-- ================================================================ --
 

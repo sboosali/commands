@@ -6,6 +6,7 @@
 module Commands.Parsers.Earley where 
 
 import           Data.List.NonEmpty              (NonEmpty (..))
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
@@ -34,9 +35,16 @@ bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
 bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
 {-# INLINEABLE bestParse #-} 
 
+firstParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t a
+firstParse p = fmap NonEmpty.head . eachParse p
+{-# INLINEABLE firstParse #-} 
+
 eachParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t (NonEmpty a)
 eachParse p = toEarleyEither . (E.fullParses (buildEarleyResult p))
 {-# INLINEABLE eachParse #-} 
+
+fromProd_ :: (forall s r. E.ProdR s r e Text a) -> String -> EarleyEither e Text a
+fromProd_ p ts = firstParse p (map T.pack (words ts))
 
 {-| 
 

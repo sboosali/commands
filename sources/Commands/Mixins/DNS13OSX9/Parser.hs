@@ -92,7 +92,7 @@ de'deriveParserObservedSharing r1 = do
 NOTE unsafe: calls 'unsafeSTToIO'. 
 
 -}
-unsafeEarleyProd :: DNSEarleyRHS a -> (E.ProdR s r String Text a)
+unsafeEarleyProd :: DNSEarleyRHS a -> E.ProdR s r String Text a
 unsafeEarleyProd r = unsafePerformIO$ unsafeSTToIO$ de'deriveParserObservedSharing r  -- TODO lol 
 {-# NOINLINE unsafeEarleyProd #-}
 

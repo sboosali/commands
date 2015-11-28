@@ -168,10 +168,10 @@ formatRHS settings rawRhs = do
  let escapedGrammar = serializeRHSAsDNSGrammar settings reifiedRhs 
  return$ escapedGrammar
 
-showRHS :: DNSEarleyRHS a -> IO Text
+showRHS :: DNSEarleyRHS a -> IO String
 showRHS rawRhs = do
  escapedGrammar <- formatRHS defaultDnsOptimizationSettings rawRhs
- return$ either (T.pack . show) displaySerializedGrammar escapedGrammar
+ return$ either show displaySerializedGrammar escapedGrammar
 
 {- | derive a grammar from a DNSEarleyRHS, by observing sharing. 
 

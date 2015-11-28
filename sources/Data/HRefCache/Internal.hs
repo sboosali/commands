@@ -21,7 +21,7 @@ import           Unsafe.Coerce
 
 {- | a @H@eterogeneous store that @Cache@s by @Ref@erence.
 
-"heterogeneous" because it has key type @(f Any)@ and the value type @(g Any)@.
+"heterogeneous" because it has key type @(f 'Any')@ and the value type @(g 'Any')@.
 
 -}
 newtype HRefCache f g = HRefCache (IntMap [(StableName (f Any), IORef (g Any))])
@@ -78,7 +78,9 @@ lookupRef k (HRefCache m) = case (List.lookup (unsafeCoerce k) <=< IntMap.lookup
  Just v -> Just (unsafeCoerce v)
 
 
-{- | -}
+{- | 
+
+-}
 class Named t where
  type NameOf t :: * -> *
  type KeyOf  t :: * -> *

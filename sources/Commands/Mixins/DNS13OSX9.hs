@@ -25,6 +25,10 @@ import Commands.Mixins.DNS13OSX9.Parser
 import Commands.RHS
 import Commands.Command.Types 
 import Commands.Sugar.Keys
+import Commands.Frontends.Dragon13 (defaultDnsOptimizationSettings,displaySerializedGrammar)
+import           Commands.Parsers.Earley (EarleyEither,fromProd_)
+
+import Data.Text.Lazy (Text)
 
 
 {-| 
@@ -41,4 +45,10 @@ isFiniteDNSEarleyFunc :: DNSEarleyFunc n t a -> IsFiniteGrammar t
 isFiniteDNSEarleyFunc = \case
  LeafRHS _ g -> isFiniteDNSRHS g 
  TreeRHS _ gRHS -> isFiniteDNSEarleyGrammar gRHS
+
+test_observeParserAndGrammar :: DNSEarleyRHS a -> (String, String -> EarleyEither String Text a)
+test_observeParserAndGrammar r =
+ ( displaySerializedGrammar (unsafeDNSGrammar defaultDnsOptimizationSettings r)
+ , fromProd_ (unsafeEarleyProd r)
+ )
 

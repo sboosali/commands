@@ -120,7 +120,7 @@ cacheByRef f = cacheIOByRef (return.f)
 
 when @m@ is pure (e.g. @'State' Int@) (i.e. can't observe sharing), or more generally the effect @u@ is pure, 'traverseShared' shoud coincide with 'traverse'. when @m@ is impure (e.g. @IO@), the effect @u@ can violate referential transparency.
 
-for example, we can "poke some holes" with @let@, then "fill those holes" with a ref like 'newIORef'.
+for example, we can "poke some holes" with @let@, then "fill those holes" with reference like 'newIORef'.
 
 >>> (traverse readIORef . traverse (atomicModifyIORef (+1)) . traverseShared newIORef) [0,0,0]  -- unshared
 [1,1,1]
@@ -138,8 +138,7 @@ recover input with @'Identity'@, like 'traverse's @identity@ law:
 [0,0,0]
 
 
-
-recover sharing-observing graph with (\_ -> (Const <$> newUniqueReally)):
+TODO recover sharing-observing graph with (\_ -> (Const <$> newUniqueReally)):
 
 >>>
 

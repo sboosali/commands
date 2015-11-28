@@ -327,7 +327,7 @@ from_SerializedGrammar_to_ShimR
  ShimR serializedRules serializedLists serializedExport serverHost serverPort
 
 -- | (for debugging)
-displaySerializedGrammar :: SerializedGrammar -> Text
-displaySerializedGrammar SerializedGrammar{..} =
- displayDoc $ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
+displaySerializedGrammar :: SerializedGrammar -> String
+displaySerializedGrammar SerializedGrammar{..} = T.unpack $ displayDoc $
+ (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
 

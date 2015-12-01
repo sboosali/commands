@@ -103,6 +103,7 @@ instance (Functor f, Functor (n t f)) => Alternative (RHS n t f) where
  some = fmap NonEmpty.toList . Some id
  {-# INLINE some #-}
 
+
 {- | both token and result must be an (instance of) 'IsString'.
 
 (see <http://chrisdone.com/posts/haskell-constraint-trick the constraint trick>)

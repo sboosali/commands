@@ -5,7 +5,7 @@ import Data.HFunctor
 -- import Data.HFoldable 
 
 
-{-| higher-order Foldable. 
+{-| higher-order Traversable. 
 
 -}
 class (HFunctor h) => HTraversable (h :: (* -> *) -> (* -> *)) where

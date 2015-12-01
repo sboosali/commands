@@ -7,11 +7,13 @@ module Commands.Extra
  ( module Commands.Extra
  , module Commands.Instances
  , module Data.Data
+ , module Data.HTypes 
  , module GHC.Generics
  , (>>>)
  , traverse_
  ) where
 import           Commands.Instances
+import Data.HTypes(Exists(..), exists) 
 
 import           Control.Lens                 (Lens', Prism', lens, makeLenses,
                                                makePrisms, prism')
@@ -169,25 +171,6 @@ guiOf
 
 hashAlphanumeric :: (Hashable a) => a -> String
 hashAlphanumeric = flip showHex "" . abs . hash
-
-{-| existentially-quantify any unary type-constructor
-
->>> :t Exists Nothing
-Exists Nothing :: Exists Maybe
-
->>> case Exists [] of Exists xs -> length xs
-0
-
--}
-data Exists f = forall x. Exists { unExists :: f x }
-
--- instance (Ord1 f) => Ord (Exists f) where -- TODO the other lifted instances 
---  compare (Exists f) (Exists g) = compare1 f g -- TODO must be homogeneous. maybe Typeable 
-
-
-{-| eliminator -}
-exists ::  (forall x. f x -> a) -> (Exists f -> a)
-exists g (Exists f) = g f
 
 nonemptyHead :: Lens' (NonEmpty a) a
 nonemptyHead = lens

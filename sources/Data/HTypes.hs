@@ -1,8 +1,9 @@
-{-# LANGUAGE KindSignatures, RankNTypes, TypeOperators, LambdaCase #-}
+{-# LANGUAGE KindSignatures, RankNTypes, TypeOperators, LambdaCase, ExistentialQuantification  #-}
 module Data.HTypes where 
 
-import Data.Functor.Product
 import Data.Functor.Sum
+import Data.Functor.Product
+import Data.Functor.Compose 
 -- import Control.Applicative (Alternative(..)) 
 
 
@@ -61,15 +62,27 @@ instance (Functor f) => Functor (HConst f g) where
 
 -- ================================================================ --
 
+{-| existentially-quantify any unary type-constructor
+
+>>> :t Exists Nothing
+Exists Nothing :: Exists Maybe
+
+>>> case Exists [] of Exists xs -> length xs
+0
+
+-}
+data Exists f = forall x. Exists { unExists :: f x }
+
+-- instance (Ord1 f) => Ord (Exists f) where -- TODO the other lifted instances 
+--  compare (Exists f) (Exists g) = compare1 f g -- TODO must be homogeneous. maybe Typeable 
+
+
+-- ================================================================ --
+
 {-| natural transformation (i.e. functor transformation).
 
 -}
 type f :~> g = forall x. f x -> g x
-
-{-| functor composition.
-
--}
-type (f :. g) a = f (g a)
 
 {-| functor sum.
 
@@ -80,6 +93,23 @@ type f :+: g = Sum f g
 
 -}
 type f :*: g = Product f g 
+
+{-| functor composition.
+
+-}
+type (f :. g) a = f (g a)
+
+{-| functor composition.
+
+-}
+type (:.:) = Compose 
+
+
+-- ================================================================ --
+
+{-| eliminate an existentially quantified datatype. -}
+exists ::  (forall x. f x -> a) -> (Exists f -> a)
+exists u (Exists f) = u f
 
 {-| eliminate a sum.  
 
@@ -100,14 +130,16 @@ type f :*: g = Product f g
 {-| project from a product.
 
 -}
-getFirst :: (f :*: g) :~> f
+getFirst, outL :: (f :*: g) :~> f
 getFirst (Pair f _) = f 
+outL = getFirst 
 
 {-| project from a product.
 
 -}
-getSecond :: (f :*: g) :~> g
+getSecond, inL :: (f :*: g) :~> g
 getSecond (Pair _ g) = g 
+inL = getSecond 
 
 {-| introduce a product. 
 

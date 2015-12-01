@@ -3,6 +3,7 @@ module Data.HTypes where
 
 import Data.Functor.Product
 import Data.Functor.Sum
+-- import Control.Applicative (Alternative(..)) 
 
 
 {-| a higher-order identity-functor. 
@@ -17,6 +18,11 @@ import Data.Functor.Sum
 -}
 newtype HIdentity f a = HIdentity { getHIdentity :: f a }
 
+instance (Functor f) => Functor (HIdentity f) where 
+ fmap f (HIdentity x) = HIdentity (fmap f x)
+
+
+-- ================================================================ --
 
 {-| a higher-order constant-functor. 
 
@@ -33,6 +39,27 @@ trivially "lifts" a "lower-order functor" into a "higher-order functor".
 -}
 newtype HConst f (g :: * -> *) a = HConst { getHConst :: f a }
 
+instance (Functor f) => Functor (HConst f g) where 
+ fmap f (HConst x) = HConst (fmap f x)
+
+-- -- | @Alternative@ is a lifted @Monoid@. 
+-- instance (Alternative f) => Applicative (HConst f g) where
+--  pure _ = HConst empty  
+--  (<*>) (HConst f) (HConst g) = HConst (f <|> g)
+
+-- instance (Monoid (f x)) => Applicative (HConst f) where -- illegal context 
+--  pure = HConst mempty  
+--  (<*>) (HConst f) (HConst g) = HConst (f <> g)
+
+-- class HMonoid f where           -- Alternative 
+--  hmempty :: f a 
+--  hmappend :: f a -> f a -> f a 
+
+-- instance (HMonoid f) => Applicative (HConst f) where
+--  pure = HConst hmempty 
+--  (<*>) (HConst f) (HConst g) = HConst (f `hmappend` g)
+
+-- ================================================================ --
 
 {-| natural transformation (i.e. functor transformation).
 

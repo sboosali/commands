@@ -21,3 +21,9 @@ instance HTraversable (HConst f) where
 
 -- ================================================================ --
 
+-- hfmapDefault :: (HTraversable h) => (f :~> g) -> (h f :~> h g)
+-- hfmapDefault u = getHIdentity . htraverse ((HIdentity . u) :: (f :~> (HIdentity :. g)))
+
+-- hfoldMapDefault :: (HTraversable h, Monoid m) => (forall b. f b -> m) -> h f a -> m
+-- hfoldMapDefault u = getHConst . htraverse (HConst . u)  
+

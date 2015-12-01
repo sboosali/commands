@@ -1,71 +1,18 @@
-{-# LANGUAGE KindSignatures, RankNTypes, TypeOperators, LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE KindSignatures, TypeOperators, LambdaCase #-}
 module Data.HFunctor where 
-
-import Data.Functor.Product
-import Data.Functor.Sum
-
-
-{-| 
-
--}
-type f :~> g = forall x. f x -> g x
-
-{-| 
-
--}
-type (f :. g) a = f (g a)
-
-type f :+: g = Sum f g 
-
-type f :*: g = Product f g 
-
-{-| eliminate a sum.  
-
--}
-(.|||.) :: (f1 :~> g) -> (f2 :~> g) -> ((f1 :+: f2) :~> g)
-(.|||.) u1 u2 = \case 
- InL f -> u1 f 
- InR f -> u2 f 
-
-(<|||>) :: (f1 :~> (m :. g)) -> (f2 :~> (m :. g)) -> ((f1 :+: f2) :~> (m :. g))
-(<|||>) u1 u2 = \case 
- InL f -> u1 f 
- InR f -> u2 f 
-
-getFirst :: Product f g a -> f a 
-getFirst (Pair f _) = f 
-
-getSecond :: Product f g a -> g a 
-getSecond (Pair _ g) = g 
-
-{-| introduce a product. 
-
--}
-(.&&&.) :: (f :~> g1) -> (f :~> g2) -> (f :~> (g1 :*: g2))
-(.&&&.) u1 u2 = \f -> Pair (u1 f) (u2 f) 
-
-(<&&&>) :: (Applicative m) => (f :~> (m :. g1)) -> (f :~> (m :. g2)) -> (f :~> (m :. (g1 :*: g2)))
-(<&&&>) u1 u2 = \f -> Pair <$> (u1 f) <*> (u2 f) 
+import Data.HTypes
 
 
 {-| higher-order Functor. 
 
 -}
 class HFunctor (h :: (* -> *) -> (* -> *)) where
-  hfmap :: (f :~> g) -> (h f :~> h g)
+ hfmap :: (f :~> g) -> (h f :~> h g)
 
+instance HFunctor HIdentity where 
+ hfmap u (HIdentity f) = HIdentity (u f)
 
-{-| a higher-order constant-functor. 
-
-trivially "lifts" a "lower-order functor" into a "higher-order functor".
-
-@
-'Const'  ::  *       ->  (* -> *) 
-'HConst' :: (* -> *) -> ((* -> *) -> (* -> *)) 
-@
-
-
--}
-newtype HConst f (g :: * -> *) a = HConst { unHConst :: f a }
-
+instance HFunctor (HConst f) where 
+ hfmap _ (HConst f) = (HConst f) 
 

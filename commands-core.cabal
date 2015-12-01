@@ -63,10 +63,12 @@ library
         Commands.Munging
         Commands.Main
 
+        Data.HTypes 
+        Data.HPrelude 
         Data.HFunctor
-        Data.HFunctor.Recursion 
         Data.HFoldable 
         Data.HTraversable 
+        Data.HFunctor.Recursion 
 
         Data.RefCache
         Data.RefCache.Internal

@@ -306,7 +306,7 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 >>> let Right{} = applyShim 'Commands.Frontends.Dragon13.Shim.getShim' "\'localhost\'" ('serializeGrammar' grammar)
 
 -}
-applyShim :: (ShimR Doc -> Doc) -> Address -> SerializedGrammar -> Either PythonSyntaxError PythonFile
+applyShim :: (ShimR Doc -> Doc) -> NatLinkConfig -> SerializedGrammar -> Either PythonSyntaxError PythonFile
 applyShim getShim_ address
  = newPythonFile
  . displayDoc
@@ -315,16 +315,23 @@ applyShim getShim_ address
 
 {- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
 
-@SerializedGrammar = ShimR - Address@
+@SerializedGrammar = ShimR - NatLinkConfig@
 -}
-from_SerializedGrammar_to_ShimR :: Address -> SerializedGrammar -> ShimR Doc
-from_SerializedGrammar_to_ShimR
- (Address (Host (        T.pack -> text -> squotes -> serverHost))
-          (Port (show -> T.pack -> text -> squotes -> serverPort))
- )
- SerializedGrammar{..}
- =
- ShimR serializedRules serializedLists serializedExport serverHost serverPort
+from_SerializedGrammar_to_ShimR :: NatLinkConfig -> SerializedGrammar -> ShimR Doc
+from_SerializedGrammar_to_ShimR NatLinkConfig{..} SerializedGrammar{..} = ShimR{..} 
+ where 
+
+ __rules__  = serializedRules 
+ __lists__  = serializedLists 
+ __export__ = serializedExport
+
+ __serverHost__  = str2doc h 
+ __serverPort__  = str2doc (show p) 
+ __logFile__     = str2doc nlLogFile 
+ __contextFile__ = str2doc nlContextFile 
+
+ Address (Host h) (Port p) = nlAddress 
+ str2doc = T.pack >>> text >>> squotes
 
 -- | (for debugging)
 displaySerializedGrammar :: SerializedGrammar -> String

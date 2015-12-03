@@ -17,8 +17,11 @@ data ShimR t = ShimR
  , __lists__      :: t  -- ^ a Python Dict
  , __export__     :: t  -- ^ a Python String
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
- , __serverHost__ :: t  -- ^ a Python String
- , __serverPort__ :: t  -- ^ a Python Int
+ , __serverHost__  :: t  -- ^ a Python String
+ , __serverPort__  :: t  -- ^ a Python Int
+ , __logFile__     :: t  -- ^ a Python String 
+ , __contextFile__ :: t  -- ^ a Python String 
+ -- , :: t   -- ^ a Python 
  } deriving (Show,Eq,Ord,Functor,Data,Generic)
 
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
@@ -27,6 +30,16 @@ newtype PythonFile = PythonFile {getPythonFile :: Text}  deriving (Show,Eq,Ord,D
 -- | an 'Exception'
 data PythonSyntaxError = PythonSyntaxError ParseError Text deriving (Show,Eq,Ord)
 instance Exception PythonSyntaxError
+
+
+data NatLinkConfig = NatLinkConfig
+ { nlAddress     :: Address
+ , nlLogFile     :: FilePath
+ , nlContextFile :: FilePath 
+ }
+
+
+-- ================================================================ --
 
 {-| smart constructor for 'PythonFile'.
 

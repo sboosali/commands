@@ -14,9 +14,9 @@ import           Commands.Parsers.Earley              (EarleyParser)
 
 -- import Control.Lens
 import qualified Network.Wai.Handler.Warp              as Wai
-import           Control.Monad.Trans.Either            (EitherT)
 import           Data.Text.Lazy                        (Text)
 
+import           Control.Monad.Trans.Either            (EitherT)
 import           Control.Monad.Reader 
 import           Control.Monad.Except (MonadError) 
 import Control.Concurrent.STM

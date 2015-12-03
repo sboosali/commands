@@ -1,16 +1,20 @@
 {-# LANGUAGE LambdaCase, RankNTypes, RecordWildCards, TupleSections #-}
-{-# LANGUAGE TypeFamilies                                           #-}
+{-# LANGUAGE TypeFamilies, TypeOperators                                            #-}
 module Commands.Servers.Servant.API where
 import           Commands.Extra 
 import           Commands.Servers.Servant.Types
 import           Commands.Servers.Servant.V 
 import           Commands.Servers.Servant.API.Types 
+import Data.HTypes ((:~>)) 
 
 import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai
-import           Servant
+import           Servant hiding((:~>)) 
 import           Servant.Client (client)
+import qualified Data.ByteString.Lazy.Char8    as BS
 
+import           Control.Monad.Trans.Either
+import           Control.Monad.Reader 
 -- import           Control.Monad.IO.Class        (liftIO)
 -- import Control.Concurrent.STM
 -- import Data.Function ((&)) 
@@ -57,4 +61,17 @@ postContext vSettings = (vInterpretContext vSettings) vSettings
 -}
 postHypothesesTo :: Address -> HypothesesRequest -> ClientResponse
 postHypothesesTo address = client hypothesesClientAPI (address2baseurl address) 
+
+-- -- | 
+-- runVServant :: (VConfig IO c v) -> (V c v :~> IO)
+-- runVServant config = run_  
+--  where
+--  run_ = runV >>> runReaderT config >>> runEitherT 
+
+-- | @enter runVServant@
+runVServant :: (VConfig IO c v) -> (V c v :~> EitherT ServantErr IO)
+runVServant config = runV >>> (flip runReaderT) config >>> bimapEitherT errorV2Servant id 
+
+errorV2Servant :: VError -> ServantErr
+errorV2Servant (VError e) = err500 { errBody = BS.pack e } 
 

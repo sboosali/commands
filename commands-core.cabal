@@ -49,7 +49,9 @@ library
         Commands.Parsers.Earley
         Commands.Servers.Servant
         Commands.Servers.Servant.Types
+        Commands.Servers.Servant.V 
         Commands.Servers.Servant.API
+        Commands.Servers.Servant.API.Types 
         Commands.Mixins.DNS13OSX9
         Commands.Mixins.DNS13OSX9.Types
         Commands.Mixins.DNS13OSX9.Derived
@@ -62,6 +64,8 @@ library
         Commands.LHS
         Commands.Munging
         Commands.Main
+
+        Data.TPrelude
 
         Data.HTypes 
         Data.HPrelude 

@@ -3,6 +3,8 @@
 module Commands.Servers.Servant.API where
 import           Commands.Extra 
 import           Commands.Servers.Servant.Types
+import           Commands.Servers.Servant.V 
+import           Commands.Servers.Servant.API.Types 
 
 import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai

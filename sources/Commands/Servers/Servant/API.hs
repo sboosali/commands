@@ -29,7 +29,7 @@ natlinkApplication :: (Show a) => (VSettings m c a) -> Wai.Application
 natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
 
 natlinkHandlers :: (Show a) => (VSettings m c a) -> Server NatlinkAPI
-natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings -- TODO ReaderT
+natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings :<|> postReload vSettings :<|> postContext vSettings -- TODO ReaderT
 
 postRecognition :: (Show a) => (VSettings m c a) -> RecognitionRequest -> Response DNSResponse
 -- postRecognition vSettings (RecognitionRequest ws) = (vSettings&vInterpretRecognition) vSettings ws
@@ -43,6 +43,12 @@ postHypotheses vSettings = (vInterpretHypotheses vSettings) vSettings
 
 postCorrection :: (Show a) => (VSettings m c a) -> CorrectionRequest -> Response DNSResponse 
 postCorrection vSettings = (vInterpretCorrection vSettings) vSettings 
+
+postReload :: (Show a) => (VSettings m c a) -> ReloadRequest -> Response DNSResponse 
+postReload vSettings = (vInterpretReload vSettings) vSettings 
+
+postContext :: (Show a) => (VSettings m c a) -> ContextRequest -> Response DNSResponse 
+postContext vSettings = (vInterpretContext vSettings) vSettings 
 
 {-| forward a hypothesis request, as a client  
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, RecordWildCards #-}
+{-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, RecordWildCards, TemplateHaskell #-}
 module Commands.Frontends.Dragon13.Shim.Types where
 import           Commands.Extra
 
@@ -6,6 +6,7 @@ import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as T
 import           Language.Python.Version2.Parser (parseModule)
 import           Language.Python.Common.ParseError (ParseError) 
+import Control.Lens 
 
 import Control.Exception (Exception)
 
@@ -21,20 +22,27 @@ data ShimR t = ShimR
  } deriving (Show,Eq,Ord,Functor,Data,Generic)
 
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
-newtype PythonFile = PythonFile Text deriving (Show,Eq,Ord,Data,Generic)
+newtype PythonFile = PythonFile {getPythonFile :: Text}  deriving (Show,Eq,Ord,Data,Generic)
 
 -- | an 'Exception'
 data PythonSyntaxError = PythonSyntaxError ParseError Text deriving (Show,Eq,Ord)
 instance Exception PythonSyntaxError
 
--- | smart constructor for 'PythonFile'.
---
--- make sure that the input is a valid (at least, syntactically correct)
--- Python file (with 'parseModule'), reports the syntax error otherwise.
---
--- may fail with the parse error and the invalid file 
+{-| smart constructor for 'PythonFile'.
+
+make sure that the input is a valid (at least, syntactically correct)
+Python file (with 'parseModule'), reports the syntax error otherwise.
+
+may fail with the parse error and the invalid file. 
+
+-}
 newPythonFile :: Text -> Either PythonSyntaxError PythonFile
 newPythonFile s = case parseModule (T.unpack s) "" of
  Right {} -> Right $ PythonFile s
  Left  e  -> Left  $ PythonSyntaxError e s
+
+
+-- ================================================================ --
+
+makePrisms ''PythonFile 
 

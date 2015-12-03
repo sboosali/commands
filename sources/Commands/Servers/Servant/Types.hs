@@ -6,6 +6,9 @@
 >>> :set -XOverloadedStrings  
 >>> import Data.Aeson
 
+
+git  
+
 -}
 module Commands.Servers.Servant.Types where
 import           Commands.Extra
@@ -36,7 +39,7 @@ type ClientResponse = EitherT ServantError IO ()
 {-| the complete API between a @command server@ and a @natlink client@. 
 
 -}
-type NatlinkAPI = RecognitionAPI :<|> HypothesesAPI :<|> CorrectionAPI
+type NatlinkAPI = RecognitionAPI :<|> HypothesesAPI :<|> CorrectionAPI :<|> ReloadAPI :<|> ContextAPI
 
 {- | the API for a successful recognition. 
 
@@ -87,6 +90,16 @@ type HypothesesAPIOf a = "hypotheses" :> ReqBody '[JSON] HypothesesRequest :> Po
 -}
 type CorrectionAPI = "correction" :> ReqBody '[JSON] CorrectionRequest :> Post '[JSON] (DNSResponse) 
 
+{-| the API for TODO 
+
+-}
+type ReloadAPI = "reload" :> ReqBody '[JSON] ReloadRequest :> Post '[JSON] (DNSResponse) 
+
+{-| the API for TODO 
+
+-}
+type ContextAPI = "context" :> ReqBody '[JSON] ContextRequest :> Post '[JSON] (DNSResponse) 
+
 {- | a successful recognition of an utterance. 
 
 >>> 'decode' "[\"hello\",\"world\"]" :: Maybe RecognitionRequest
@@ -129,6 +142,16 @@ data CorrectionRequest = CorrectionRequest [Text]
 data CorrectionResponse = CorrectionResponse (ForeignResultsObject, [Text]) 
  deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON)
 
+{-| 
+
+-}
+type ReloadRequest = () 
+
+{-| 
+
+-}
+type ContextRequest = () 
+
 {-| a "pointer" to a `ResObj` kept by the natlink client. 
 
 (actually, an identifier, currently unmanaged and non-opaque, and may or may not exist). 
@@ -145,14 +168,23 @@ data ForeignResultsObject = ForeignResultsObject Integer
 data VSettings m c a = VSettings
  { vPort                 :: Wai.Port
  , vSetup                :: VSettings m c a -> IO (Either VError ())
- , vInterpretRecognition :: VSettings m c a -> RecognitionRequest -> Response DNSResponse
- , vInterpretHypotheses  :: VSettings m c a -> HypothesesRequest  -> Response DNSResponse
- , vInterpretCorrection  :: VSettings m c a -> CorrectionRequest  -> Response DNSResponse
+ , vInterpretRecognition :: VHandler m c a RecognitionRequest
+ , vInterpretHypotheses  :: VHandler m c a HypothesesRequest 
+ , vInterpretCorrection  :: VHandler m c a CorrectionRequest 
+ , vInterpretReload      :: VHandler m c a ReloadRequest     
+ , vInterpretContext     :: VHandler m c a ContextRequest    
  , vConfig               :: VConfig m c a
  , vUIAddress            :: Address 
  , vGlobals              :: VGlobals c 
  -- , vUpdateConfig   :: VPlugin :~>: VConfig
  }
+
+{-| 
+
+-}
+type VHandler m c a i = VSettings m c a -> i -> Response DNSResponse
+-- newtype VHandler m c a i = VHandler { getVHandler :: VSettings m c a -> i -> Response DNSResponse }  -- contravariant 
+-- TODO type VHandlers m c a is = Rec (VHandler m c a) is
 
 {- | read-only.
 "dynamic" configuration
@@ -192,9 +224,10 @@ data DNSResponse = DNSResponse -- TODO Rec Maybe []
  { _responseCorrection      :: Maybe CorrectionResponse
  , _responseDNSMode         :: Maybe DNSMode 
  , _responseMicrophoneState :: Maybe MicrophoneState 
+ , _responseContext         :: Maybe String -- or c, but then the API types themselves are parameterized 
 -- , response :: Maybe 
  } 
- deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON) -- TODO Monoid 
+ deriving (Show,Read,Eq,Ord,Data,Generic,ToJSON,FromJSON) -- TODO Monoid, like First  
 
 data VMode
  = RecognitionMode 
@@ -229,8 +262,14 @@ hypothesesClientAPI = Proxy
 correctionAPI :: Proxy CorrectionAPI
 correctionAPI = Proxy 
 
+reloadAPI :: Proxy ReloadAPI
+reloadAPI = Proxy 
+
+contextAPI :: Proxy ContextAPI
+contextAPI = Proxy 
+
 emptyDNSResponse :: DNSResponse
-emptyDNSResponse = DNSResponse Nothing Nothing Nothing 
+emptyDNSResponse = DNSResponse Nothing Nothing Nothing Nothing 
 
 
 -- ================================================================ --

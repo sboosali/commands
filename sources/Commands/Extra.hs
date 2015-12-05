@@ -5,6 +5,9 @@
 -- | assorted functionality, imported by most modules in this package.  
 module Commands.Extra
  ( module Commands.Extra
+ , module Data.Possibly 
+ , module Data.Address 
+ , module Data.GUI
  , module Commands.Instances
  , module Data.Data
  , module Data.HTypes 
@@ -13,22 +16,21 @@ module Commands.Extra
  , traverse_
  ) where
 import           Commands.Instances
+import Data.Possibly 
+import Data.Address 
+import Data.GUI
 import Data.HTypes(Exists(..), exists) 
 
-import           Control.Lens                 (Lens', Prism', lens, makeLenses,
-                                               makePrisms, prism')
-import           Control.Monad.Catch          (MonadThrow, throwM)
+import           Control.Lens                 (Lens', Prism', lens, prism')
+import           Data.Hashable
 import           Control.Monad.Reader         (ReaderT, local)
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
 import           Data.Bifunctor               (first)
 import           Data.Either.Validation       (Validation, eitherToValidation)
-import           Data.Hashable
 import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Text.Lazy               (Text)
-import           Formatting                   (format, shown, string, (%))
 import           Numeric
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
-import Servant.Common.BaseUrl (BaseUrl(..), Scheme(..)) 
 
 -- TODO import Data.Functor.Classes
 import           Control.Applicative
@@ -45,79 +47,15 @@ import           Data.Typeable                (Typeable, tyConModule, tyConName,
                                                typeRepTyCon)
 import qualified Debug.Trace
 import           GHC.Generics                 (Generic)
-import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
-                                               NameFlavour (NameG),
-                                               OccName (OccName),
-                                               PkgName (PkgName))
 import           GHC.Exts                          (IsString (..))
 import Data.Data (Data) 
 import           Data.Foldable                   (traverse_)
 import Control.Concurrent.STM(swapTVar,TVar,STM) 
 
 
--- | generalized 'Maybe':
---
--- >>> (return "actually" :: Possibly String) :: Maybe String
--- Just "actually"
---
--- >>> (return "actually" :: Possibly String) :: [String]
--- ["actually"]
---
--- >>> import Control.Exception
--- >>> (return "actually" :: Possibly String) :: Either SomeException String
--- Right "actually"
---
---
-type Possibly a = forall m. (MonadThrow m) => m a
-
-failed :: String -> Possibly a
-failed = throwM . userError
-
--- | easily define smart constructors, whose error message has a
--- fully-qualified name for debugging. if you rename the module, the
--- error message changes automatically. and if you rename the
--- identifier, you will get a compile time error from Template Haskell
--- if you don't update the error message
--- (unless another name is captured).
---
--- e.g.
---
--- @
--- natural :: Integer -> Possibly Natural
--- natural i
---  | i >= 0    = return $ Natural i
---  | otherwise = failure 'natural
--- @
---
-failure :: Name -> Possibly a
-failure = throwM . userError . showName
 
 __BUG__ :: SomeException -> a
 __BUG__ = error . show
-
-showName :: Name -> String
-showName = either show showGUI . fromGlobalName
-
--- | could have fourth field: @Version@.
-data GUI = GUI
- { _guiPackage    :: !Package
- , _guiModule     :: !Module
- , _guiIdentifier :: !Identifier
- } deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
-
-newtype Package    = Package    String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
-newtype Module     = Module     String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
-newtype Identifier = Identifier String deriving (Show,Read,Eq,Ord,Data,Generic,Hashable)
-
--- | only 'NameG' is global, i.e. is unique modulo package and module.
-fromGlobalName :: Name -> Possibly GUI
-fromGlobalName (Name (OccName occ) (NameG _ (PkgName pkg) (ModName mod))) = return $ GUI (Package pkg) (Module mod) (Identifier occ)
-fromGlobalName (Name (OccName occ) _) = failed occ
-
--- | >>> showGUI (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
--- "package-Module.SubModule.identifier"
-showGUI :: GUI -> String
-showGUI (GUI (Package pkg) (Module mod) (Identifier occ)) = pkg <> "-" <> mod <> "." <> occ
 
 -- | The constructors of a (zero-based) Enum.
 --
@@ -261,25 +199,6 @@ sccs2cycles = mapMaybe $ \case
 snoc :: [a] -> a -> [a]
 snoc xs x = xs <> [x]
 
-data Address = Address
- { _host :: Host
- , _port :: Port
- } deriving (Show,Read,Eq,Ord,Data,Generic)
-
-newtype Host = Host String deriving (Show,Read,Eq,Ord,Data,Generic)
-newtype Port = Port Int    deriving (Show,Read,Eq,Ord,Data,Generic)
-
-localhost :: Host 
-localhost = Host "localhost" 
-
--- | >>> displayAddress$ Address (Host "localhost") (Port 8000)
--- "http://localhost:8000"
-displayAddress :: Address -> Text
-displayAddress (Address (Host h) (Port p)) = format ("http://"%string%":"%shown) h p
-
-address2baseurl :: Address -> BaseUrl
-address2baseurl (Address (Host h) (Port p)) = BaseUrl Http h p 
-
 -- | a natural transformation
 type (:~>:) f g = forall x. f x -> g x
 
@@ -406,16 +325,4 @@ cross = sequence
 -}
 takeTVar :: TVar (Maybe a) -> STM (Maybe a)
 takeTVar var = swapTVar var Nothing 
-
-
--- ================================================================ --
-
-makeLenses ''GUI
-makePrisms ''Package
-makePrisms ''Module
-makePrisms ''Identifier
-
-makeLenses ''Address
-makePrisms ''Host
-makePrisms ''Port
 

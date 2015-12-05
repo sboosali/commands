@@ -65,6 +65,10 @@ library
         Commands.Munging
         Commands.Main
 
+        Data.Possibly
+        Data.Address 
+        Data.GUI
+
         Data.TPrelude
 
         Data.HTypes 

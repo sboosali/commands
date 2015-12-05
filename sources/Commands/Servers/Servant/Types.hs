@@ -22,7 +22,7 @@ import           Control.Monad.Trans.Either            (EitherT)
 {-| a response, when Haskell is the server. 
 
 -}
-type Response = EitherT ServantErr IO
+type Response = EitherT ServantErr IO -- TODO V c v 
 
 
 {-| a response, when Haskell is the client. 

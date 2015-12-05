@@ -13,7 +13,6 @@ import qualified Commands.Frontends.Dragon13.Serialize as DNS
 import           Commands.Parsers.Earley              (EarleyParser)
 
 -- import Control.Lens
-import qualified Network.Wai.Handler.Warp              as Wai
 import           Data.Text.Lazy                        (Text)
 
 import           Control.Monad.Trans.Either            (EitherT)
@@ -24,16 +23,16 @@ import Control.Concurrent.STM
 
 {-| 
 
-types: 
+types (parameters, for extensibility): 
 
-* @c@ the "context"
-* @v@ the "value", invariant
+* @c@ the "context" 
+* @v@ the "value" 
 
 
 -}
 newtype V c v a = V { runV :: Eff 
 
- [ ReaderT (VConfig IO c v) 
+ [ ReaderT (VSettings IO c v)
  -- , WorkflowT 
  -- , NatlinkT
  -- , VServerT
@@ -42,7 +41,7 @@ newtype V c v a = V { runV :: Eff
  ] IO a
 
  } deriving
- ( MonadReader (VConfig IO c v)
+ ( MonadReader (VSettings IO c v)
  -- , MonadWorkflow
  -- , MonadNatlink
  -- , MonadVServer
@@ -61,50 +60,67 @@ newtype V c v a = V { runV :: Eff
 "static" configuration.
 
 -}
-data VSettings m c a = VSettings
- { vPort                 :: Wai.Port
- , vSetup                :: VSettings m c a -> IO (Either VError ())
- , vInterpretRecognition :: VHandler m c a RecognitionRequest
- , vInterpretHypotheses  :: VHandler m c a HypothesesRequest 
- , vInterpretCorrection  :: VHandler m c a CorrectionRequest 
- , vInterpretReload      :: VHandler m c a ReloadRequest     
- , vInterpretContext     :: VHandler m c a ContextRequest    
- , vConfig               :: VConfig m c a
- , vUIAddress            :: Address 
- , vGlobals              :: VGlobals c 
+data VSettings m c v = VSettings
+ { vSettings_            :: VSettings_
+ , vSetup                :: VSettings_ -> VConfig m c v -> IO (Either VError ())
+ , vConfig               :: VConfig m c v 
+ , vGlobals              :: VGlobals c       -- not read-only 
  -- , vUpdateConfig   :: VPlugin :~>: VConfig
+
+ , vInterpretRecognition :: VHandler m c v RecognitionRequest
+ , vInterpretHypotheses  :: VHandler m c v HypothesesRequest 
+ , vInterpretCorrection  :: VHandler m c v CorrectionRequest 
+ , vInterpretReload      :: VHandler m c v ReloadRequest     
+ , vInterpretContext     :: VHandler m c v ContextRequest    
+ }
+
+
+{- | read-only.
+
+simple, "static" configuration.
+
+-}
+data VSettings_ = VSettings_    -- VAddresses 
+ { vServerAddress        :: Address 
+ , vUIAddress            :: Address 
+ -- , vMonitoringAddress     :: Address 
+ -- , vEmacs Address     :: Address 
+ -- , vChromeAddress     :: Address 
  }
 
 
 {-| 
 
 -}
-type VHandler m c a i = VSettings m c a -> i -> Response DNSResponse
+type VHandler m c v i = VSettings m c v -> i -> Response DNSResponse
+-- type VHandler m c v i = VGlobals c -> VConfig m c v -> i -> Response DNSResponse
 -- newtype VHandler m c a i = VHandler { getVHandler :: VSettings m c a -> i -> Response DNSResponse }  -- contravariant 
 -- TODO type VHandlers m c a is = Rec (VHandler m c a) is
 
 
 {- | read-only.
+
 "dynamic" configuration
+
 -}
 data VConfig m c a = VConfig
+ { vPlugin  :: VPlugin m c a 
+ } 
+
+
+{- | read-only.
+
+"dynamic" configuration
+
+-}
+data VPlugin m c a = VPlugin
  { vGrammar :: DNS.SerializedGrammar
  , vParser  :: (forall s r. EarleyParser s r String Text a) 
  , vDesugar :: c -> a -> m ()
  }
 
 
-{- |
--}
-data VError = VError String
- deriving (Show,Read,Eq,Ord,Data,Generic)
-
-
 {-| 
-
-naming: 
-
-* @c@ for "context". a type parameter, for extensibility. 
 
 -}
 data VGlobals c = VGlobals 
@@ -113,4 +129,11 @@ data VGlobals c = VGlobals
  , vContext :: TVar c 
  } 
  -- TODO deriving (Generic)
+
+
+{- |
+-}
+data VError = VError String
+ deriving (Show,Read,Eq,Ord,Data,Generic)
+
 

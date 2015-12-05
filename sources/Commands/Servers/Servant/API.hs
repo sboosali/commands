@@ -12,6 +12,7 @@ import qualified Network.Wai.Handler.Warp       as Wai
 import           Servant hiding((:~>)) 
 import           Servant.Client (client)
 import qualified Data.ByteString.Lazy.Char8    as BS
+import           Control.Lens 
 
 import           Control.Monad.Trans.Either
 import           Control.Monad.Reader 
@@ -22,17 +23,18 @@ import           Control.Monad.Reader
 
 serveNatlink :: (Show a) => (VSettings m c a) -> IO ()
 serveNatlink settings@VSettings{..} = do
- vSetup settings >>= \case
-  Left e  -> do
+ vSetup vSettings_ vConfig >>= \case
+  Left e -> do
    print e
   Right() -> do
-   Wai.run vPort (natlinkApplication settings)
+   Wai.run ((vSettings_&vServerAddress)^.(port._Port)) (natlinkApplication settings)
 
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
 natlinkApplication :: (Show a) => (VSettings m c a) -> Wai.Application
 natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
+-- natlinkApplication vSettings = serve natlinkAPI (enter (runVServant vSettings) natlinkHandlers) 
 
 natlinkHandlers :: (Show a) => (VSettings m c a) -> Server NatlinkAPI
 natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings :<|> postReload vSettings :<|> postContext vSettings -- TODO ReaderT
@@ -68,9 +70,9 @@ postHypothesesTo address = client hypothesesClientAPI (address2baseurl address)
 --  where
 --  run_ = runV >>> runReaderT config >>> runEitherT 
 
--- | @enter runVServant@
-runVServant :: (VConfig IO c v) -> (V c v :~> EitherT ServantErr IO)
-runVServant config = runV >>> (flip runReaderT) config >>> bimapEitherT errorV2Servant id 
+-- -- | @enter runVServant@
+-- runVServant :: (VConfig IO c v) -> (V c v :~> EitherT ServantErr IO)
+-- runVServant config = runV >>> (flip runReaderT) config >>> bimapEitherT errorV2Servant id 
 
 errorV2Servant :: VError -> ServantErr
 errorV2Servant (VError e) = err500 { errBody = BS.pack e } 

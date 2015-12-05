@@ -21,42 +21,62 @@ import           Control.Monad.Reader
 -- import Data.Function ((&)) 
 
 
-serveNatlink :: (Show a) => (VSettings m c a) -> IO ()
-serveNatlink settings@VSettings{..} = do
- vSetup vSettings_ vConfig >>= \case
+natlinkIO :: VSettings m c v -> IO ()
+natlinkIO settings = do
+ environment <- getVEnvironment settings 
+ (settings&vSetup) environment >>= \case
+
   Left e -> do
-   print e
-  Right() -> do
-   Wai.run ((vSettings_&vServerAddress)^.(port._Port)) (natlinkApplication settings)
+      print e
+
+  Right () -> do
+      Wai.run (getVPort settings) (natlinkApplication settings)
 
 -- makeServantInterpreter :: -> Interpreter
 -- makeServantInterpreter
 
-natlinkApplication :: (Show a) => (VSettings m c a) -> Wai.Application
-natlinkApplication vSettings = serve natlinkAPI (natlinkHandlers vSettings)
--- natlinkApplication vSettings = serve natlinkAPI (enter (runVServant vSettings) natlinkHandlers) 
+natlinkApplication :: VSettings m c v -> Wai.Application 
+natlinkApplication settings = serve natlinkAPI (natlinkServer settings) 
 
-natlinkHandlers :: (Show a) => (VSettings m c a) -> Server NatlinkAPI
-natlinkHandlers vSettings = postRecognition vSettings :<|> postHypotheses vSettings :<|> postCorrection vSettings :<|> postReload vSettings :<|> postContext vSettings -- TODO ReaderT
+-- TODO type IsValue v = (Show v) 
 
-postRecognition :: (Show a) => (VSettings m c a) -> RecognitionRequest -> Response DNSResponse
--- postRecognition vSettings (RecognitionRequest ws) = (vSettings&vInterpretRecognition) vSettings ws
-postRecognition vSettings = (vInterpretRecognition vSettings) vSettings 
+natlinkServer :: VSettings m c v -> Server NatlinkAPI 
+natlinkServer settings = enterV (runVServant settings) (natlinkHandlers settings) 
 
-{-| handle a hypothesis request, as a server  
+enterV
+ :: (V m c v :~> EitherT ServantErr IO)
+ -> (ServerT NatlinkAPI (V m c v) -> ServerT NatlinkAPI (EitherT ServantErr IO))
+ -- -> (forall x. ServerT NatlinkAPI (V m c v x) -> ServerT NatlinkAPI (EitherT ServantErr IO x))
+ -- -> (ServerT NatlinkAPI (V m c v) :~> ServerT NatlinkAPI (EitherT ServantErr IO))
+enterV u = enter (Nat u) 
 
--}
-postHypotheses :: (Show a) => (VSettings m c a) -> HypothesesRequest -> Response DNSResponse
-postHypotheses vSettings = (vInterpretHypotheses vSettings) vSettings 
+-- type family ServerT (layout :: k) (m :: * -> *) :: *
 
-postCorrection :: (Show a) => (VSettings m c a) -> CorrectionRequest -> Response DNSResponse 
-postCorrection vSettings = (vInterpretCorrection vSettings) vSettings 
+natlinkHandlers :: VSettings m c v -> ServerT NatlinkAPI (V m c v) 
+natlinkHandlers VSettings{..} 
+    = vInterpretRecognition
+ :<|> vInterpretHypotheses
+ :<|> vInterpretCorrection
+ :<|> vInterpretReload 
+ :<|> vInterpretContext 
 
-postReload :: (Show a) => (VSettings m c a) -> ReloadRequest -> Response DNSResponse 
-postReload vSettings = (vInterpretReload vSettings) vSettings 
+-- | (use with 'enter') 
+runVServant :: VSettings m c v -> (V m c v :~> EitherT ServantErr IO)
+runVServant settings m = do 
+ environment <- liftIO$ getVEnvironment settings 
+ runVServantWith environment m 
 
-postContext :: (Show a) => (VSettings m c a) -> ContextRequest -> Response DNSResponse 
-postContext vSettings = (vInterpretContext vSettings) vSettings 
+-- | 
+runVServantWith :: VEnvironment m c v -> (V m c v :~> EitherT ServantErr IO)
+runVServantWith environment = runV >>> (flip runReaderT) environment >>> bimapEitherT errorV2Servant id 
+
+errorV2Servant :: VError -> ServantErr
+errorV2Servant (VError e) = err500{ errBody = BS.pack e } 
+
+-- {-| handle a hypothesis request, as a server  
+-- -}
+-- postHypotheses :: (Show a) => (VSettings m c a) -> HypothesesRequest -> Response DNSResponse
+-- postHypotheses vSettings = (vInterpretHypotheses vSettings) vSettings 
 
 {-| forward a hypothesis request, as a client  
 
@@ -64,16 +84,6 @@ postContext vSettings = (vInterpretContext vSettings) vSettings
 postHypothesesTo :: Address -> HypothesesRequest -> ClientResponse
 postHypothesesTo address = client hypothesesClientAPI (address2baseurl address) 
 
--- -- | 
--- runVServant :: (VConfig IO c v) -> (V c v :~> IO)
--- runVServant config = run_  
---  where
---  run_ = runV >>> runReaderT config >>> runEitherT 
-
--- -- | @enter runVServant@
--- runVServant :: (VConfig IO c v) -> (V c v :~> EitherT ServantErr IO)
--- runVServant config = runV >>> (flip runReaderT) config >>> bimapEitherT errorV2Servant id 
-
-errorV2Servant :: VError -> ServantErr
-errorV2Servant (VError e) = err500 { errBody = BS.pack e } 
-
+getVPort :: VSettings m c v -> Int
+getVPort = view (to vConfig . to vSettings_ . to vPort . _Port)
+-- getVPort settings = (settings&vConfig&vPort) ^. (_Port)

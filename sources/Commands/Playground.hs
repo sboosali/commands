@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeFamilies, PolyKinds, TypeOperators, LiberalTypeSynonyms #-}
+{-# LANGUAGE GADTs, NoMonomorphismRestriction #-}
 module Commands.Playground where 
 
 -- import Data.Vinyl 
@@ -30,4 +30,19 @@ module Commands.Playground where
 -- type family TMap f as where 
 --  TMap f '[] = '[] 
 --  TMap f (a ': as) = f a ': TMap f as 
+
+-- data Universe a where
+--   NAT  :: Universe Int
+--   BOOL :: Universe Bool
+
+-- foo NAT = Just (0::Int)  
+-- foo _   = Nothing
+
+-- bar :: Universe a -> Maybe Int
+-- bar NAT = Just 0
+-- bar _   = Nothing
+
+-- baz :: Universe a -> Maybe a
+-- baz NAT = Just 0
+-- baz _   = Nothing
 

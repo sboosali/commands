@@ -1,9 +1,19 @@
-{-# LANGUAGE DataKinds, TypeOperators  #-}
+{-# LANGUAGE DataKinds, TypeOperators, KindSignatures #-}
 module Commands.Servers.Servant.API.Types where
 import Commands.Servers.Servant.Types 
 
 import Servant 
 
+import GHC.TypeLits (Symbol) 
+
+
+{-| signature for a simple foreign function, via JSON and HTTP. 
+
+-}
+type PostAPI (s :: Symbol) (a :: *) (b :: *)
+ =  s
+ :> ReqBody '[JSON] a
+ :> Post    '[JSON] b 
 
 {-| the complete API between a @command server@ and a @natlink client@. 
 
@@ -25,11 +35,7 @@ $ python -c 'import sys,os,json,urllib2; print (urllib2.urlopen(urllib2.Request(
 @
 
 -}
-type RecognitionAPI = "recognition" :> ReqBody '[JSON] RecognitionRequest :> Post '[JSON] (DNSResponse) 
-
-type HypothesesAPI = HypothesesAPIOf (DNSResponse)
-
-type HypothesesClientAPI = HypothesesAPIOf () 
+type RecognitionAPI = PostAPI "recognition" RecognitionRequest DNSResponse
 
 {-| the API for correcting recognition, given Dragon's hypotheses. 
 
@@ -52,23 +58,24 @@ is single-threaded and callback-driven. thus, most of our http responses are @()
 and we pack their responses into a single @Update@.  
 
 -}
-type HypothesesAPIOf a = "hypotheses" :> ReqBody '[JSON] HypothesesRequest :> Post '[JSON] a 
+type HypothesesAPI       = PostAPI "hypotheses" HypothesesRequest DNSResponse
+type HypothesesClientAPI = PostAPI "hypotheses" HypothesesRequest () 
 
 {-| the API for TODO 
 
 -}
-type CorrectionAPI = "correction" :> ReqBody '[JSON] CorrectionRequest :> Post '[JSON] (DNSResponse) 
+type CorrectionAPI = PostAPI "correction" CorrectionRequest DNSResponse
 
 {-| the API for TODO 
 
 -}
-type ReloadAPI = "reload" :> ReqBody '[JSON] ReloadRequest :> Post '[JSON] (DNSResponse) 
+type ReloadAPI = PostAPI "reload" ReloadRequest DNSResponse
 
 
 {-| the API for TODO 
 
 -}
-type ContextAPI = "context" :> ReqBody '[JSON] ContextRequest :> Post '[JSON] (DNSResponse) 
+type ContextAPI = PostAPI "context" ContextRequest DNSResponse
 
 
 -- ================================================================ --

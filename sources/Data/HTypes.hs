@@ -88,16 +88,19 @@ type f :~> g = forall x. f x -> g x
 
 -}
 type f :+: g = Sum f g 
+infixr 4 :+:
 
 {-| functor product.
 
 -}
 type f :*: g = Product f g 
+infixr 5 :*: 
 
 {-| functor composition.
 
 -}
 type (f :. g) a = f (g a)
+infixr 6 :. 
 
 {-| functor composition.
 

@@ -11,10 +11,6 @@ import Data.HPrelude
 
 import Control.Category ((>>>), (<<<)) 
 import Control.Monad((<=<), (>=>))
--- import qualified Data.Map as Map
--- import           Data.Map (Map)
--- import Control.Monad.Trans.State
--- import           Data.Function                   ((&))
 
 
 -- ================================================================ --
@@ -159,6 +155,10 @@ hapoM
 hapoM coalgebra = (return <<< hinject) <=< htraverse (return <|||> hapoM coalgebra) <=< coalgebra
 
 
+
+-- ================================================================ --
+
+
 -- {-| 
 
 -- e.g. 
@@ -197,29 +197,4 @@ hapoparaM'StableName'Search = hapoparaM (getFirst >>> makeStableName)
 
 
 -}
-
-
--- ================================================================ --
-
-
-{-| 
-
--}
--- hsearch
---  :: ( (m ~ State (Map k (Exists t))), Ord k
---     , (h ~ HBase t) , HTraversable h, HCoRecursive t
---     )
---  => (Exists t -> Maybe (k, Exists t)) -- Prism
---  -> (forall x. t x -> Map k (Exists t))
--- hsearch _getItem = flip(execState) Map.empty . hapoM coalgebra
---  where
---  coalgebra r = case _getItem r of
---   Nothing -> return $ Right r        -- neither seen nor unseen
---   Just (k,v) -> do
---       Map.lookup k & \case
---           Just r -> return $ Left r  -- had already been seen
---           Nothing -> do
---               Map.insert k v         -- 
---               return $ Right r       -- had not yet been seen
-
 

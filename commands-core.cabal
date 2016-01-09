@@ -78,6 +78,7 @@ library
         Data.HFoldable 
         Data.HTraversable 
         Data.HFunctor.Recursion 
+        Data.HFunctor.ObserveSharing 
 
         Data.RefCache
         Data.RefCache.Internal

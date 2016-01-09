@@ -87,3 +87,4 @@ postHypothesesTo address = client hypothesesClientAPI (address2baseurl address)
 getVPort :: VSettings m c v -> Int
 getVPort = view (to vConfig . to vSettings_ . to vPort . _Port)
 -- getVPort settings = (settings&vConfig&vPort) ^. (_Port)
+

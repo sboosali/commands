@@ -14,6 +14,7 @@ import           Commands.Parsers.Earley              (EarleyParser)
 
 -- import Control.Lens
 import           Data.Text.Lazy                        (Text)
+import Data.Vinyl 
 
 import           Control.Monad.Trans.Either            (EitherT)
 import           Control.Monad.Reader 
@@ -65,12 +66,15 @@ data VSettings m c v = VSettings
  { vSetup                :: VEnvironment m c v -> IO (Either VError ()) -- TODO VConfig only, with shim
  , vConfig               :: VConfig m c 
  , vPluginRef            :: TVar (VPlugin m c v) 
+ -- , vHandlers :: MyHandlers m c v 
 
  , vInterpretRecognition :: VHandler m c v RecognitionRequest
  , vInterpretHypotheses  :: VHandler m c v HypothesesRequest 
  , vInterpretCorrection  :: VHandler m c v CorrectionRequest 
  , vInterpretReload      :: VHandler m c v ReloadRequest     
  , vInterpretContext     :: VHandler m c v ContextRequest    
+
+ -- , vContextProviders :: Proxy api 
  }
 
 
@@ -158,6 +162,7 @@ data VGlobals c = VGlobals
  { vResponse :: TVar DNSResponse -- ^ 
  , vMode :: TVar VMode 
  , vContext :: TVar c 
+ , vHypotheses :: TVar (Maybe [Hypothesis])
  -- , vVocabularies :: TVar (Map String [String]) -- TODO safer 
  -- , :: TVar 
  } 
@@ -195,14 +200,32 @@ data VGlobals c = VGlobals
 {-| 
 
 -}
-data VBackend m = VBackend
+data VBackend m = VBackend      -- TODO signature 
  { vExecute :: m :~> IO 
  -- , vCurrentApplication :: m String  -- TODO shouldn't privilege the current application over any other user defined context 
  }
 
 
+type MyHandlers m c v = VoiceHandlers m c v MyRequests -- TODO user 
+
+type MyRequests =               -- TODO user 
+ [ RecognitionRequest
+ , HypothesesRequest 
+ , CorrectionRequest 
+ , ReloadRequest     
+ , ContextRequest
+ ]
+
+type VoiceHandlers m c v is = Rec (VoiceHandler m c v) is
+
+newtype VoiceHandler m c v i = VoiceHandler { getVoiceHandler :: i -> V m c v DNSResponse }  -- contravariant 
+
+
+
+
+-- ================================================================ --
+
 getVEnvironment :: VSettings m c v -> IO (VEnvironment m c v) 
 getVEnvironment VSettings{..} = atomically$ do 
  VEnvironment vConfig <$> readTVar vPluginRef
-
 

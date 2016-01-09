@@ -110,7 +110,8 @@ data ForeignResultsObject = ForeignResultsObject Integer
 -}
 data DNSResponse = DNSResponse -- TODO Rec Maybe [] 
  { _responseCorrection      :: Maybe CorrectionResponse
- , _responseDNSMode         :: Maybe DNSMode 
+ , _responseVMode         :: Maybe VMode 
+ -- , _responseDNSMode         :: Maybe Mode 
  , _responseMicrophoneState :: Maybe MicrophoneState 
  , _responseContext         :: Maybe String -- or c, but then the API types themselves are parameterized 
 -- , response :: Maybe 
@@ -122,8 +123,14 @@ data DNSResponse = DNSResponse -- TODO Rec Maybe []
 
 -}
 data VMode
- = RecognitionMode 
- | CorrectionMode 
+ = NormalMode 
+ | CorrectingMode 
+
+ | DictatingMode 
+ | SleepingMode  
+ | OffMode  
+ | ReadingMode 
+
  deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)
 
 

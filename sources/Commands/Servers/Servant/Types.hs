@@ -134,12 +134,13 @@ data VMode
  deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)
 
 
-{-| 
+{-| <http://www.nuance.com/naturallyspeaking/customer-portal/documentation/userguide/chapter7/ug_chapter7_switch_recognition_mode.asp> 
 
 -}
 data DNSMode 
- = CommandsMode
+ = DictationAndCommandsMode 
  | DictationMode
+ | CommandsMode
  | SpellingMode
  | NumberMode
  deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic,ToJSON,FromJSON)

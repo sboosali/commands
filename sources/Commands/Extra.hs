@@ -36,7 +36,7 @@ import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 import           Control.Applicative
 import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
-                                               SomeException (..), catches)
+                                               SomeException (..), catches, evaluate)
 import           Data.Graph
 import           Data.List                    (nub)
 import           Data.Maybe
@@ -51,7 +51,7 @@ import           GHC.Exts                          (IsString (..))
 import Data.Data (Data) 
 import           Data.Foldable                   (traverse_)
 import Control.Concurrent.STM(swapTVar,TVar,STM) 
-
+import System.Mem.StableName
 
 
 __BUG__ :: SomeException -> a
@@ -325,4 +325,12 @@ cross = sequence
 -}
 takeTVar :: TVar (Maybe a) -> STM (Maybe a)
 takeTVar var = swapTVar var Nothing 
+
+maybe2bool :: Maybe a -> Bool
+maybe2bool = maybe False (const True) 
+
+forceStableName
+ :: a -- ^ strict
+ -> IO (StableName a)
+forceStableName x = evaluate x >> makeStableName x
 

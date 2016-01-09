@@ -17,7 +17,7 @@ import qualified Data.Text.Lazy as T
 import Data.Bifunctor(second, bimap)
 import Data.Bitraversable(bitraverse) 
 import Control.Comonad.Cofree (Cofree(..)) 
-import Control.Monad.Catch (MonadThrow (..))
+-- import Control.Monad.Catch (MonadThrow (..))
 import           Data.List.NonEmpty              (NonEmpty (..), nonEmpty)
 import qualified Data.List.NonEmpty              as NonEmpty
 

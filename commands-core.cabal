@@ -96,7 +96,6 @@ library
         -- cabal sandbox add-source ../
         workflow-osx ==0.0.1, 
         s-expression ==0.0.0,  
-        derive-monoid ==0.0.0,  
 
         Earley ==0.10.1.0, 
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, GADTs, KindSignatures, StandaloneDeriving, RankNTypes, UndecidableInstances  #-}
-{-# LANGUAGE LambdaCase, OverloadedStrings, PatternSynonyms, TypeOperators, ConstraintKinds, TypeFamilies, GeneralizedNewtypeDeriving   #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, PatternSynonyms, TypeOperators, ConstraintKinds, TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables    #-}
 module Commands.RHS.Open where
 import Data.HFunctor.Recursion
 import Data.HPrelude 
@@ -12,14 +12,14 @@ import           Control.Applicative
 import Data.Void (Void)  
 import           Data.Monoid
 import           GHC.Exts            (IsList (..), IsString (..))
--- import System.Mem.StableName
+import System.Mem.StableName
 
 
 {- | a recursive 'RhsF'. 
 
 note on types: 
 
-* @n@ and @h@ are higher-kinded type constructors 
+* @n@ (TODO) and @h@ are higher-kinded type constructors 
 (TODO they should know about all four type parameters, including each other). 
 
 * @r@ is "fixed" to @(RHS t n h a)@ itself
@@ -135,6 +135,26 @@ pattern AlterRHS rs = RHS (Alter rs)
 -- pattern SomeRHS r = RHS (Some r) 
 
 
+{-
+
+= \case 
+ Pure a -> pure$ Pure a             -- must match GADT to change its type 
+ rf `Apply` h -> pure$ rf `Apply` h 
+ rf :<*> rx -> pure$ rf :<*> rx 
+
+ Alter rs  -> pure$ Alter rs 
+ -- Opt  i x  -> pure$ Opt  i x  
+ -- Many i x  -> pure$ Many i x
+ -- Some i x  -> pure$ Some i x  
+
+ NonTerminal n r -> pure$ NonTerminal n r 
+ Terminal i t -> pure$ Terminal i t
+ -- r@Terminals{} -> pure$ r 
+
+-}
+
+
+
 -- ================================================================ --
 
 {-| a non-recursive and lower-order 'RhsF'. 
@@ -144,7 +164,7 @@ note on types:
 * @Void@          knocks out the 'NonTerminal' constructor, since @0 * a = 0@. 
 * @(HConst f)@    lifts the given lower-order functor.  
 * @(Const n)@     direct reference becomes indirect reference.  
-* @()@            trivializes the injections, since @1^a = a@.   
+* @()@            trivializes the injections (e.g. 'Pure'), since @1^a = a@.   
 
 -}
 newtype RHS_ t n f = RHS_ { unRHS_ :: RhsF -- TODO naming: RHS0?  
@@ -242,7 +262,7 @@ data RhsF
  Apply       :: (r (x -> a)) -> (h r x)     -> RhsF t n h r a
  (:<*>)      :: (r (x -> a)) -> (r x)       -> RhsF t n h r a
 
- Alter       :: [r a]                    -> RhsF t n h r a
+ Alter       :: [r a]                    -> RhsF t n h r a 
  -- Opt         :: (Maybe x    -> a) -> r x -> RhsF t n h r a
  -- Many        :: ([x]        -> a) -> r x -> RhsF t n h r a
  -- Some        :: (NonEmpty x -> a) -> r x -> RhsF t n h r a
@@ -409,12 +429,79 @@ htraverseRhsF u = \case
 --   _ -> return$ InR r0 
 
 
--- renameRHSByStableName :: RHS t n h a -> IO (RHS t (n, StableName a) h a) 
--- renameRHSByStableName = traverseNameRhsF go -- works on cyclic?  must be lazy?
---  where
---  go :: RHS t n h a -> IO (RHS t (n, StableName a) h a) 
---  go r0 = \case 
---   NonTerminal n r -> (\s -> NonTerminal (n,s) r) <$> makeStableName r0 
---   _ -> return r0
+-- {-| 
 
+-- -}
+-- {-# INLINEABLE htraverseRhsF #-}
+-- ntraverseRhsF
+--  :: (HTraversable h, Applicative m)
+--  => (forall x. RhsF t n1 h r x -> n1 -> m n2) 
+--  -> (RhsF t n1 h r :~> (m :. RhsF t n2 h r)) 
+
+-- ntraverseRhsF u = \case
+--   r0 NonTerminal n r -> u n (\s -> InR $ NonTerminal (n,s) r) <$> makeStableName r0 
+--   _ -> pure r0 
+
+-- nmapRhsF
+--  :: (n1 -> n2)
+--  -> (RHS t n1 h :~> RHS t n2 h)
+-- nmapRhsF = underIdentity ntraverseRhsF
+
+-- underIdentity :: (f a -> f b) -> (a -> b) -> (f a -> f b) -- @n@ isn't final type parameter 
+-- underIdentity f g = getIdentity . f (Identity . g) -- TODO see ala https://hackage.haskell.org/package/lens-4.13/docs/Control-Lens-Iso.html
+
+
+-- ntraverseRhsF
+--  :: (n1 -> m n2)
+--  -> (RHS t n1 h :~> (m :. RHS t n2 h))
+-- ntraverseRhsF u = 
+--  where
+--  go = \case 
+--   NonTerminal n r -> NonTerminal <$> u n <*> pure r
+--   r -> pure r  -- unsafeCoerce? for convenience and efficiency. is the memory representation the same for all @n :: *@? 
+
+
+type StableNameRHS t n h a = StableName (RHS t n h a) 
+
+
+{-| 
+
+given two outputs, @(let r1 = NonTerminal (n1, s1) _)@ and @(let r2 = NonTerminal (n2, s2) _)@, 
+then @s1==s2@ implies @n1==n2@, but not vice versa.    
+
+-}
+observeSharingRHS :: forall t n h a. (HTraversable h) => RHS t n h a -> IO (RHS t (n, Exists StableName) h a) 
+observeSharingRHS = traverseRHS go -- TODO works on cyclic?  must be lazy?  use Pipe, not Traversable? might as well run State and IO at the same time, since consuming the structure-with-interleaving would be impure anyway 
+ where
+ go :: forall r x. RhsF t n h r x -> IO (RhsF t (n, Exists StableName) h r x) 
+ go = \case 
+  r0@(NonTerminal n r) -> (\s -> NonTerminal (n, Exists s) r) <$> makeStableName r0 
+
+  -- not {r -> pure r}, must match a GADT to change its type 
+
+  Terminal i t -> pure$ Terminal i t
+
+  Pure a -> pure$ Pure a           
+  rf `Apply` h -> pure$ rf `Apply` h 
+  rf :<*> rx -> pure$ rf :<*> rx 
+
+  Alter rs  -> pure$ Alter rs 
+ -- Opt  i x  -> pure$ Opt  i x  
+ -- Many i x  -> pure$ Many i x
+ -- Some i x  -> pure$ Some i x  
+
+
+
+{-| 
+
+-}
+{-# INLINEABLE traverseRHS #-}
+traverseRHS
+ :: (HTraversable h, Applicative m)
+ => (forall r x. RhsF t n h r x -> m (RhsF t' n' h r x))
+ -> (            RHS  t n h   a -> m (RHS  t' n' h   a)) 
+-- traverseRHS u = cataM u 
+traverseRHS = undefined 
+
+-- TODO for RHS, a ReaderT (Algebra h), explicit dictionary 
 

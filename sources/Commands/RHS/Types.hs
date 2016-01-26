@@ -7,7 +7,7 @@
 module Commands.RHS.Types where
 import Commands.Extra (Exists) 
 
-import           Control.Lens
+import           Control.Lens hiding (Empty) -- TODO 
 import           Data.List.NonEmpty  (NonEmpty (..))
 import qualified Data.List.NonEmpty  as NonEmpty
 

@@ -40,9 +40,9 @@ library
 
     Commands.RHS
     Commands.RHS.Types
-    Commands.RHS.Derived 
-    Commands.RHS.Finite 
-    Commands.RHS.Open 
+    Commands.RHS.Derived
+    Commands.RHS.Finite
+    Commands.RHS.Open
 
     Commands.Command.Types
 
@@ -74,19 +74,19 @@ library
     Commands.Main
 
     Data.Possibly
-    Data.Address 
+    Data.Address
     Data.GUI
     Data.Some
 
     Data.TPrelude
 
-    Data.HTypes 
-    Data.HPrelude 
+    Data.HTypes
+    Data.HPrelude
     Data.HFunctor
-    Data.HFoldable 
-    Data.HTraversable 
-    Data.HFunctor.Recursion 
-    Data.HFunctor.ObserveSharing 
+    Data.HFoldable
+    Data.HTraversable
+    Data.HFunctor.Recursion
+    Data.HFunctor.ObserveSharing
 
     Data.RefCache
     Data.RefCache.Internal
@@ -98,26 +98,27 @@ library
     CabalLenses.PackageDescription.TH
 
   other-modules:
-      Commands.Playground 
+      Commands.Playground
 
   build-depends:
        base ==4.8.*
 
      -- packages:
      -- cabal sandbox add-source ../
+     , workflow-types
+     , workflow-pure
      , workflow-osx ==0.0.1
      , s-expression ==0.0.0
 
-     -- extra-deps:  
-     -- not on stack 
-     , bv ==0.3.*
+     -- extra-deps:
+     -- not on stack
      , language-python ==0.5.*
      , recursion-schemes ==4.1.*
 
-     -- shared with command-spiros 
-     , aeson 
+     -- shared with command-spiros
+     , aeson
 
-     -- ekmett 
+     -- ekmett
      , bifunctors ==5.2.*
      , profunctors ==5.2.*
      , free ==4.12.*
@@ -129,28 +130,28 @@ library
      , either ==4.4.*
      , semigroups ==0.18.*
 
-     -- servant 
-     , servant-client ==0.4.4.6
-     , servant-server ==0.4.4.6
-     , servant        ==0.4.4.6
+     -- servant
+     , servant-client ==0.4.4.*
+     , servant-server ==0.4.4.*
+     , servant        ==0.4.4.*
 
-     -- on stack 
+     -- on stack
      , Earley ==0.10.1.0
-     , split 
+     , split
      , ListLike
-     , text ==1.2.* 
+     , text ==1.2.*
      , wl-pprint-text
-     , formatting 
-     , interpolatedstring-perl6 ==1.0.* 
-     , http-types ==0.9.* 
+     , formatting
+     , interpolatedstring-perl6 ==1.0.*
+     , http-types ==0.9.*
      , vector ==0.11.*
-     , async ==2.1.* 
+     , async ==2.1.*
      , parallel >=3.2.0.6 && <3.3
      , hashable >=1.2.3.3 && <1.3
      , MemoTrie >=0.6.2 && <0.7
      , unordered-containers >=0.2.5 && <0.3
 
-     -- standard library 
+     -- standard library
      , time ==1.5.*
      , bytestring ==0.10.*
      , stm ==2.4.*
@@ -160,17 +161,17 @@ library
      , transformers ==0.4.2.*
      , ghc-prim
      , Cabal >=1.22.4
-     , filepath 
+     , filepath
 
 
-executable example
+executable example-commands-core
   main-is: Example.hs
   hs-source-dirs: executables
   default-language: Haskell2010
   ghc-options: -Wall -fno-warn-name-shadowing -threaded -with-rtsopts=-N
   build-depends:
       base ==4.8.*
-    , commands-core 
+    , commands-core
 
 
 test-suite tests
@@ -187,8 +188,8 @@ test-suite tests
     Test.DocTest.Discover
 
   build-depends:
-      base 
-    , commands-core 
+      base
+    , commands-core
 
     , template-haskell
     , Cabal
@@ -196,7 +197,7 @@ test-suite tests
     , semigroups
     , lens
 
-    -- testing 
+    -- testing
     , QuickCheck
     , doctest
     , tasty
@@ -210,10 +211,9 @@ benchmark command
   default-language: Haskell2010
   ghc-options: -Wall -fno-warn-name-shadowing -threaded
   build-depends:
-      base 
-    , commands-core 
-    , lens 
-    , deepseq 
+      base
+    , commands-core
+    , lens
+    , deepseq
     , criterion
-    , semigroups 
-
+    , semigroups

@@ -11,6 +11,10 @@ import Test.Tasty.QuickCheck
 import System.Exit              (exitFailure)
 
 
+main = do
+ doctests  -- ByteCodeLink: can't find label. During interactive linking, GHCi couldn't find the following symbol: currentApplicationPath
+ tastytests
+
 tastytests = defaultMain $ testGroup "QuickCheck"
  [ testProperty "serialized DNSGrammar is valid Python" prop_DNSGrammar
  ]
@@ -18,7 +22,7 @@ tastytests = defaultMain $ testGroup "QuickCheck"
 -- doctestModules = fmap ("sources/" <>) . (fmap.fmap) (\case '.' -> '/'; c -> c) $
 
 doctests = do
- loadPackageDescription >>= \case
+ loadPackageDescription  "./commands-core.cabal" >>= \case
   Left e -> do
    print e
    exitFailure
@@ -26,7 +30,3 @@ doctests = do
    -- print (pkg)
    print (modulePaths pkg)
    doctest (modulePaths pkg)
-
-main = do
- -- doctests  -- ByteCodeLink: can't find label. During interactive linking, GHCi couldn't find the following symbol: currentApplicationPath
- tastytests

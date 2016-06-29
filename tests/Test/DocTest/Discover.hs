@@ -9,23 +9,24 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse (ParseResult (..),
                                               parsePackageDescription)
 
-import Data.List                             (intercalate)
+import Data.List                             (intercalate,nub)
 
 
-loadPackageDescription :: IO (Either PError GenericPackageDescription)
-loadPackageDescription = do
- projectDirectory <- return "/Users/sambo/voice/commands-core/commands-core.cabal"
+loadPackageDescription :: FilePath -> IO (Either PError GenericPackageDescription)
+loadPackageDescription cabalFile = do
+ projectDirectory <- return cabalFile --TODO discover
  cabalFile <- readFile projectDirectory
  return$ case parsePackageDescription cabalFile of
   ParseFailed e -> Left e
   ParseOk _ pkg -> Right pkg
 
 -- | when `hs-source-dirs` is not singleton, includes nonexistent files.
+-- Removes duplicates, as stripping ".hs" extension often collides into a directory.
 modulePaths :: GenericPackageDescription -> [FilePath]
 modulePaths pkg = do
  d <- pkg^..packageHsSourcesDirs
  m <- pkg^..packageExposedModules
- return$ intercalate "/" (d : components m) -- e.g. ("sources/sources" : ["Commands","Core"])
+ return$ (intercalate "/" . nub) (d : components m) -- e.g. ("sources/sources" : ["Commands","Core"])
 
 -- packageLibrary :: Traversal' GenericPackageDescription Library
 -- packageLibrary = packageDescriptionL.libraryL.each

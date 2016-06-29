@@ -15,16 +15,17 @@ import           GHC.Exts            (IsList (..), IsString (..))
 import System.Mem.StableName
 
 
+--------------------------------------------------------------------------------
+
 {- | a recursive 'RhsF'. 
 
 note on types: 
 
 * @n@ (TODO) and @h@ are higher-kinded type constructors 
-(TODO they should know about all four type parameters, including each other). 
 
 * @r@ is "fixed" to @(RHS t n h a)@ itself
 
-isomorphic to @HFix (RhsF t n h)@, but the fixpoint is specialized because: 
+isomorphic to @'HFix' (RhsF t n h)@, but the fixpoint is specialized because: 
 
 * @newtype@s provide better error messages than @type@s, and the user sees this type. 
 * (more importantly) we can define domain-specific 'Applicative'/'Alternative' instances. 
@@ -37,6 +38,7 @@ newtype RHS t n h a = RHS { unRHS :: RhsF
  (RHS t n h)
  (a)
  }
+-- TODO should they know about all four type parameters, including each other.
 
 
 deriving instance (Functor'RHS t n h) => (Functor (RHS t n h)) -- NOTE uses UndecidableInstances
@@ -47,9 +49,9 @@ deriving instance (Functor'RHS t n h) => (Functor (RHS t n h)) -- NOTE uses Unde
 
 {- | mostly lawful: 'fmap' and 'pure' behave lawfully. 
 
-left-distributivity of '<*>' over '<|>' is intentionally violated. that is, we want @(x \<|> y) \<*> z@ to be preserved, not to be distributed into @(x \<*> z) \<|> (y \<*> z)@. this helps: 
+left-distributivity of '<*>' over '<|>' is intentionally violated. i.e. we want @(x \<|> y) \<*> z@ to be preserved, not to be distributed into @(x \<*> z) \<|> (y \<*> z)@. this helps: 
 
-* when @(x \<|> y)@ is actually the infinite @(x \<|> y \<|> ...)@; interpreting the undistributed @(x \<|> y) \<*> z@ might terminate while the @(x \<|> y \<|> ...) \<*> z@ may terminate while the distributed @(x \<*> z) \<|> (y \<*> z) \<|> ...@ will not.
+* when @(x \<|> y)@ is actually the infinite @(x \<|> y \<|> ...)@; interpreting the undistributed @(x \<|> y \<|> ...) \<*> z@ may terminate, while the distributed @(x \<*> z) \<|> (y \<*> z) \<|> ...@ will not.
 * when the interpretation (e.g. a chart parser) can increase performance by sharing such "inner alternation". 
 
 '<*>' is left-associated. 
@@ -155,16 +157,16 @@ pattern AlterRHS rs = RHS (Alter rs)
 
 
 
--- ================================================================ --
+--------------------------------------------------------------------------------
 
 {-| a non-recursive and lower-order 'RhsF'. 
 
 note on types: 
 
-* @Void@          knocks out the 'NonTerminal' constructor, since @0 * a = 0@. 
-* @(HConst f)@    lifts the given lower-order functor.  
-* @(Const n)@     direct reference becomes indirect reference.  
-* @()@            trivializes the injections (e.g. 'Pure'), since @1^a = a@.   
+* @Void@          : knocks out the 'NonTerminal' constructor, since @0 * a = 0@. 
+* @(HConst f)@    : lifts the given lower-order functor.  
+* @(Const n)@     : direct reference becomes indirect reference.  
+* @()@            : trivializes the injections (e.g. 'Pure'), since @1^a = 1@.   
 
 -}
 newtype RHS_ t n f = RHS_ { unRHS_ :: RhsF -- TODO naming: RHS0?  
@@ -197,26 +199,37 @@ newtype RHS_ t n f = RHS_ { unRHS_ :: RhsF -- TODO naming: RHS0?
 
 
 
--- ================================================================ --
+--------------------------------------------------------------------------------
 
-{- | a right-hand side in a
-<https://en.wikipedia.org/wiki/Extended_Backus-Naur_Form EBNF>.
+{- | a 
+<https://en.wikipedia.org/wiki/Extended_Backus-Naur_Form EBNF>
+grammar.
 
 EBNF features (using Wikipedia's jargon):
 
-* "terminals" come from 'Terminal' / 'Terminals'. 
-* "alternation" comes from the 'Alternative' instance, via 'Alter'.
-* "sequencing" comes from 'Applicative' instance, via 'Pure' / 'Apply' / ':<*>'.
-* "optionality" and "repetition" come from 'Opt' / 'Many' / 'Some'.
-* "grouping" just comes from Haskell's precedence/parentheses.
-* *no* "exceptions"
+* "terminals" come from 'Terminal'. 
 * "non-terminals" come from 'NonTerminal' 
-(and thus, the name "RHS" is a bit of a lie, as this one case can hold a "LHS" too). 
+* "alternation" comes from the 'Alternative' instance, via 'Alter'.
+* "sequencing" comes from 'Applicative' instance, via  'Apply' / ':<*>'.
+* "epislon"s come from 'Pure' (TODO or @'Alter' []@?).
+* "optionality" comes from 'Opt'.
+* "repetition" come from 'Many' / 'Some'.
+* ("grouping" just comes from Haskell's precedence/parentheses.)
+* (*no* "exceptions")
 
-also, it's a <http://bnfc.digitalgrammars.com/ labeled BNF>:
+(TODO and thus, the name "RHS" is a bit of a lie, as this one case can hold a "LHS" too).
+(rename to Grammar or G)
 
-* a constructor on the left of '<$>' labels the grammatical sequence.
+In fact it's a <http://bnfc.digitalgrammars.com/ Labeled BNF>.
+
+LBNF features:
+
+* a constructor on the left of '<$>' labels the grammatical sequence (e.g. @f <$> a <*> b@ labels the sequence of @a@ and @b@ with @f@).
 * the type of '<*>' is heterogeneous, which lets us capture right-hand-sides of different types
+
+Furthermore:
+
+* extensibility is provided by the @h@ type: 
 
 naming: 
 
@@ -233,7 +246,7 @@ e.g.:
 
 TODO 
 
-when partially applied, @RhsF t n h@ and its @f@ will have the same kind-arity: 
+when partially applied, an @RhsF t n h@ has the same kind-arity as its @h@: 
 
 @
 RhsF t n h        :: ((* -> *) -> (* -> *)) -> (* -> *)
@@ -267,13 +280,14 @@ data RhsF
  -- Many        :: ([x]        -> a) -> r x -> RhsF t n h r a
  -- Some        :: (NonEmpty x -> a) -> r x -> RhsF t n h r a
 
- NonTerminal :: n          -> r a -> RhsF t n h r a -- TODO one field?  :: n -> RhsF t n h r a  TODO move into RHS?  
- Terminal    :: (t -> a)   -> !t  -> RhsF t n h r a         
- -- Terminals   :: (t -> a)                         -> RhsF t n h r a  -- placeholder for the set of terminals in the grammar 
+ NonTerminal :: n          -> r a -> RhsF t n h r a -- TODO one field?  :: n -> RhsF t n h r a  TODO move into RHS? 
+ Terminal    :: (t -> a)   -> !t  -> RhsF t n h r a
+ -- Terminals   :: (t -> a)                         -> RhsF t n h r a  -- placeholder for the set of terminals in the grammar TODO should be part of @h@
 
 deriving instance (Functor'RhsF h r) => (Functor (RhsF t n h r))
 
 
+-- | 'hfmapRhsF'
 instance (HFunctor h) => HFunctor (RhsF t n h) where
  hfmap = hfmapRhsF 
  {-# INLINEABLE hfmap #-}
@@ -284,6 +298,7 @@ instance (HFunctor h) => HFunctor (RhsF t n h) where
 --  {-# INLINEABLE hfold #-}
 
 
+-- | 'htraverseRhsF'
 instance (HTraversable h) => HTraversable (RhsF t n h) where
  htraverse = htraverseRhsF 
  {-# INLINEABLE htraverse #-}
@@ -295,11 +310,16 @@ instance (HTraversable h) => HTraversable (RhsF t n h) where
 
 @t@ can default to String.
 
+'fromStringRhsF'
+
 -}
 instance (IsString t, Show t, a ~ t) => IsString (RhsF t n h r a) where --TODO remove Show constraint or show it's needed for defaulting
- fromString s = Terminal id t where t = fromString s
+ fromString = fromStringRhsF
  {-# INLINEABLE fromString #-}
 
+fromStringRhsF :: (IsString t, Show t, a ~ t) => String -> (RhsF t n h r a)
+fromStringRhsF s = Terminal id t where t = fromString s
+{-# INLINEABLE fromStringRhsF #-}
 
 -- -- | @([r1,r2,r3] :: RHS t n h a)@ is @('mconcat' [r1,r2,r3])@ is @('asum' [r1,r2,r3])@ is @(r1 '<|>' r2 '<|>' r3)@
 -- instance IsList (RhsF t n h r a) where
@@ -319,7 +339,7 @@ type Functor'RhsF h r =
 pattern Empty = Alter []
 
 
--- ================================================================ --
+--------------------------------------------------------------------------------
 
 toListRHS :: RHS t n h a -> [RHS t n h a]
 toListRHS (AlterRHS rs) = rs
@@ -327,7 +347,7 @@ toListRHS r = [r]
 {-# INLINE toListRHS #-}
 
 
--- ================================================================ --
+--------------------------------------------------------------------------------
 
 {-| 
 
@@ -404,7 +424,7 @@ htraverseRhsF u = \case
  -- r@Terminals{} -> r 
 
 
--- ================================================================ --
+--------------------------------------------------------------------------------
 
 
 -- {-| 
@@ -505,3 +525,4 @@ traverseRHS = undefined
 
 -- TODO for RHS, a ReaderT (Algebra h), explicit dictionary 
 
+--------------------------------------------------------------------------------

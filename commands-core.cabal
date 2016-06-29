@@ -34,135 +34,135 @@ library
   ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors
 
   exposed-modules:
-    Commands.Core
+                  Commands.Core
 
-    Commands.RHS
-    Commands.RHS.Types
-    Commands.RHS.Derived
-    Commands.RHS.Finite
-    Commands.RHS.Open
+                  Commands.RHS
+                  Commands.RHS.Types
+                  Commands.RHS.Derived
+                  Commands.RHS.Finite
+                  Commands.RHS.Open
 
-    Commands.Command.Types
-    Commands.Frontends.Types
-    Commands.Backends.Types
-
-    -- TODO rm
-    Commands.Frontends.Dragon13
-    Commands.Frontends.Dragon13.Types
-    Commands.Frontends.Dragon13.Lens
-    Commands.Frontends.Dragon13.Text
-    Commands.Frontends.Dragon13.Optimize
-    Commands.Frontends.Dragon13.Shim
-    Commands.Frontends.Dragon13.Shim.Types
-    Commands.Frontends.Dragon13.Serialize
-
-    Commands.Parsers.Earley
-
-    Commands.Mixins.DNS13OSX9
-    Commands.Mixins.DNS13OSX9.Types
-    Commands.Mixins.DNS13OSX9.Derived
-    Commands.Mixins.DNS13OSX9.Parser
-    Commands.Mixins.DNS13OSX9.Frontend
-    Commands.Mixins.DNS13OSX9.ObservedSharing
-
-    Commands.Extra
-    Commands.Instances
-    Commands.LHS
-    Commands.Munging
-    Commands.Main
-
-    Data.Possibly
-    Data.Address
-    Data.GUI
-    Data.Some
+                  Commands.Command.Types
+                  Commands.Frontends.Types
+                  Commands.Backends.Types
 
     -- TODO rm
-    Data.TPrelude
-    Data.HTypes
-    Data.HPrelude
-    Data.HFunctor
-    Data.HFoldable
-    Data.HTraversable
-    Data.HFunctor.Recursion
-    Data.HFunctor.ObserveSharing
+                  Commands.Frontends.Dragon13
+                  Commands.Frontends.Dragon13.Types
+                  Commands.Frontends.Dragon13.Lens
+                  Commands.Frontends.Dragon13.Text
+                  Commands.Frontends.Dragon13.Optimize
+                  Commands.Frontends.Dragon13.Shim
+                  Commands.Frontends.Dragon13.Shim.Types
+                  Commands.Frontends.Dragon13.Serialize
+
+                  Commands.Parsers.Earley
+
+                  Commands.Mixins.DNS13OSX9
+                  Commands.Mixins.DNS13OSX9.Types
+                  Commands.Mixins.DNS13OSX9.Derived
+                  Commands.Mixins.DNS13OSX9.Parser
+                  Commands.Mixins.DNS13OSX9.Frontend
+                  Commands.Mixins.DNS13OSX9.ObservedSharing
+
+                  Commands.Extra
+                  Commands.Instances
+                  Commands.LHS
+                  Commands.Munging
+                  Commands.Main
+
+                  Data.Possibly
+                  Data.Address
+                  Data.GUI
+                  Data.Some
 
     -- TODO rm
-    Data.RefCache
-    Data.RefCache.Internal
-    Data.HRefCache
-    Data.HRefCache.Internal
-    Data.RefCache.Extra
+                  Data.TPrelude
+                  Data.HTypes
+                  Data.HPrelude
+                  Data.HFunctor
+                  Data.HFoldable
+                  Data.HTraversable
+                  Data.HFunctor.Recursion
+                  Data.HFunctor.ObserveSharing
 
     -- TODO rm
-    CabalLenses.PackageDescription
-    CabalLenses.PackageDescription.TH
+                  Data.RefCache
+                  Data.RefCache.Internal
+                  Data.HRefCache
+                  Data.HRefCache.Internal
+                  Data.RefCache.Extra
+
+    -- TODO rm
+                  CabalLenses.PackageDescription
+                  CabalLenses.PackageDescription.TH
 
   other-modules:
       Commands.Playground
 
   build-depends:
-       base >=4.8 && <5.0
+                base >=4.8 && <5.0
 
      -- packages:
      -- , workflow-types
      -- , workflow-pure
      -- , workflow-extra
      -- , workflow-osx ==0.0.1
-     , s-expression ==0.0.0
+              , s-expression ==0.0.0
 
      -- extra-deps:
      -- not on stack
-     , language-python ==0.5.*
-     , recursion-schemes ==4.1.*
+              , language-python ==0.5.*
+              , recursion-schemes ==4.1.*
 
      -- shared with command-spiros
-     , aeson
+              , aeson
 
      -- ekmett
-     , bifunctors ==5.2.*
-     , profunctors ==5.2.*
-     , free ==4.12.*
-     , tagged==0.8.*
-     , kan-extensions ==4.2.*
-     , reducers ==3.12.*
-     , exceptions ==0.8.*
-     , lens ==4.13.*
-     , either ==4.4.*
-     , semigroups ==0.18.*
+              , bifunctors ==5.2.*
+              , profunctors ==5.2.*
+              , free ==4.12.*
+              , tagged==0.8.*
+              , kan-extensions ==4.2.*
+              , reducers ==3.12.*
+              , exceptions ==0.8.*
+              , lens ==4.13.*
+              , either ==4.4.*
+              , semigroups ==0.18.*
 
      -- servant
-     , servant-client ==0.4.4.*
-     , servant-server ==0.4.4.*
-     , servant        ==0.4.4.*
+              , servant-client ==0.4.4.*
+              , servant-server ==0.4.4.*
+              , servant        ==0.4.4.*
 
      -- on stackage
-     , Earley ==0.10.1.0
-     , split
-     , ListLike
-     , text ==1.2.*
-     , wl-pprint-text
-     , formatting
-     , interpolatedstring-perl6 ==1.0.*
-     , http-types ==0.9.*
-     , vector ==0.11.*
-     , async ==2.1.*
-     , parallel >=3.2.0.6 && <3.3
-     , hashable >=1.2.3.3 && <1.3
-     , MemoTrie >=0.6.2 && <0.7
-     , unordered-containers >=0.2.5 && <0.3
-     , pipes
+              , Earley ==0.10.1.0
+              , split
+              , ListLike
+              , text ==1.2.*
+              , wl-pprint-text
+              , formatting
+              , interpolatedstring-perl6 ==1.0.*
+              , http-types ==0.9.*
+              , vector ==0.11.*
+              , async ==2.1.*
+              , parallel >=3.2.0.6 && <3.3
+              , hashable >=1.2.3.3 && <1.3
+              , MemoTrie >=0.6.2 && <0.7
+              , unordered-containers >=0.2.5 && <0.3
+              , pipes
 
      -- standard library
-     , time ==1.5.*
-     , bytestring ==0.10.*
-     , stm ==2.4.*
-     , template-haskell ==2.10.*
-     , containers ==0.5.*
-     , mtl ==2.2.*
-     , transformers ==0.4.2.*
-     , ghc-prim
-     , Cabal >=1.22.4
-     , filepath
+              , time ==1.5.*
+              , bytestring ==0.10.*
+              , stm ==2.4.*
+              , template-haskell ==2.10.*
+              , containers ==0.5.*
+              , mtl ==2.2.*
+              , transformers ==0.4.2.*
+              , ghc-prim
+              , Cabal >=1.22.4
+              , filepath
 
 
 executable example-commands-core

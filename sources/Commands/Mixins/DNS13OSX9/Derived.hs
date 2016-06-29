@@ -192,7 +192,7 @@ epsilon = simpleGrammar 'epsilon (UnsafeEarleyProduction unitEarleyParser) UnitD
 {-| inject a string.
 
 -}
-token :: (IsString t, Show t) => String -> RHS n t f t
+token :: (IsString t, Show t) => String -> RHS n t f t -- TODO mv these to .RHS.Derived
 token = fromString
 
 {-| @str = 'token'@

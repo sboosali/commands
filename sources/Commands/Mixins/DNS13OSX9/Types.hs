@@ -17,7 +17,6 @@ module Commands.Mixins.DNS13OSX9.Types where
 import           Commands.RHS
 import           Commands.Command.Types
 import Commands.Frontends.Dragon13
-import qualified Commands.Backends.OSX as OSX
 
 import qualified Text.Earley.Grammar             as E
 import qualified Text.Earley.Internal            as E
@@ -38,13 +37,16 @@ type C c a = DNSEarleyCommand c a
 
 -- ================================================================ --
 
+-- | 
 type DNSEarleyRHS = RHS
  (DNSEarleyName String)
  Text
  (DNSEarleyFunc (DNSEarleyName String) Text)
 
+-- | 
 type DNSEarleyName n = ConstName (DNSInfo, n)
 
+-- | 
 data DNSEarleyFunc n t a -- TODO redistribute the sums 
  = LeafRHS (UnsafeEarleyProduction String t a) (DNSRHS t Void)
  | TreeRHS (RHS n t (DNSEarleyFunc n t) a) (RHS n t (DNSEarleyFunc n t) a)
@@ -59,13 +61,12 @@ deriving instance (Functor (n t (DNSEarleyFunc n t))) => Functor (DNSEarleyFunc 
 data SomeDNSEarleyRHS = forall x. -- TODO use RHS0 
  SomeDNSEarleyRHS { unSomeDNSEarleyRHS :: DNSEarleyRHS x } 
 
+-- | 
 type DNSEarleyCommand c = Command -- TODO remove 
  (DNSEarleyName String)
  Text
  (DNSEarleyFunc (DNSEarleyName String) Text)
  c
- OSX.CWorkflow_
-
 
 -- ================================================================ --
 

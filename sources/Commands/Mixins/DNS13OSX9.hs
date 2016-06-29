@@ -15,7 +15,6 @@ module Commands.Mixins.DNS13OSX9
  , module Commands.Mixins.DNS13OSX9.Parser 
  , module Commands.RHS
  , module Commands.Command.Types 
- , module Commands.Sugar.Keys
  ) where
 
 import Commands.Mixins.DNS13OSX9.Types 
@@ -24,7 +23,6 @@ import Commands.Mixins.DNS13OSX9.Frontend
 import Commands.Mixins.DNS13OSX9.Parser 
 import Commands.RHS
 import Commands.Command.Types 
-import Commands.Sugar.Keys
 import Commands.Frontends.Dragon13 (defaultDnsOptimizationSettings,displaySerializedGrammar)
 import           Commands.Parsers.Earley (EarleyEither,fromProd_)
 

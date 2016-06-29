@@ -26,8 +26,6 @@ source-repository head
     location: https://github.com/sboosali/commands-core
 
 library
-  if !os(osx)
-      buildable: False
 
   hs-source-dirs: sources
   default-language: Haskell2010
@@ -45,7 +43,10 @@ library
     Commands.RHS.Open
 
     Commands.Command.Types
+    Commands.Frontends.Types
+    Commands.Backends.Types
 
+    -- TODO rm
     Commands.Frontends.Dragon13
     Commands.Frontends.Dragon13.Types
     Commands.Frontends.Dragon13.Lens
@@ -54,8 +55,6 @@ library
     Commands.Frontends.Dragon13.Shim
     Commands.Frontends.Dragon13.Shim.Types
     Commands.Frontends.Dragon13.Serialize
-
-    Commands.Backends.OSX
 
     Commands.Parsers.Earley
 
@@ -66,7 +65,6 @@ library
     Commands.Mixins.DNS13OSX9.Frontend
     Commands.Mixins.DNS13OSX9.ObservedSharing
 
-    Commands.Sugar.Keys
     Commands.Extra
     Commands.Instances
     Commands.LHS
@@ -78,8 +76,8 @@ library
     Data.GUI
     Data.Some
 
+    -- TODO rm
     Data.TPrelude
-
     Data.HTypes
     Data.HPrelude
     Data.HFunctor
@@ -88,12 +86,14 @@ library
     Data.HFunctor.Recursion
     Data.HFunctor.ObserveSharing
 
+    -- TODO rm
     Data.RefCache
     Data.RefCache.Internal
     Data.HRefCache
     Data.HRefCache.Internal
     Data.RefCache.Extra
 
+    -- TODO rm
     CabalLenses.PackageDescription
     CabalLenses.PackageDescription.TH
 
@@ -101,13 +101,13 @@ library
       Commands.Playground
 
   build-depends:
-       base ==4.8.*
+       base >=4.8 && <5.0
 
      -- packages:
-     -- cabal sandbox add-source ../
-     , workflow-types
-     , workflow-pure
-     , workflow-osx ==0.0.1
+     -- , workflow-types
+     -- , workflow-pure
+     -- , workflow-extra
+     -- , workflow-osx ==0.0.1
      , s-expression ==0.0.0
 
      -- extra-deps:
@@ -135,7 +135,7 @@ library
      , servant-server ==0.4.4.*
      , servant        ==0.4.4.*
 
-     -- on stack
+     -- on stackage
      , Earley ==0.10.1.0
      , split
      , ListLike
@@ -150,6 +150,7 @@ library
      , hashable >=1.2.3.3 && <1.3
      , MemoTrie >=0.6.2 && <0.7
      , unordered-containers >=0.2.5 && <0.3
+     , pipes
 
      -- standard library
      , time ==1.5.*
@@ -174,6 +175,7 @@ executable example-commands-core
     , commands-core
 
 
+-- stack test commands-core
 test-suite tests
   type: exitcode-stdio-1.0
   main-is: Tests.hs
@@ -204,7 +206,8 @@ test-suite tests
     , tasty-quickcheck
 
 
-benchmark command
+-- stack bench commands-core
+benchmark benchmarks
   type: exitcode-stdio-1.0
   main-is: Bench.hs
   hs-source-dirs: bench

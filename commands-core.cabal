@@ -41,6 +41,7 @@ library
                   Commands.RHS.Derived
                   Commands.RHS.Finite
                   Commands.RHS.Open
+                  Commands.RHS.ObserveSharing
 
                   Commands.Command.Types
                   Commands.Frontends.Types
@@ -98,7 +99,7 @@ library
                   CabalLenses.PackageDescription.TH
 
   other-modules:
-      Commands.Playground
+                Commands.Playground
 
   build-depends:
                 base >=4.8 && <5.0
@@ -109,6 +110,7 @@ library
      -- , workflow-extra
      -- , workflow-osx ==0.0.1
               , s-expression ==0.0.0
+              , reified-bindings ==0.0.0
 
      -- extra-deps:
      -- not on stack

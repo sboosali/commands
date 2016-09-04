@@ -7,17 +7,17 @@
 
 -}
 module Data.HFunctor.ObserveSharing where 
-import Commands.Extra (forceStableName ) 
+--import Commands.Extra (forceStableName ) 
 import Data.HPrelude
 import Data.HFunctor.Recursion 
 import Data.Some
 
 import Data.Hashable 
-import qualified Data.HashMap.Lazy as Map 
+--import qualified Data.HashMap.Lazy as Map 
 import           Data.HashMap.Lazy (HashMap) 
 
-import Control.Monad.Trans.State
-import           Data.Function                   ((&))
+--import Control.Monad.Trans.State
+--import           Data.Function                   ((&))
 import System.Mem.StableName
 
 

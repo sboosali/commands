@@ -38,6 +38,7 @@ import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches, evaluate)
 import           Data.Graph
+import qualified Data.Set as Set
 import           Data.List                    (nub)
 import           Data.Maybe
 import           Data.Monoid                  ((<>))
@@ -52,6 +53,7 @@ import Data.Data (Data)
 import           Data.Foldable                   (traverse_)
 import Control.Concurrent.STM(swapTVar,TVar,STM) 
 import System.Mem.StableName
+import Control.Monad.IO.Class (MonadIO(..))
 
 
 __BUG__ :: SomeException -> a
@@ -130,13 +132,13 @@ eitherToValidations = eitherToValidation . first (:[])
 --
 --
 getLefts :: (Eq n, Bifoldable p) => p n t -> [n]
-getLefts = nub . bifoldMap (:[]) (const [])
+getLefts = nub . bifoldMap (:[]) (const []) --TODO ordNub
 
 -- | a 'bifoldMap' on the right, removing duplicates.
 --
 --
 getRights :: (Eq t, Bifoldable p) => p n t -> [t]
-getRights = nub . bifoldMap (const []) (:[])
+getRights = nub . bifoldMap (const []) (:[]) --TODO ordNub
 
 -- | helper function to write manual Show instances.
  -- e.g. for existentially quantified types.
@@ -329,8 +331,27 @@ takeTVar var = swapTVar var Nothing
 maybe2bool :: Maybe a -> Bool
 maybe2bool = maybe False (const True) 
 
+-- | 
 forceStableName
- :: a -- ^ strict
- -> IO (StableName a)
-forceStableName x = evaluate x >> makeStableName x
+ :: (MonadIO m)
+ => a -- ^ strict in @a@
+ -> m (StableName a)
+forceStableName x = liftIO (evaluate x) >> liftIO (makeStableName x)
+
+newStableName
+ :: (MonadIO m)
+ => a -- ^ strict in @a@
+ -> m (StableName a)
+newStableName x = liftIO $ do
+  _ <- evaluate x
+  makeStableName x
+
+-- | remove duplicates in @O(n log n)@ time.
+-- <https://github.com/nh2/haskell-ordnub>
+ordNub :: (Ord a) => [a] -> [a]
+ordNub l = go Set.empty l
+  where
+    go _ [] = []
+    go s (x:xs) = if x `Set.member` s then go s xs
+                                      else x : go (Set.insert x s) xs
 

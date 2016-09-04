@@ -112,7 +112,7 @@ unVoidDNSRHS = second (\case)
 
 -- 1. collect Cofree's by name
 -- 2. for each, project Cofree's to name
-reifyDNSRHS :: forall i n t. (Eq n) => Cofree (DNSRHS t) (i,n) -> NonEmpty (DNSProduction i t n)
+reifyDNSRHS :: forall i n t. (Eq n) => Cofree (DNSRHS t) (i,n) -> NonEmpty (DNSProduction i t n) --TODO All this shit
 --  Map n (DNSProduction i t n) is more efficient but unordered
 reifyDNSRHS = NonEmpty.fromList            --   TODO prove safety
  . fmap (snd >>> toIndirectDNSRHS >>> toDNSProduction)

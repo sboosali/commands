@@ -149,7 +149,12 @@ hanaM coalgebra = (return <<< hinject) <=< htraverse (hanaM coalgebra) <=< coalg
 
 -}
 hapoM
- :: ((h ~ HBase t), HCoRecursive t, Monad m, HTraversable h)
+ :: ( h ~ HBase t
+    , HRecursive   t
+    , HCoRecursive t
+    , HTraversable h
+    , Monad m
+    )
  => (f :~> (m :. h (t :+: f)))
  -> (f :~> (m :. t))
 hapoM coalgebra = (return <<< hinject) <=< htraverse (return <|||> hapoM coalgebra) <=< coalgebra

@@ -17,6 +17,8 @@ import           GHC.Exts            (IsList (..), IsString (..))
 -- import Text.Printf
 
 
+newtype ConstNonTerminal n t (f :: (* -> *)) a = ConstNonTerminal n
+
 {-| a grammatical right hand side.  
 
 
@@ -166,4 +168,6 @@ _NonTerminal = prism (uncurry NonTerminal) $ \case
 -- makePrisms ''RHS
 makeLenses ''ConstName
 makeLenses ''SomeRHS
+
+--TODO refactor -? to .? conflicts with lens?
 

@@ -25,7 +25,7 @@ _rhsObserveSharing r = do
     Just v  -> do
       return v
     Nothing -> mdo
-      () <- hmodify $ hinsert k v  -- use `v` 
+      () <- hmodify $ hinsert k v  -- use `v`
       r' <- go r
       v <- newHaskellExpression1 r'  -- make `v`
       return r'
@@ -48,7 +48,7 @@ os = ntraverseRhsF $ \(r,n) -> do
     Just v  -> do
       return v
     Nothing -> mdo
-      () <- hmodify $ hinsert k v  -- use `v` 
+      () <- hmodify $ hinsert k v  -- use `v`
       r' <- go r
       v <- newHaskellExpression1 r'  -- make `v`
       return r'
@@ -65,7 +65,7 @@ os = ntraverseRhsF $ \(r,n) -> do
 e.g.
 
 @
-production :: RHS t n h a -> RHS t HIdentity h a 
+production :: RHS t n h a -> RHS t HIdentity h a
 production = NonTerminal . HIdentity
 
 x = production $ ...
@@ -80,7 +80,7 @@ x = production $ ...
 --TODO
 -- type HaskellBinding1 = HIdentity HaskellBinding
 -- type StableName1 = HIdentity StableName
--- type StableNameRHS t n h a = StableName (RHS t n h a) 
+-- type StableNameRHS t n h a = StableName (RHS t n h a)
 
 --------------------------------------------------------------------------------
 
@@ -91,17 +91,17 @@ x = production $ ...
 -- rhsObserveSharingF :: RHS t HIdentity h :~> (IO :. (RHS t HaskellExpression1 h :+: RhsF t HaskellExpression1 h (RHS t HIdentity h)))
 -- rhsObserveSharingF r = do
 --   undefined
-  
+
  -- Pure a -> Pure a
- -- rf `Apply` h -> u rf `Apply` (hfmap u h) 
- -- rf :<*> rx -> u rf :<*> u rx 
+ -- rf `Apply` h -> u rf `Apply` (hfmap u h)
+ -- rf :<*> rx -> u rf :<*> u rx
 
  -- Alter rs  -> Alter (u `map` rs)
  -- -- Opt  i x  -> i  <$> optional (go x)
  -- -- Many i x  -> i  <$> many     (go x)
  -- -- Some i x  -> i' <$> some     (go x) where i' = i . NonEmpty.fromList
 
- -- NonTerminal n -> NonTerminal (hfmap u n) -- TODO unshared 
+ -- NonTerminal n -> NonTerminal (hfmap u n) -- TODO unshared
  -- Terminal i t -> Terminal i t
 
 --old rhsObserveSharing :: RHS t n h a -> IO (RHS t (HaskellExpression1 :*: n) h a)
@@ -118,9 +118,9 @@ a recursion scheme that:
 * is monadic
 
 -}
-hendoparapoM 
+hendoparapoM
  :: ( h ~ HBase g
-    , HRecursive   g 
+    , HRecursive   g
     , HCoRecursive g
     , HTraversable h
     , Monad m
@@ -227,8 +227,8 @@ Ord n
 -- all Sentences of a finite grammar
 sentences : FiniteR t -> [Sentence t]
 is streaming(?)
-is efficient 
-bottom-up 
+is efficient
+bottom-up
 
 efficient
 sublinear
@@ -241,7 +241,7 @@ F-algebra
 with caching on non-terminals?
 
 hcata :: (HRecursive h, HFunctor (HBase h)) => HAlgebra (HBase h) f -> (h :~> f)
-hcata algebra = hproject >>> hfmap (hcata algebra) >>> algebra 
+hcata algebra = hproject >>> hfmap (hcata algebra) >>> algebra
 
 enumerateSentences :: FiniteGrammarF t n [Sentence t] -> [Sentence t]
 cata \case
@@ -264,7 +264,7 @@ where go = hapoM coalgebra
 
 a mix of 'hapoM' and 'paraM', where @f ~ t@.
 
-hendoparapoM 
+hendoparapoM
  :: ( h ~ HBase t
     , HRecursive   t
     , HCoRecursive t
@@ -281,7 +281,7 @@ NO
 
 and t changes type (Id to haskellExpression)
 
-StableName (R HIdentity ..) ≠ StableName (R HaskellExpression1 ..) 
+StableName (R HIdentity ..) ≠ StableName (R HaskellExpression1 ..)
 
 RecursiveDo won't work
 makeStableName before `evaluate` ≠ makeStableName after `evaluate`

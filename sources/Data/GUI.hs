@@ -1,13 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BangPatterns, LambdaCase, DeriveAnyClass, RankNTypes #-}
-module Data.GUI where 
-import Data.Possibly 
+module Data.GUI where
+import Data.Possibly
 
 import           Control.Lens                 (makeLenses,makePrisms)
 import           Data.Hashable
 
 import           GHC.Generics                 (Generic)
-import Data.Data (Data) 
+import Data.Data (Data)
+import           Data.Typeable                (Typeable, tyConModule, tyConName,
+                                               tyConPackage, typeRep,
+                                               typeRepTyCon)
 import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                NameFlavour (NameG),
                                                OccName (OccName),
@@ -27,15 +30,15 @@ newtype Identifier = Identifier String deriving (Show,Read,Eq,Ord,Data,Generic,H
 
 -- ================================================================ --
 
-{-| 
+{-|
 
->>> :set -XTemplateHaskell 
+>>> :set -XTemplateHaskell
 >>> fromGlobalName 'fromGlobalName
 GUI {_guiPackage = Package "comma_DQcOV5TDnEq96EyrJpikmg", _guiModule = Module "Data.GUI", _guiIdentifier = Identifier "fromGlobalName"}
--- TODO is "comma_DQcOV5TDnEq96EyrJpikmg" deterministic? 
->>> let localName = () 
->>> fromGlobalName 'localName :: Just GUI 
-Nothing 
+-- TODO is "comma_DQcOV5TDnEq96EyrJpikmg" deterministic?
+>>> let localName = ()
+>>> fromGlobalName 'localName :: Just GUI
+Nothing
 
 only 'NameG' is global, i.e. is unique modulo package and module.
 
@@ -48,16 +51,16 @@ fromGlobalName = \case
 showName :: Name -> String
 showName = either show showGUI . fromGlobalName
 
-{-| 
+{-|
 
 >>> showGUI (GUI (Package "package") (Module "Module.SubModule") (Identifier "identifier"))
-"package-Module.SubModule.identifier" 
+"package-Module.SubModule.identifier"
 
 -}
 showGUI :: GUI -> String
 showGUI (GUI (Package pkg) (Module mod) (Identifier occ)) = pkg ++ "-" ++ mod ++ "." ++ occ
 
-{-| 
+{-|
 
 easily define smart constructors, whose error message has a
 fully-qualified name for debugging. if you rename the module, the
@@ -78,6 +81,17 @@ natural i
 -}
 failure :: Name -> Possibly a
 failure = throwM . userError . showName
+
+-- | the globally unique identifier of a type: @(pkg,
+-- <https://www.haskell.org/onlinereport/lexemes.html modid>,
+-- <https://www.haskell.org/onlinereport/lexemes.html tycon>)@
+--
+--
+guiOf :: (Typeable a) => proxy a -> GUI
+guiOf
+ = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t))
+ . typeRepTyCon
+ . typeRep
 
 -- ================================================================ --
 

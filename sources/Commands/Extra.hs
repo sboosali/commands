@@ -2,35 +2,31 @@
 {-# LANGUAGE DeriveGeneric, ExistentialQuantification, FlexibleContexts     #-}
 {-# LANGUAGE LambdaCase, OverloadedStrings, RankNTypes, RecordWildCards     #-}
 {-# LANGUAGE TemplateHaskell, TypeOperators                                 #-}
--- | assorted functionality, imported by most modules in this package.  
+-- | assorted functionality, imported by most modules in this package.
 module Commands.Extra
  ( module Commands.Extra
- , module Data.Possibly 
- , module Data.Address 
+ , module Data.Possibly
+ , module Data.Address
  , module Data.GUI
  , module Commands.Instances
  , module Data.Data
- , module Data.HTypes 
+ , module Data.HTypes
  , module GHC.Generics
  , (>>>)
  , traverse_
  ) where
 import           Commands.Instances
-import Data.Possibly 
-import Data.Address 
+import Data.Possibly
+import Data.Address
 import Data.GUI
-import Data.HTypes(Exists(..), exists) 
+import Data.HTypes(Exists(..), exists)
 
 import           Control.Lens                 (Lens', Prism', lens, prism')
 import           Data.Hashable
 import           Control.Monad.Reader         (ReaderT, local)
-import           Data.Bifoldable              (Bifoldable, bifoldMap)
-import           Data.Bifunctor               (first)
-import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Data.List.NonEmpty           (NonEmpty (..))
 import           Data.Text.Lazy               (Text)
 import           Numeric
-import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 
 -- TODO import Data.Functor.Classes
 import           Control.Applicative
@@ -43,44 +39,18 @@ import           Data.List                    (nub)
 import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import           Data.Ord
-import           Data.Typeable                (Typeable, tyConModule, tyConName,
-                                               tyConPackage, typeRep,
-                                               typeRepTyCon)
+import           Data.Typeable                (Typeable)
 import qualified Debug.Trace
 import           GHC.Generics                 (Generic)
 import           GHC.Exts                          (IsString (..))
-import Data.Data (Data) 
+import Data.Data (Data)
 import           Data.Foldable                   (traverse_)
-import Control.Concurrent.STM(swapTVar,TVar,STM) 
+import Control.Concurrent.STM(swapTVar,TVar,STM)
 import System.Mem.StableName
 import Control.Monad.IO.Class (MonadIO(..))
 
-
 __BUG__ :: SomeException -> a
 __BUG__ = error . show
-
--- | The constructors of a (zero-based) Enum.
---
--- >>> constructors :: [Bool]
--- [False,True]
---
--- (Bounded Constraint elided for convenience; doesn't terminate on un@Bounded@ @Enum@erations)
---
-constructors :: (Enum a) => [a]
-constructors = enumFrom (toEnum 0)
-
--- | The first constructor of a (zero-based) Enum.
---
--- >>> enumDefault :: Bool
--- False
---
--- (Bounded Constraint elided for convenience; doesn't terminate on un@Bounded@ @Enum@erations)
---
-enumDefault :: (Enum a) => a
-enumDefault = toEnum 0
-
-displayDoc :: Doc -> Text
-displayDoc = displayT . renderPretty 1.0 80
 
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
 (-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
@@ -98,17 +68,6 @@ tracing = Debug.Trace.traceShowM
 with :: Monad m => r -> ReaderT r m a -> ReaderT r m a
 with = local . const
 
--- | the globally unique identifier of a type: @(pkg,
--- <https://www.haskell.org/onlinereport/lexemes.html modid>,
--- <https://www.haskell.org/onlinereport/lexemes.html tycon>)@
---
---
-guiOf :: (Typeable a) => proxy a -> GUI
-guiOf
- = (\t -> GUI (Package $ tyConPackage t) (Module $ tyConModule t) (Identifier $ tyConName t))
- . typeRepTyCon
- . typeRep
-
 hashAlphanumeric :: (Hashable a) => a -> String
 hashAlphanumeric = flip showHex "" . abs . hash
 
@@ -121,31 +80,6 @@ nonemptyTail :: Lens' (NonEmpty a) [a]
 nonemptyTail = lens
  (\(_ :| xs)   -> xs)
  (\(x :| _) xs -> x :| xs)
-
--- | @Either@ is a @Monad@: it short-circuits. 'Validation' is an @Applicative@, but not a @Monad@: under @traverse@ (or @bitraverse@), it runs the validation (@:: a -> f b@) on every field (@:: a@) in the traversable (@:: t a@), monoidally appending together all errors, not just the first.
-eitherToValidations :: Either e a -> Validation [e] a
-eitherToValidations = eitherToValidation . first (:[])
-
--- | a 'bifoldMap' on the left, removing duplicates.
---
---
---
---
-getLefts :: (Eq n, Bifoldable p) => p n t -> [n]
-getLefts = nub . bifoldMap (:[]) (const []) --TODO ordNub
-
--- | a 'bifoldMap' on the right, removing duplicates.
---
---
-getRights :: (Eq t, Bifoldable p) => p n t -> [t]
-getRights = nub . bifoldMap (const []) (:[]) --TODO ordNub
-
--- | helper function to write manual Show instances.
- -- e.g. for existentially quantified types.
-showsPrecNewtype :: (Show a) => Int -> String -> a -> ShowS
-showsPrecNewtype depth name value = showParen
- (depth > 10)
- (showString (name <> " ") . showsPrec (10+1) value)
 
 -- | see <https://hackage.haskell.org/package/lens-4.7/docs/Control-Exception-Lens.html#g:6 Control.Exception.Lens>
 prismException :: (Exception e) => Prism' SomeException e
@@ -300,10 +234,10 @@ filterBlanks = filter $ \case
  ("",_) -> False
  (_, _) -> True
 
-{- | n-ary (homogeneous) depth-first cross-product. 
+{- | n-ary (homogeneous) depth-first cross-product.
 
->>> let xss = [[1,2,3],[4,5,6]] 
->>> cross xss 
+>>> let xss = [[1,2,3],[4,5,6]]
+>>> cross xss
 [[1,4],[1,5],[1,6],[2,4],[2,5],[2,6],[3,4],[3,5],[3,6]]
 >>> length (cross xss)
 9
@@ -312,26 +246,26 @@ filterBlanks = filter $ \case
 >>> length xss
 2
 
-@cross = 'sequence'@ 
+@cross = 'sequence'@
 
-prop> length (cross xss) == product (map length xss) 
+prop> length (cross xss) == product (map length xss)
 
 prop> all (\ys -> length xss == length ys) (cross xss)
 
 -}
-cross :: [[a]] -> [[a]] 
-cross = sequence 
+cross :: [[a]] -> [[a]]
+cross = sequence
 
 {-| "dirty" the cache.
 
 -}
 takeTVar :: TVar (Maybe a) -> STM (Maybe a)
-takeTVar var = swapTVar var Nothing 
+takeTVar var = swapTVar var Nothing
 
 maybe2bool :: Maybe a -> Bool
-maybe2bool = maybe False (const True) 
+maybe2bool = maybe False (const True)
 
--- | 
+-- |
 forceStableName
  :: (MonadIO m)
  => a -- ^ strict in @a@
@@ -354,4 +288,3 @@ ordNub l = go Set.empty l
     go _ [] = []
     go s (x:xs) = if x `Set.member` s then go s xs
                                       else x : go (Set.insert x s) xs
-

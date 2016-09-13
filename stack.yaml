@@ -10,9 +10,12 @@ build:
 packages:
 - .
 
+- ../spiros
+
 - ../reified-bindings
 
 extra-deps:
+- spiros-0.0.0
 
 - reified-bindings-0.0.0
 

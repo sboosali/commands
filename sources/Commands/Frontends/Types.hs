@@ -32,6 +32,8 @@ module Commands.Frontends.Types where
 
 import qualified Pipes.Core as P
 
+import Prelude.Spiros
+import Prelude()
 
 {-|
 

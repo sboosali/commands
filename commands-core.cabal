@@ -45,7 +45,10 @@ library
     -- TODO                  Commands.RHS.ObserveSharing
 
                   Commands.Command.Types
+
                   Commands.Frontends.Types
+                  Commands.Frontends.Dictation
+
                   Commands.Backends.Types
 
     -- TODO rm
@@ -88,13 +91,15 @@ library
 
   build-depends:
                 base >=4.8 && <5.0
+                
+              , spiros
+              , reified-bindings
 
      -- packages:
      -- , workflow-types
      -- , workflow-pure
      -- , workflow-extra
      -- , workflow-osx
-              , reified-bindings
 
      -- ekmett
               , profunctors

@@ -3,5 +3,16 @@ resolver: lts-6.1
 packages:
 - .
 
-extra-deps: []
+- ../spiros
 
+#- ../commands-core
+#- ../commands-frontend-DragonNaturallySpeaking
+
+#- ../reified-bindings
+
+extra-deps:
+- spiros-0.0.0
+
+#- commands-frontend-DragonNaturallySpeaking-0.0.0
+
+#- language-python-0.5.4

@@ -3,5 +3,14 @@ resolver: lts-6.1
 packages:
 - .
 
-extra-deps: []
+- ../commands-core
+- ../reified-bindings
 
+extra-deps:
+
+- commands-core-0.0.0
+- reified-bindings-0.0.0
+
+- language-python-0.5.4
+- string-conv-0.1.1
+- optparse-generic-1.1.1

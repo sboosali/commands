@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-import qualified DragonNaturallySpeaking.Example
-
-main = DragonNaturallySpeaking.Example.main
-
+module Main where
+import qualified Commands.Frontends.Dragon13.Example
+main = Commands.Frontends.Dragon13.Example.main

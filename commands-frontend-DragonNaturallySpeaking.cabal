@@ -52,38 +52,63 @@ library
                      ScopedTypeVariables StandaloneDeriving
 
  exposed-modules:
-                 DragonNaturallySpeaking
-                 DragonNaturallySpeaking.Types
+
+                 Commands.Frontends.Dragon13
+                 Commands.Frontends.Dragon13.Types
+                 Commands.Frontends.Dragon13.Lens
+                 Commands.Frontends.Dragon13.Text
+                 Commands.Frontends.Dragon13.Optimize
+                 Commands.Frontends.Dragon13.Shim
+                 Commands.Frontends.Dragon13.Shim.Types
+                 Commands.Frontends.Dragon13.Serialize
+
+                 Commands.Mixins.DNS13OSX9
+                 Commands.Mixins.DNS13OSX9.Types
+                 Commands.Mixins.DNS13OSX9.Derived
+                 Commands.Mixins.DNS13OSX9.Parser
+                 Commands.Mixins.DNS13OSX9.Frontend
+                 Commands.Mixins.DNS13OSX9.ObservedSharing
+
 -- other-modules:
-                 DragonNaturallySpeaking.Extra
-                 DragonNaturallySpeaking.Example
+                Commands.Frontends.Dragon13.Example
+                Commands.Frontends.Dragon13.Extra
+                Commands.Frontends.Dragon13.Instances
 
  build-depends:
-               base >=4.7 && <5
+                base >=4.7 && <5
 
---              , transformers
---              , mtl
---              , containers
+              , commands-core ==0.0.0
+
+              , transformers
+              , mtl
+              , containers
 --              , bytestring
 --              , stm
---              , template-haskell
+              , template-haskell
 
-          , deepseq
-          , hashable
-          , semigroups
+              , deepseq
+              , hashable
+              , semigroups
 
---              , lens
---              , exceptions
---              , free
---              , bifunctors
---              , profunctors
---              , either
+              , lens
+              , Earley
+              , split
+              , ListLike
+              , text
+              , wl-pprint-text
+              , bifunctors
+              , profunctors
+              , free
+              , exceptions
+              , reducers
+              , either
+
 --              , pipes
 --              , formatting
 --              , servant
 --              , Earley
 --              , split
---              , interpolatedstring-perl6
+              , interpolatedstring-perl6
 --              , wl-pprint-text
 --              , text
 --              , aeson
@@ -92,6 +117,8 @@ library
 --              , async
 --              , parallel
 
+              -- not on Stackage
+              , language-python
 
 executable example-commands-frontend-DragonNaturallySpeaking
  hs-source-dirs:      executables
@@ -101,8 +128,8 @@ executable example-commands-frontend-DragonNaturallySpeaking
  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
 
  build-depends:
-    base
-  , commands-frontend-DragonNaturallySpeaking
+     base >=4.7 && <5
+   , commands-frontend-DragonNaturallySpeaking
 
 
 -- $ stack test doctest
@@ -115,7 +142,7 @@ test-suite doctest
  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
 
  build-depends:
-    base
+    base >=4.7 && <5
   , commands-frontend-DragonNaturallySpeaking
   , doctest
 
@@ -133,7 +160,7 @@ test-suite unittest
   DragonNaturallySpeaking.Test
 
  build-depends:
-    base
+    base >=4.7 && <5
   , commands-frontend-DragonNaturallySpeaking
   , hspec ==2.2.*
   , QuickCheck ==2.8.*
@@ -151,8 +178,7 @@ benchmark command
  ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
 
  build-depends:
-    base
+    base >=4.7 && <5
   , commands-frontend-DragonNaturallySpeaking
   , criterion
   , deepseq
-

@@ -2,6 +2,5 @@
 import Test.DocTest
 
 main = doctest
- [ "sources/DragonNaturallySpeaking.hs"
+ [ "sources/Commands/Frontends/Dragon13/Serialize.hs" -- Commands.Frontends.Dragon13.Serialize
  ]
-

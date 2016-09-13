@@ -69,6 +69,8 @@ library
                  Commands.Mixins.DNS13OSX9.Frontend
                  Commands.Mixins.DNS13OSX9.ObservedSharing
 
+                 Commands.Frontends.Natlink.Types
+
 -- other-modules:
                 Commands.Frontends.Dragon13.Example
                 Commands.Frontends.Dragon13.Extra
@@ -78,6 +80,7 @@ library
                 base >=4.7 && <5
 
               , commands-core ==0.0.0
+              , spiros
 
               , transformers
               , mtl

@@ -3,11 +3,11 @@
 module Commands.Frontends.Dragon13.Extra
  ( module Commands.Frontends.Dragon13.Extra
  , module Data.Possibly
- , Data, Generic
- , (>>>), traverse_
+ , module Prelude.Spiros
  ) where
 
 import Data.Possibly
+import Prelude.Spiros
 
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
 import           Data.Bifunctor               (first)
@@ -15,18 +15,8 @@ import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 import           Data.Text.Lazy               (Text)
 
-import           Control.Applicative
-import           Data.Foldable
-import           Control.Exception            (SomeException (..))
-import           Data.Monoid                  ((<>))
 import qualified Data.Set as Set
 import           GHC.Exts                          (IsString (..))
-import           GHC.Generics                 (Generic)
-import Data.Data (Data)
-import           Control.Arrow ((>>>))
-
-__BUG__ :: SomeException -> a
-__BUG__ = error . show
 
 -- | The constructors of a (zero-based) Enum.
 --
@@ -55,7 +45,7 @@ displayDoc = displayT . renderPretty 1.0 80
  -- e.g. for existentially quantified types.
 showsPrecNewtype :: (Show a) => Int -> String -> a -> ShowS
 showsPrecNewtype depth name value = showParen
- (depth > 10)
+ (depth >= 11)
  (showString (name <> " ") . showsPrec (10+1) value)
 
 -- | remove duplicates in @O(n log n)@ time.

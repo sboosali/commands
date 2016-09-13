@@ -5,7 +5,7 @@
 --
 module Commands.Frontends.Dragon13.Serialize where
 
-import           Commands.Frontends.Dragon13.Extra
+import           Commands.Frontends.Dragon13.Extra hiding ((<>))
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Lens

@@ -1,6 +1,7 @@
 module Commands.Server.Types where
 
 -- import Commands.Frontends.Natlink.Types
+import Commands.Frontends.Dictation
 import Digit
 
 import Prelude.Spiros
@@ -17,5 +18,5 @@ from the recognition being corrected).
 -}
 data Correction
  = ChosenCorrection Digit
- | SpokenCorrection String
+ | SpokenCorrection Dictation
  | EditedCorrection Digit

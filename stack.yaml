@@ -5,14 +5,15 @@ packages:
 
 - ../spiros
 
-#- ../commands-core
+- ../commands-core
 #- ../commands-frontend-DragonNaturallySpeaking
 
-#- ../reified-bindings
+- ../reified-bindings
 
 extra-deps:
 - spiros-0.0.0
 
+- commands-core-0.0.0
 #- commands-frontend-DragonNaturallySpeaking-0.0.0
 
 #- language-python-0.5.4

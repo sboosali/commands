@@ -52,13 +52,20 @@ library
                      ScopedTypeVariables StandaloneDeriving
 
  exposed-modules:
-                 Commands.Server.Types
+                 Commands.Server.Backend.Types
+                 Commands.Server.Correction.Types
+                 Commands.Server.Correction.Shell
+                 Commands.Server.Platform.Types
 
  build-depends:
                base >=4.7 && <5
 
              , spiros ==0.0.0
              , commands-core ==0.0.0
+             , workflow-types ==0.0.0
+
+             , haskeline
+             , data-default-class
 
 --              , transformers
 --              , mtl
@@ -69,6 +76,7 @@ library
 
 --              , lens
 --              , exceptions
+              , semigroups
 --              , free
 --              , bifunctors
 --              , profunctors
@@ -80,7 +88,7 @@ library
 --              , split
 --              , interpolatedstring-perl6
 --              , wl-pprint-text
---              , text
+             , text
 --              , aeson
 --              , hashable
 --              , unordered-containers

@@ -5,6 +5,8 @@ packages:
 
 - ../spiros
 
+- ../workflow-types
+
 - ../commands-core
 #- ../commands-frontend-DragonNaturallySpeaking
 
@@ -12,6 +14,8 @@ packages:
 
 extra-deps:
 - spiros-0.0.0
+
+- workflow-types-0.0.0
 
 - commands-core-0.0.0
 #- commands-frontend-DragonNaturallySpeaking-0.0.0

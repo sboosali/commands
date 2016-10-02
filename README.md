@@ -3,4 +3,12 @@
 
 # commands-server-simple
 
-TODO
+A very simple `servant` HTTP server that executes `WorkflowT IO` actions.
+
+e.g.
+
+```haskell
+import Commands.Servers.Simple
+import Workflow.<platform> -- Workflow.OSX, Workflow.Windows, Workflow.Linux
+main = runSimpleServer (defaultSettings runWorkflowT)
+```

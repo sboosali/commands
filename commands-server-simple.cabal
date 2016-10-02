@@ -1,7 +1,7 @@
 name:                commands-server-simple
 version:             0.0.0
-synopsis:            TODO
-description:         TODO
+synopsis:            A very simple @servant@ HTTP server that executes @WorkflowT IO@ actions.
+description:         A very simple @servant@ HTTP server that executes @WorkflowT IO@ actions.
 homepage:            http://github.com/sboosali/commands-server-simple#readme
 license:             BSD3
 license-file:        LICENSE

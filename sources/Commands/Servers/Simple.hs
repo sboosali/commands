@@ -13,8 +13,6 @@ import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai
 import Servant
 
-import Control.Monad (unless)
-
 import Prelude.Spiros
 import Prelude()
 
@@ -39,8 +37,7 @@ handlers = handleRecognition
 -- type family ServerT (layout :: k) (m :: * -> *) :: *
 
 handleRecognition :: Settings -> RecognitionHandler
-handleRecognition Settings{munge, ignore, exec= W.ExecuteWorkflow exec} ws = exec $ do
-  unless (ignore ws) $ do
-      W.sendText (munge ws)
+handleRecognition Settings{handle, exec= W.ExecuteWorkflow exec} ws
+ = liftIO $ exec $ handle ws
 
 -- _500 :: String -> ServantErr _500 s = err500{ errBody = BS.pack e }

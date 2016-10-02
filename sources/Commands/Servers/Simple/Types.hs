@@ -13,6 +13,7 @@ import           Control.Monad.Trans.Except            (ExceptT)
 
 import GHC.TypeLits (Symbol)
 import Data.Char(toLower)
+import Control.Monad (unless)
 
 import Prelude.Spiros
 import Prelude()
@@ -61,8 +62,7 @@ type Recognition = [String]
 
 -}
 data Settings = Settings
- { munge                :: [String] -> String
- , ignore               :: [String] -> Bool
+ { handle               :: [String] -> W.WorkflowT IO ()
  , exec                 :: W.ExecuteWorkflow
  , port                 :: Int
  }
@@ -70,10 +70,11 @@ data Settings = Settings
 defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
+ handle ws = unless (ignore ws) $ W.sendText (munge ws)
  munge = unwords > fmap toLower > (++ " ")
  ignore = unwords > (`elem` noise)
- port  = 8888
  noise = ["the","will","if","him","that","a","she","and"]
+ port  = 8888
 
 recognitionAPI :: Proxy RecognitionAPI
 recognitionAPI = Proxy

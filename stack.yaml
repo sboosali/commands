@@ -2,6 +2,11 @@ resolver: lts-6.1
 
 packages:
 - .
+- ../spiros
 
-extra-deps: []
+- ../workflow-types
 
+extra-deps:
+- spiros-0.0.0
+
+- workflow-types-0.0.0

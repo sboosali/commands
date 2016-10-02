@@ -57,37 +57,16 @@ library
 
  build-depends:
                base >=4.7 && <5
+             , transformers
 
---              , transformers
---              , mtl
---              , containers
---              , bytestring
---              , stm
---              , template-haskell
+             , spiros ==0.0.0
+             , workflow-types ==0.0.0
 
-          , deepseq
-          , hashable
-          , semigroups
-
---              , lens
---              , exceptions
---              , free
---              , bifunctors
---              , profunctors
---              , either
---              , pipes
---              , formatting
-              , servant
-              , servant-server
---              , split
---              , interpolatedstring-perl6
---              , wl-pprint-text
---              , text
---              , aeson
---              , hashable
---              , unordered-containers
---              , async
---              , parallel
+             , servant
+             , servant-server
+             , wai
+             , warp
+             , text
 
 
 executable example-commands-server-simple

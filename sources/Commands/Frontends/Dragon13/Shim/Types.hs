@@ -5,8 +5,8 @@ import           Commands.Extra
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as T
 import           Language.Python.Version2.Parser (parseModule)
-import           Language.Python.Common.ParseError (ParseError) 
-import Control.Lens 
+import           Language.Python.Common.ParseError (ParseError)
+import Control.Lens
 
 import Control.Exception (Exception)
 
@@ -19,9 +19,9 @@ data ShimR t = ShimR
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
  , __serverHost__  :: t  -- ^ a Python String
  , __serverPort__  :: t  -- ^ a Python Int
- , __logFile__     :: t  -- ^ a Python String 
- , __contextFile__ :: t  -- ^ a Python String 
- -- , :: t   -- ^ a Python 
+ , __logFile__     :: t  -- ^ a Python String
+ , __contextFile__ :: t  -- ^ a Python String
+ -- , :: t   -- ^ a Python
  } deriving (Show,Eq,Ord,Functor,Data,Generic)
 
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
@@ -35,7 +35,7 @@ instance Exception PythonSyntaxError
 data NatLinkConfig = NatLinkConfig
  { nlAddress     :: Address
  , nlLogFile     :: FilePath
- , nlContextFile :: FilePath 
+ , nlContextFile :: FilePath
  }
 
 
@@ -46,7 +46,7 @@ data NatLinkConfig = NatLinkConfig
 make sure that the input is a valid (at least, syntactically correct)
 Python file (with 'parseModule'), reports the syntax error otherwise.
 
-may fail with the parse error and the invalid file. 
+may fail with the parse error and the invalid file.
 
 -}
 newPythonFile :: Text -> Either PythonSyntaxError PythonFile
@@ -54,8 +54,6 @@ newPythonFile s = case parseModule (T.unpack s) "" of
  Right {} -> Right $ PythonFile s
  Left  e  -> Left  $ PythonSyntaxError e s
 
-
 -- ================================================================ --
 
-makePrisms ''PythonFile 
-
+makePrisms ''PythonFile

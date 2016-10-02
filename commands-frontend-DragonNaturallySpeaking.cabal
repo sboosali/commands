@@ -114,7 +114,7 @@ library
               , interpolatedstring-perl6
 --              , wl-pprint-text
 --              , text
---              , aeson
+              , aeson
 --              , hashable
 --              , unordered-containers
 --              , async

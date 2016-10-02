@@ -308,11 +308,15 @@ escapeDNSGrammar = validationToEither . bitraverse (eitherToValidations . escape
 
 -}
 applyShim :: (ShimR Doc -> Doc) -> NatLinkConfig -> SerializedGrammar -> Either PythonSyntaxError PythonFile
-applyShim getShim_ address
+applyShim shimmy c
  = newPythonFile
- . displayDoc
- . getShim_
- . from_SerializedGrammar_to_ShimR address
+ . applyShim_ shimmy c
+
+applyShim_ :: (ShimR Doc -> Doc) -> NatLinkConfig -> SerializedGrammar -> Text
+applyShim_ shimmy c
+ = displayDoc
+ . shimmy
+ . from_SerializedGrammar_to_ShimR c
 
 {- | @Address (Host "localhost") (Port 8000)@ becomes @("'localhost'", "'8000'")@
 

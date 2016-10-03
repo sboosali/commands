@@ -62,14 +62,14 @@ library
                  Commands.Frontends.Dragon13.Shim.Types
                  Commands.Frontends.Dragon13.Serialize
 
+                 Commands.Frontends.Natlink.Types
+
                  Commands.Mixins.DNS13OSX9
                  Commands.Mixins.DNS13OSX9.Types
                  Commands.Mixins.DNS13OSX9.Derived
                  Commands.Mixins.DNS13OSX9.Parser
                  Commands.Mixins.DNS13OSX9.Frontend
                  Commands.Mixins.DNS13OSX9.ObservedSharing
-
-                 Commands.Frontends.Natlink.Types
 
 -- other-modules:
                 Commands.Frontends.Dragon13.Example
@@ -122,54 +122,54 @@ library
 
               -- not on Stackage
               , language-python
-
--- $ stack test doctest
-test-suite doctest
- hs-source-dirs:      tests
- main-is:             DocTest.hs
- type:                exitcode-stdio-1.0
-
- default-language:    Haskell2010
- ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-
- build-depends:
-    base >=4.7 && <5
-  , commands-frontend-DragonNaturallySpeaking
-  , doctest
-
-
--- $ stack test unittest
-test-suite unittest
- hs-source-dirs:      tests
- main-is:             UnitTest.hs
- type:                exitcode-stdio-1.0
-
- default-language:    Haskell2010
- ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-
- other-modules:
-  DragonNaturallySpeaking.Test
-
- build-depends:
-    base >=4.7 && <5
-  , commands-frontend-DragonNaturallySpeaking
-  , hspec ==2.2.*
-  , QuickCheck ==2.8.*
-  -- , tasty
-  -- , tasty-quickcheck
-
-
--- $ stack bench
-benchmark command
- hs-source-dirs:      benchmarks
- main-is:             Bench.hs
- type:                exitcode-stdio-1.0
-
- default-language: Haskell2010
- ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
-
- build-depends:
-    base >=4.7 && <5
-  , commands-frontend-DragonNaturallySpeaking
-  , criterion
-  , deepseq
+--
+-- -- $ stack test doctest
+-- test-suite doctest
+--  hs-source-dirs:      tests
+--  main-is:             DocTest.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , doctest
+--
+--
+-- -- $ stack test unittest
+-- test-suite unittest
+--  hs-source-dirs:      tests
+--  main-is:             UnitTest.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  other-modules:
+--   DragonNaturallySpeaking.Test
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , hspec ==2.2.*
+--   , QuickCheck ==2.8.*
+--   -- , tasty
+--   -- , tasty-quickcheck
+--
+--
+-- -- $ stack bench
+-- benchmark command
+--  hs-source-dirs:      benchmarks
+--  main-is:             Bench.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language: Haskell2010
+--  ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , criterion
+--   , deepseq

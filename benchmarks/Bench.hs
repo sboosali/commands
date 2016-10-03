@@ -1,4 +1,4 @@
-import DragonNaturallySpeaking()
+module Main where
 import Criterion.Main
 
 main = defaultMain [
@@ -7,4 +7,3 @@ main = defaultMain [
     , bench "2" $ whnf length [1..1000::Int]
     ]
   ]
-

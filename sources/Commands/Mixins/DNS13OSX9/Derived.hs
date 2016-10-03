@@ -12,7 +12,6 @@ import Control.Lens hiding (snoc)
 
 import Data.Void
 import           Data.Char
-import           Data.Proxy
 import           Data.Typeable
 import GHC.Exts (IsString(..))
 import           Language.Haskell.TH.Syntax      (Name)
@@ -29,9 +28,9 @@ getTerminalsDNSEarley
  -> [t]
 getTerminalsDNSEarley = getTerminals' (const id) getTerminalsFromDNSEarleyFunc
  where                          -- TODO explicit signatures
- getTerminalsFromDNSEarleyFunc :: (forall a.  DNSEarleyFunc n t a -> [t])
+ getTerminalsFromDNSEarleyFunc :: (forall x.  DNSEarleyFunc n t x -> [t])
  getTerminalsFromDNSEarleyFunc = (maybe [] getTerminalsFromBoth . projectDNSEarleyFunc)
- getTerminalsFromBoth :: (forall a. ((RHS n t (DNSEarleyFunc n t) a), (RHS n t (DNSEarleyFunc n t) a)) -> [t])
+ getTerminalsFromBoth :: (forall x. ((RHS n t (DNSEarleyFunc n t) x), (RHS n t (DNSEarleyFunc n t) x)) -> [t])
  getTerminalsFromBoth (pRHS,gRHS) = getTerminalsDNSEarley pRHS ++ getTerminalsDNSEarley gRHS
 
 {-| @(<=>) = 'genericGrammar'@

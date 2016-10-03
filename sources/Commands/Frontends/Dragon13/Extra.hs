@@ -7,16 +7,17 @@ module Commands.Frontends.Dragon13.Extra
  ) where
 
 import Data.Possibly
-import Prelude.Spiros
 
 import           Data.Bifoldable              (Bifoldable, bifoldMap)
 import           Data.Bifunctor               (first)
 import           Data.Either.Validation       (Validation, eitherToValidation)
 import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
-import           Data.Text.Lazy               (Text)
 
 import qualified Data.Set as Set
 import           GHC.Exts                          (IsString (..))
+
+import Prelude.Spiros
+import Prelude(toEnum)
 
 -- | The constructors of a (zero-based) Enum.
 --

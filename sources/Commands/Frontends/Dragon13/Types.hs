@@ -10,12 +10,10 @@ import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.List.NonEmpty    (NonEmpty (..))
-import Data.Semigroup
 
 import Data.Char             (toLower)
 import Data.Traversable
 import GHC.Exts              (IsString (..))
-import Numeric.Natural
 
 -- ================================================================ --
 

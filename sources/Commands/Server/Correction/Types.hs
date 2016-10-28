@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 
 {-|
 -}
@@ -7,6 +7,8 @@ module Commands.Server.Correction.Types where
 -- import Commands.Frontends.Natlink.Types
 import Commands.Frontends.Dictation
 import Digit
+
+import Control.Lens (makeLenses)
 
 import Prelude.Spiros
 import Prelude()
@@ -47,3 +49,7 @@ newtype Hypotheses = Hypotheses [Hypothesis]
 {-|
 -}
 type Hypothesis = [Text]
+
+--------------------------------------------------------------------------------
+
+makeLenses ''CorrectionSettings

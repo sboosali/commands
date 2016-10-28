@@ -52,6 +52,7 @@ library
                      ScopedTypeVariables StandaloneDeriving
 
  exposed-modules:
+                 Commands.Server.Types
                  Commands.Server.Backend.Types
                  Commands.Server.Correction.Types
                  Commands.Server.Correction.Shell
@@ -59,38 +60,15 @@ library
 
  build-depends:
                base >=4.7 && <5
+             , transformers
+--             , mtl
 
              , spiros ==0.0.0
              , commands-core ==0.0.0
+             , commands-frontend-DragonNaturallySpeaking ==0.0.0
              , workflow-types ==0.0.0
 
              , haskeline
              , data-default-class
-
---              , transformers
---              , mtl
---              , containers
---              , bytestring
---              , stm
---              , template-haskell
-
---              , lens
---              , exceptions
-              , semigroups
---              , free
---              , bifunctors
---              , profunctors
---              , either
---              , pipes
---              , formatting
---              , servant
---              , Earley
---              , split
---              , interpolatedstring-perl6
---              , wl-pprint-text
+--             , bytestring
              , text
---              , aeson
---              , hashable
---              , unordered-containers
---              , async
---              , parallel

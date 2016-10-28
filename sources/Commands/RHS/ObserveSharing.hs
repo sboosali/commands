@@ -3,62 +3,62 @@
 {-|
 -}
 module Commands.RHS.ObserveSharing where
-import Commands.Extra
-import Commands.RHS.Open
-
-import Data.HFunctor.Recursion
-import Data.HPrelude
-import ReifiedBindings.HaskellBinding
-
---import System.Mem.StableName
-import Data.Function
-import Control.Monad.State
-
-rhsObserveSharing :: RHS t HIdentity h :~> (IO :. (RHS t HaskellExpression1 h))
-rhsObserveSharing = _rhsObserveSharing >>> (evalStateT&flip) ()
-
-_rhsObserveSharing :: RHS t HIdentity h :~> (StateT () IO :. (RHS t HaskellExpression1 h))
-_rhsObserveSharing r = do
-  k <- forceStableName r
-  s <- get
-  hlookup k s >>= \case
-    Just v  -> do
-      return v
-    Nothing -> mdo
-      () <- hmodify $ hinsert k v  -- use `v`
-      r' <- go r
-      v <- newHaskellExpression1 r'  -- make `v`
-      return r'
-
-  where
-  go = undefined
-  hlookup = undefined
-  hinsert = undefined
-  hmodify = undefined
-
-_rhsfObserveSharing :: (HTraversable'RhsF n h) => RhsF t n h (RHS t HIdentity h) :~> (StateT () IO :. (RhsF t n h (RHS t HaskellExpression1 h)))
-_rhsfObserveSharing = htraverseRhsF _rhsObserveSharing
-
-
-os :: RHS t HIdentity h :~> (StateT () IO :. (RHS t HaskellExpression1 h))
-os = ntraverseRhsF $ \(r,n) -> do
-  k <- forceStableName r
-  s <- get
-  hlookup k s >>= \case
-    Just v  -> do
-      return v
-    Nothing -> mdo
-      () <- hmodify $ hinsert k v  -- use `v`
-      r' <- go r
-      v <- newHaskellExpression1 r'  -- make `v`
-      return r'
-
-  where
-  go = undefined
-  hlookup = undefined
-  hinsert = undefined
-  hmodify = undefined
-
+-- import Commands.Extra
+-- import Commands.RHS.Open
+--
+-- import Data.HFunctor.Recursion
+-- import Data.HPrelude
+-- import ReifiedBindings.HaskellBinding
+--
+-- --import System.Mem.StableName
+-- import Data.Function
+-- import Control.Monad.State
+--
+-- rhsObserveSharing :: RHS t HIdentity h :~> (IO :. (RHS t HaskellExpression1 h))
+-- rhsObserveSharing = _rhsObserveSharing >>> (evalStateT&flip) ()
+--
+-- _rhsObserveSharing :: RHS t HIdentity h :~> (StateT () IO :. (RHS t HaskellExpression1 h))
+-- _rhsObserveSharing r = do
+--   k <- forceStableName r
+--   s <- get
+--   hlookup k s >>= \case
+--     Just v  -> do
+--       return v
+--     Nothing -> mdo
+--       () <- hmodify $ hinsert k v  -- use `v`
+--       r' <- go r
+--       v <- newHaskellExpression1 r'  -- make `v`
+--       return r'
+--
+--   where
+--   go = undefined
+--   hlookup = undefined
+--   hinsert = undefined
+--   hmodify = undefined
+--
+-- _rhsfObserveSharing :: (HTraversable'RhsF n h) => RhsF t n h (RHS t HIdentity h) :~> (StateT () IO :. (RhsF t n h (RHS t HaskellExpression1 h)))
+-- _rhsfObserveSharing = htraverseRhsF _rhsObserveSharing
+--
+--
+-- os :: RHS t HIdentity h :~> (StateT () IO :. (RHS t HaskellExpression1 h))
+-- os = ntraverseRhsF $ \(r,n) -> do
+--   k <- forceStableName r
+--   s <- get
+--   hlookup k s >>= \case
+--     Just v  -> do
+--       return v
+--     Nothing -> mdo
+--       () <- hmodify $ hinsert k v  -- use `v`
+--       r' <- go r
+--       v <- newHaskellExpression1 r'  -- make `v`
+--       return r'
+--
+--   where
+--   go = undefined
+--   hlookup = undefined
+--   hinsert = undefined
+--   hmodify = undefined
+--
 
 {-|
 
@@ -105,29 +105,29 @@ x = production $ ...
  -- Terminal i t -> Terminal i t
 
 --old rhsObserveSharing :: RHS t n h a -> IO (RHS t (HaskellExpression1 :*: n) h a)
-
-{-|
-
-"higher", "endo", "para", "apo", "Monad".
-
-a recursion scheme that:
-
-* is top-down
-* short-circuits
-* is given the whole input
-* is monadic
-
--}
-hendoparapoM
- :: ( h ~ HBase g
-    , HRecursive   g
-    , HCoRecursive g
-    , HTraversable h
-    , Monad m
-    )
- => (f :~> (m :. h (g :+: f)))
- -> (f :~> (m :. g))
-hendoparapoM = hapoM
+-- 
+-- {-|
+--
+-- "higher", "endo", "para", "apo", "Monad".
+--
+-- a recursion scheme that:
+--
+-- * is top-down
+-- * short-circuits
+-- * is given the whole input
+-- * is monadic
+--
+-- -}
+-- hendoparapoM
+--  :: ( h ~ HBase g
+--     , HRecursive   g
+--     , HCoRecursive g
+--     , HTraversable h
+--     , Monad m
+--     )
+--  => (f :~> (m :. h (g :+: f)))
+--  -> (f :~> (m :. g))
+-- hendoparapoM = hapoM
 
 
 {-TODO

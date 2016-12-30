@@ -7,6 +7,8 @@ let
   f = import ./default.nix;
   ps = {
     spiros = ../spiros;
+    workflow-types = ../workflow-types;
+    # commands-server-types = ../commands-server-types;
   };
 
   haskellPackages = if compiler == "default"

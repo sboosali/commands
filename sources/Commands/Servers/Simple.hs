@@ -28,6 +28,7 @@ runSimpleServer $ defaultSettings runWorkflowT
 -}
 main = do
   print "Commands.Servers.Simple"
+  -- runSimpleServer (defaultSettings ?) 
 
 runSimpleServer :: Settings -> IO ()
 runSimpleServer settings@Settings{..} = Wai.run port (serve recognitionAPI (handlers settings))

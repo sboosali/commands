@@ -58,6 +58,7 @@ library
  build-depends:
                base >=4.7 && <5
              , transformers
+             , containers
 
              , spiros ==0.0.0
              , workflow-types ==0.0.0

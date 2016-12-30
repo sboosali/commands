@@ -14,6 +14,7 @@ import           Control.Monad.Trans.Except            (ExceptT)
 import GHC.TypeLits (Symbol)
 import Data.Char(toLower)
 import Control.Monad (unless)
+import qualified Data.Map as Map
 
 import Prelude.Spiros
 import Prelude()
@@ -62,7 +63,7 @@ type Recognition = [String]
 
 -}
 data Settings = Settings
- { handle               :: [String] -> W.WorkflowT IO ()
+ { handle               :: Recognition -> W.WorkflowT IO ()
  , exec                 :: W.ExecuteWorkflow
  , port                 :: Int
  }
@@ -70,11 +71,42 @@ data Settings = Settings
 defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
- handle ws = unless (ignore ws) $ W.sendText (munge ws)
- munge = unwords > fmap toLower > (++ " ")
- ignore = unwords > (`elem` noise)
- noise = ["the","will","if","him","that","a","she","and"]
+ handle = defaultHandler
  port  = 8888
+
+defaultHandler :: Recognition -> W.WorkflowT IO ()
+defaultHandler ws = do
+ liftIO$ putStrLn ""
+ liftIO$ print ws
+ liftIO$ print a
+ 
+ case a of
+   Ignored_ -> nothing
+   Shortcut_ kbd -> W.press kbd
+   Dictated_ vs -> W.sendText vs
+   
+ where
+ a = defaultParseAction ws
+
+defaultParseAction :: Recognition -> Action_
+defaultParseAction = go
+ where
+ go ws
+  | isNoise ws = Ignored_
+  | otherwise = maybe (Dictated_ vs) Shortcut_ $ isShortcut vs
+  where
+  vs = munge ws
+ isNoise = munge > (`elem` noise)
+ munge = unwords > fmap toLower > (++ " ")
+ noise = ["the","will","if","him","that","a","she","and"]
+ isShortcut = (Map.lookup&flip) shortcuts
+ shortcuts = Map.fromList
+  [ "copy"-: "C-c"
+  , "paste"-: "C-v"
+  , "undo"-: "C-z"
+  ]
+
+data Action_ = Ignored_ | Shortcut_ String | Dictated_ String deriving (Show)
 
 recognitionAPI :: Proxy RecognitionAPI
 recognitionAPI = Proxy

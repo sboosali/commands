@@ -29,6 +29,7 @@ instance Eq SomeStableName where
 instance Hashable SomeStableName where 
   hashWithSalt salt (SomeStableName s) = hashWithSalt salt s 
 
+{-
 
 {-| 'hsearch' where @k@ is a 'StableName' and @v@ is @t@.  
 
@@ -59,3 +60,4 @@ hsearch
  -> (forall x. t x -> m (HashMap k v))
 hsearch = undefined 
 
+-}

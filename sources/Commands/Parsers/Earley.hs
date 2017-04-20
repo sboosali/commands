@@ -9,7 +9,7 @@ import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Text.Earley                     as E
 import qualified Text.Earley.Grammar             as E
-import qualified Text.Earley.Internal            as E
+import qualified Text.Earley.Parser.Internal            as E
 import qualified Data.Text.Lazy as T
 import           Data.Text.Lazy (Text)
 
@@ -31,33 +31,37 @@ data EarleyParser s r e t a = EarleyParser
 
 -- ================================================================ --
 
-bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
-bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
-{-# INLINEABLE bestParse #-}
+fromProd_ :: (forall s r. E.ProdR s r e Text a) -> String -> EarleyEither e Text a
+fromProd_ p ts = firstParse p (map T.pack (words ts))
 
 firstParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t a
 firstParse p = fmap NonEmpty.head . eachParse p
 {-# INLINEABLE firstParse #-}
 
+bestParse :: (forall s r. EarleyParser s r e t a) -> [t] -> EarleyEither e t a
+bestParse p ts = (p&pBest) <$> eachParse (p&pProd) ts
+{-# INLINEABLE bestParse #-}
+
 eachParse :: (forall s r. E.ProdR s r e t a) -> [t] -> EarleyEither e t (NonEmpty a)
 eachParse p = toEarleyEither . (E.fullParses (buildEarleyResult p))
 {-# INLINEABLE eachParse #-}
-
-fromProd_ :: (forall s r. E.ProdR s r e Text a) -> String -> EarleyEither e Text a
-fromProd_ p ts = firstParse p (map T.pack (words ts))
 
 {-|
 
 warning: uses "Text.Earley.Internal"
 
+type E.Parser e i a = forall s. i -> ST s (E.Result s e i a)
+
 -}
 buildEarleyResult
  :: E.ProdR s a n t a
- -> ST s ([t] -> ST s (E.Result s n [t] a))
-buildEarleyResult p1 = do
+-- -> ST s ([t] -> ST s (E.Result s n [t] a))
+ -> [t] -> ST s (E.Result s n [t] a) -- Like parser, but S isn't  safely existentially quantified
+buildEarleyResult p1 ts = do
   p2 <- pureNonTerminal <$> E.mkRule p1
   s <- E.initialState p2
-  return $ E.parse [s] . E.emptyParseEnv
+--  return $ E.parse [s] . E.emptyParseEnv
+  E.parse [s] (E.emptyParseEnv ts) -- TODO Is it correct?
 
 {-|
 

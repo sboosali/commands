@@ -21,6 +21,8 @@ import           Data.HashMap.Lazy (HashMap)
 import System.Mem.StableName
 
 
+{-
+
 data SomeStableName = forall x. SomeStableName (StableName x)
 
 instance Eq SomeStableName where 
@@ -59,3 +61,4 @@ hsearch
  -> (forall x. t x -> m (HashMap k v))
 hsearch = undefined 
 
+-}

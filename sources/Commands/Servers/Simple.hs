@@ -13,6 +13,8 @@ import qualified Network.Wai                    as Wai
 import qualified Network.Wai.Handler.Warp       as Wai
 import Servant
 
+import Control.Monad
+
 import Prelude.Spiros
 import Prelude()
 
@@ -29,8 +31,16 @@ runSimpleServer $ defaultSettings runWorkflowT
 main = do
   print "Commands.Servers.Simple"
 
+{- | launches the server.
+
+Simultaneously, reads from standard input, for debugging.
+
+-}
 runSimpleServer :: Settings -> IO ()
-runSimpleServer settings@Settings{..} = Wai.run port (serve recognitionAPI (handlers settings))
+runSimpleServer settings@Settings{..} = do
+	forkever_ $do
+		getLine >>= cmdln
+	Wai.run port (serve recognitionAPI (handlers settings))
 
 handlers :: Settings -> Server RecognitionAPI
 handlers = handleRecognition

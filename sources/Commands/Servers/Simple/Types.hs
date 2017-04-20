@@ -62,8 +62,9 @@ type Recognition = [String]
 
 -}
 data Settings = Settings
- { handle               :: [String] -> W.WorkflowT IO ()
+ { handle               :: [String] -> W.WorkflowT IO () -- tokenized
  , exec                 :: W.ExecuteWorkflow
+ , cmdln                :: String -> IO () -- not tokenized
  , port                 :: Int
  }
 
@@ -74,6 +75,7 @@ defaultSettings exec = Settings{..}
  munge = unwords > fmap toLower > (++ " ")
  ignore = unwords > (`elem` noise)
  noise = ["the","will","if","him","that","a","she","and"]
+ cmdln s = putStrLn (munge (words s)) -- echoes
  port  = 8888
 
 recognitionAPI :: Proxy RecognitionAPI

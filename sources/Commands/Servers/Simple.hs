@@ -38,6 +38,6 @@ handlers = handleRecognition
 
 handleRecognition :: Settings -> RecognitionHandler
 handleRecognition Settings{handle, exec= W.ExecuteWorkflow exec} ws
- = liftIO $ exec $ handle ws
+ = Handler $ liftIO $ exec $ handle ws
 
 -- _500 :: String -> ServantErr _500 s = err500{ errBody = BS.pack e }

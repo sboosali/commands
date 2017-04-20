@@ -23,7 +23,7 @@ type RecognitionHandler = Recognition -> Response ()
 {-| The server's response.
 
 -}
-type Response = ExceptT ServantErr IO
+type Response = Handler -- ExceptT ServantErr IO
 
 {-| signature for a simple foreign function, via JSON and HTTP.
 

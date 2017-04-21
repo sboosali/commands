@@ -16,16 +16,10 @@ import Commands.Frontends.Dragon13.Text
 import Control.Lens(makeLenses,makePrisms)
 import           Data.Aeson (ToJSON,FromJSON) --TODO rm
 
-<<<<<<< HEAD
 import Prelude.Spiros
 import Prelude()
 
 --------------------------------------------------------------------------------
-=======
---import Prelude.Spiros
---import Prelude()
-import Data.Word
->>>>>>> 5206ae2f0f08f5e7cf1064dd23f12f1148cabb45
 
 {-|
 
@@ -41,8 +35,6 @@ newtype Recognition = Recognition [DNSToken]
 -- | only the utterance ('dnsPronounced'), without metadata
 rawRecognition :: Recognition -> [String]
 rawRecognition = toListOf (_Recognition.dnsPronounced)
-
-type DNSRecognition = [DNSWord]
 
 {-| the "leaves" of the grammar.
 
@@ -102,10 +94,6 @@ validateDNSWord s = Just s --TODO
 -}
 pattern MAXIMUM_ALTERNATIVE_RECOGNITIONS = 10
 
-data DNSWordInfo = DNSWordInfo Word64
-
-data DNSPronunciation = DNSPronunciation String
-
 {-| <http://www.nuance.com/naturallyspeaking/customer-portal/documentation/userguide/chapter7/ug_chapter7_switch_recognition_mode.asp>
 
 -}
@@ -134,7 +122,6 @@ instance Hashable MicrophoneState
 instance ToJSON   MicrophoneState
 instance FromJSON MicrophoneState
 
-<<<<<<< HEAD
 data GrammarObject = GrammarObject_ { getGrammarObject :: Int }
 unsafeGrammarObject = GrammarObject
 
@@ -370,78 +357,33 @@ class MonadNatlink m where
  addWord :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
 
  setSelection :: SelectionGrammarId -> DNSBuffer -> m SelectionSettingStatus
-=======
-newtype GrammarObject = GrammarObject Integer
 
-newtype GrammarRule = GrammarRule String
->>>>>>> 5206ae2f0f08f5e7cf1064dd23f12f1148cabb45
+{-|
+-}
+data NatlinkF k
+ = RecognitionMimic  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L209)
+ | ExecuteScript  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
+ | InputFromFile  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L249)
 
-newtype ResultsObject = ResultsObject Integer
+ | SetMicrophoneState  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L178)
+ | GetMicrophoneState  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
 
-data Results = Results
- { resultsHypotheses :: [Recognition]
- }
- 
-newtype DNSAudio = DNSAudio ()
+ | SetTimerCallback  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
 
-newtype PythonExpression = PythonExpression String
+ | SetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
+ | GetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L373)
+ | DeleteWord  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L421)
+ | AddWord  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
 
-data Exclusivity = Exclusive | Inclusive
+ | LoadGrammarObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L574)
+ | ActivateGrammarRule  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L601)
+ | DectivateGrammarRule  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L614)
+ | SetExclusiveGrammar  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L619)
 
--- {-|
--- -}
--- data NatlinkF k
---  = RecognitionMimic      -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L209)
---  | ExecuteScript         -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
---  | InputFromFile         -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L249)
+ | GetResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
+ | GetResultsObjectAudio  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
+ | CorrectResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
 
---  | SetMicrophoneState    -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L178)
---  | GetMicrophoneState    -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
-
---  | SetTimerCallback      -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
-
---  | SetWordInfo           -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
---  | GetWordInfo           -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L373)
---  | DeleteWord            -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L421)
---  | AddWord               -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
-
---  | LoadGrammarObject     -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L574)
---  | ActivateGrammarRule   -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L601)
---  | DectivateGrammarRule  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L614)
---  | SetExclusiveGrammar   -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L619)
-
---  | GetResultsObject      -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
---  | GetResultsObjectAudio -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
---  | CorrectResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
-
-<<<<<<< HEAD
-=======
-class MonadNatlink m where
-
- -- executeScript             :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
- recognitionMimic             :: DNSRecognition -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L209)
-
- setMicrophoneState           :: MicrophoneState -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L178)
- getMicrophoneState           :: m MicrophoneState  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
-
- setTimerCallback             :: PythonExpression -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
-
- setWordInfo                  :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
- getWordInfo                  :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L373)
- deleteWord                   :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L421)
- addWord                      :: DNSWord -> DNSWordInfo -> [DNSPronunciation] -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
-
- loadGrammarObject            :: GrammarObject -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L574)
- activateGrammarRule          :: GrammarObject -> GrammarRule -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L601)
- dectivateGrammarRule         :: GrammarObject -> GrammarRule -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L614)
- setExclusiveGrammar          :: GrammarObject -> Exclusivity -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L619)
-
- getCurrentResultsObject :: m ResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
- getResults              :: ResultsObject -> m Results -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L717)
- getResultsAudio         :: ResultsObject -> m DNSAudio  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
- correctResults          :: ResultsObject -> DNSRecognition -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
-
->>>>>>> 5206ae2f0f08f5e7cf1064dd23f12f1148cabb45
 --------------------------------------------------------------------------------
 
 makePrisms ''Recognition
@@ -452,7 +394,6 @@ makeLenses ''DNSWord
 makePrisms ''DNSMode
 makePrisms ''MicrophoneState
 
-<<<<<<< HEAD
 makeLenses ''GrammarProperties
 makeLenses ''ControlGrammar
 makeLenses ''SelectionGrammar
@@ -465,7 +406,3 @@ makeLenses ''SelectionResults
 makePrisms ''RecognitionAudio
 makePrisms ''DragonScriptExpression
 makePrisms ''PythonExpression
-=======
---TODO sboosali.github.io https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt
-
->>>>>>> 5206ae2f0f08f5e7cf1064dd23f12f1148cabb45

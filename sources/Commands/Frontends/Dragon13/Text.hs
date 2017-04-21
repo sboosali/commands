@@ -21,7 +21,6 @@ module Commands.Frontends.Dragon13.Text
 import           Commands.Extra
 
 import           Data.Char
-import           Data.Monoid    ((<>))
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as T
 

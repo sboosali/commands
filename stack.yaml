@@ -1,4 +1,5 @@
-resolver: lts-6.1
+resolver: nightly-2017-04-19 #lts-8.11
+compiler: ghc-8.0.2
 
 packages:
 - .
@@ -17,3 +18,4 @@ extra-deps:
 - reified-bindings-0.0.0
 
 - language-python-0.5.4
+- recursion-schemes-5

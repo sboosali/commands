@@ -17,7 +17,6 @@ import           Data.Either                       (partitionEithers)
 import qualified Data.List                         as List
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
-import           Data.Monoid                       ((<>))
 import           Numeric.Natural
 
 

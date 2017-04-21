@@ -13,7 +13,7 @@ import Commands.Mixins.DNS13OSX9.ObservedSharing
 import Commands.Parsers.Earley
 
 import qualified Text.Earley                     as E
-import qualified Text.Earley.Internal            as E
+import qualified Text.Earley.Parser.Internal            as E
 import Data.Text.Lazy (Text)
 
 import           Control.Monad.ST

@@ -22,7 +22,6 @@ import           Data.List.NonEmpty              (NonEmpty (..))
 import qualified Data.List.NonEmpty              as NonEmpty
 
 import Data.Void
-import Data.Monoid              ((<>))
 -- import           Data.Unique
 import           Data.Function                   (on)
 import Control.Monad.Trans.State

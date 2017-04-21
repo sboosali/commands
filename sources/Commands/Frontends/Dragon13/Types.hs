@@ -200,6 +200,7 @@ instance Monoid (DNSRHS t n) where
 pattern ZeroDNSRHS = 'DNSNonTerminal' ('SomeDNSLHS' ('DNSBuiltinList' 'DNSEmptyList'))
 
 -}
+pattern ZeroDNSRHS :: DNSRHS t n
 pattern ZeroDNSRHS = DNSNonTerminal (SomeDNSLHS (DNSBuiltinList DNSEmptyList))
 
 {- On the Implementation:
@@ -265,6 +266,7 @@ thus:
 "denotationally", we have the above equational reasoning. "operationally", I guess that DNS checks whether it can match the current token to any token in the empty list, which it never can (failing), but then the option is matched (always succeeding).
 
 -}
+pattern UnitDNSRHS :: DNSRHS t n
 pattern UnitDNSRHS = DNSOptional ZeroDNSRHS
 
 asDNSSequence :: DNSRHS t n -> NonEmpty (DNSRHS t n)
@@ -272,6 +274,7 @@ asDNSSequence = \case
  DNSSequence rs -> rs
  r -> r :| []
 
+pattern SomeDNSNonTerminal :: DNSLHS l s n -> DNSRHS t n
 pattern SomeDNSNonTerminal l = DNSNonTerminal (SomeDNSLHS l)
 
 -- TODO nonemptyDNS: if DNS unit represents the empty list, why not simplify types and use normal lists? Avoids needing to optimize away (DNSSequence DNSUnit). Delays empty case analysis until pretty printing.

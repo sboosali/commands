@@ -18,7 +18,6 @@ import qualified Data.List                         as List
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 
-
 -- | a grammar can be normalized/optimized with its @i@ and @n@ type parameters.
 type DNSGrammarOptimizeable t n = DNSGrammar DNSInfo t n
 

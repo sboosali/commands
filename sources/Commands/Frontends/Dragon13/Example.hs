@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase, NamedFieldPuns, OverloadedLists, OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 -- | (See source), or "Commands.Frontends.Dragon13.Serialize"
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-incomplete-uni-patterns #-}
 module Commands.Frontends.Dragon13.Example where
 import Commands.Frontends.Dragon13
 
@@ -38,5 +38,5 @@ main = do
   print serializedRules
 
   print serializedLists
-  
+
   print serializedExport

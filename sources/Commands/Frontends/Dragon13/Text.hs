@@ -24,7 +24,6 @@ import           Data.Char
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as T
 
-
 newtype DNSName = DNSName { unDNSName :: Text } deriving (Show,Eq,Ord,Data,Generic)
 -- pattern DNSName s <- DNSName_ s
 

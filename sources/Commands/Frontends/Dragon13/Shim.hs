@@ -7,7 +7,6 @@ import           Text.InterpolatedString.Perl6
 
 import           GHC.Exts                        (IsString)
 
-
 {- |
 
 given valid input, output will be a syntactically-valid Python (2.6)
@@ -58,7 +57,7 @@ import traceback
 H_RULES  = {__rules__}
 H_LISTS  = {__lists__}
 H_EXPORT = {__export__}
-H_SERVER_HOST = {__serverHost__}  
+H_SERVER_HOST = {__serverHost__}
 H_SERVER_PORT = {__serverPort__}
 
 # e.g. for debugging
@@ -112,7 +111,7 @@ class NarcissisticGrammar(GrammarBase):
         print "---------- gotHypothesis -------------"
         print words
 
-    # recognitionType = self | reject | other 
+    # recognitionType = self | reject | other
     def gotResultsObject(self, recognitionType, resultsObject):
         print "---------- gotResultsObject ----------"
         print "recognitionType =", recognitionType
@@ -179,7 +178,7 @@ class NarcissisticGrammar(GrammarBase):
 
 # TODO             handleDGNUpdate(grammar, response)
 def handleDGNUpdate(grammar, response):
-    pass 
+    pass
 
 def should_request(grammar,data):
     b = data and not handle_microphone(grammar,data) and isUnicode(data) and not isNoise(data)
@@ -192,8 +191,8 @@ def should_request(grammar,data):
 def handle_microphone(grammar,data):
     raw = " ".join(data)
 
-    if   raw == "mike on": 
-        # grammar.setMicState("on") 
+    if   raw == "mike on":
+        # grammar.setMicState("on")
         grammar.activateSet([microphone_export, H_EXPORT], exclusive=1)
         return True
     elif raw == "mike off":

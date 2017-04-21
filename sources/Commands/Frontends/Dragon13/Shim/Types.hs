@@ -24,6 +24,17 @@ data ShimR t = ShimR
  -- , :: t   -- ^ a Python
  } deriving (Show,Eq,Ord,Functor,Data,Generic)
 
+-- | "keyword arguments" for 'getShim'.
+data SelectionShimR t = SelectionShimR
+ { __SelectionShimR_name__        :: t  -- ^ a Python String
+ -- TODO  this stuff below should probably be a separate interpolation, like servant-python
+ , __SelectionShimR_serverHost__  :: t  -- ^ a Python String
+ , __SelectionShimR_serverPort__  :: t  -- ^ a Python Int
+ , __SelectionShimR_logFile__     :: t  -- ^ a Python String
+ , __SelectionShimR_contextFile__ :: t  -- ^ a Python String
+ -- , :: t   -- ^ a Python
+ } deriving (Show,Eq,Ord,Functor,Data,Generic)
+
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
 newtype PythonFile = PythonFile {getPythonFile :: Text}  deriving (Show,Eq,Ord,Data,Generic)
 

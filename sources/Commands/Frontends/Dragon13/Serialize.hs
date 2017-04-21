@@ -275,9 +275,9 @@ which doesn't parse as Python.
 
 -}
 enclosePythonic :: Doc -> Doc -> Doc -> [Doc] -> Doc
-enclosePythonic left right sep ds
+enclosePythonic left right seperator ds
   = left
- <> (align . cat $ punctuate sep ds)
+ <> (align . cat $ punctuate seperator ds)
  <> right
 
 -- | validates the grammar (@:: 'DNSGrammar' name token@) :
@@ -335,10 +335,11 @@ from_SerializedGrammar_to_ShimR NatLinkConfig{..} SerializedGrammar{..} = ShimR{
  __logFile__     = str2doc nlLogFile
  __contextFile__ = str2doc nlContextFile
 
- Address (Host h) (Port p) = nlAddress
+ Address (Host h) (Port p) = nlAddress -- TODO lol
  str2doc = T.pack >>> text >>> squotes
 
 -- | (for debugging)
 displaySerializedGrammar :: SerializedGrammar -> String
 displaySerializedGrammar SerializedGrammar{..} = T.unpack $ displayDoc $
  (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
+

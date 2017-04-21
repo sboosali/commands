@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving, TemplateHaskell, PatternSynonyms #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving, PatternSynonyms, OverloadedStrings #-}
 
 {-| the speech engine API, as exposed by
 <https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L106 Natlink>
@@ -13,10 +13,11 @@ import Commands.Frontends.Dragon13.Extra
 import Commands.Frontends.Dragon13.Types (DNSGrammar(..), DNSInfo)
 import Commands.Frontends.Dragon13.Text
 
-import Control.Lens(makeLenses,makePrisms)
 import           Data.Aeson (ToJSON,FromJSON) --TODO rm
+import Data.Maybe (isJust)
+import           Data.Text.Lazy (Text)
+--import qualified Data.Text.Lazy as T
 
-import Prelude.Spiros
 import Prelude()
 
 --------------------------------------------------------------------------------
@@ -31,10 +32,6 @@ newtype DNSBuffer = DNSBuffer String
 -}
 newtype Recognition = Recognition [DNSToken]
  deriving (Show,Read,Eq,Ord,Generic,Data,NFData,Hashable,ToJSON,FromJSON,Semigroup,Monoid)
-
--- | only the utterance ('dnsPronounced'), without metadata
-rawRecognition :: Recognition -> [String]
-rawRecognition = toListOf (_Recognition.dnsPronounced)
 
 {-| the "leaves" of the grammar.
 
@@ -55,9 +52,9 @@ DNSToken
 
 -}
 data DNSToken = DNSToken
- { _dnsPronounced :: String
- , _dnsWritten    :: String
- , _dnsCategory   :: String
+ { _dnsPronounced :: Text
+ , _dnsWritten    :: Text
+ , _dnsCategory   :: Text
  }
  deriving (Show,Read,Eq,Ord,Data,Generic)
 instance NFData   DNSToken
@@ -65,14 +62,14 @@ instance Hashable DNSToken
 instance ToJSON   DNSToken
 instance FromJSON DNSToken
 
-toDNSToken :: String -> Maybe DNSToken --TODO
+toDNSToken :: Text -> Maybe DNSToken --TODO
 toDNSToken s = if s & (validDNSToken > isJust) then Just DNSToken{..} else Nothing
  where
  _dnsPronounced = s
  _dnsWritten = ""
  _dnsCategory = ""
 
-validDNSToken :: String -> Maybe String --TODO
+validDNSToken :: Text -> Maybe Text --TODO
 validDNSToken s = Just s
 
 {-| the "leaves" of the grammar.
@@ -82,16 +79,16 @@ Provided to Dragon NaturallySpeaking in the grammar that is loaded.
 Validated by 'validateDNSWord'
 
 -}
-data DNSWord = DNSWord String
+data DNSWord = DNSWord Text
 
-validateDNSWord :: String -> Maybe DNSWord
-validateDNSWord s = Just s --TODO
+validateDNSWord :: Text -> Maybe DNSWord
+validateDNSWord s = s & (DNSWord > Just) --TODO
 
 --------------------------------------------------------------------------------
 
 {-|
-
 -}
+pattern MAXIMUM_ALTERNATIVE_RECOGNITIONS :: Natural
 pattern MAXIMUM_ALTERNATIVE_RECOGNITIONS = 10
 
 {-| <http://www.nuance.com/naturallyspeaking/customer-portal/documentation/userguide/chapter7/ug_chapter7_switch_recognition_mode.asp>
@@ -121,12 +118,6 @@ instance NFData   MicrophoneState
 instance Hashable MicrophoneState
 instance ToJSON   MicrophoneState
 instance FromJSON MicrophoneState
-
-data GrammarObject = GrammarObject_ { getGrammarObject :: Int }
-unsafeGrammarObject = GrammarObject
-
-data ResultsObject = ResultsObject_ { getResultsObject :: Int }
-unsafeResultsObject = ResultsObject
 
 newtype PythonExpression = PythonExpression { getPythonExpression :: String }
 
@@ -177,6 +168,38 @@ booleanGrammarLoadStatus = \case
   GrammarLoadSuccess      -> True
   GrammarLoadBadGrammar   -> False
   GrammarLoadInvalidWord  -> False
+
+--------------------------------------------------------------------------------
+
+type ForeignIdentifier = Int
+
+data GrammarObject = GrammarObject_ ForeignIdentifier -- { getGrammarObject :: Int }
+ deriving (Show,Eq,Ord,Generic) -- Show only for debugging
+instance NFData   GrammarObject
+instance Hashable GrammarObject
+
+unsafeGrammarObject :: ForeignIdentifier -> GrammarObject
+unsafeGrammarObject = GrammarObject_
+
+newtype SelectionGrammarObject = SelectionGrammarObject_ ForeignIdentifier
+ deriving (Show,Eq,Ord,Generic) -- Show only for debugging
+instance NFData   SelectionGrammarObject
+instance Hashable SelectionGrammarObject
+
+unsafeSelectionGrammarObject :: ForeignIdentifier -> SelectionGrammarObject
+unsafeSelectionGrammarObject = SelectionGrammarObject_
+
+data ResultsObject = ResultsObject_ ForeignIdentifier -- { getResultsObject :: Int }
+   deriving (Show,Eq,Ord,Generic) -- Show only for debugging
+instance NFData   ResultsObject
+instance Hashable ResultsObject
+
+unsafeResultsObject :: ForeignIdentifier -> ResultsObject
+unsafeResultsObject = ResultsObject_
+
+data SelectionResultsObject = SelectionResultsObject_ ForeignIdentifier -- { getResultsObject :: Int }
+unsafeSelectionResultsObject :: ForeignIdentifier -> SelectionResultsObject
+unsafeSelectionResultsObject = SelectionResultsObject_
 
 --------------------------------------------------------------------------------
 
@@ -299,24 +322,26 @@ data SelectionGrammar = SelectionGrammar
 {-|
 
 -}
+defaultSelectionGrammar :: SelectionGrammar
+defaultSelectionGrammar = SelectionGrammar{..}
+ where
+ _selectionProperties = defaultGrammarProperties
+ _selectionConfiguration = defaultSelectionConfiguration
+
+{-|
+
+-}
 data SelectionConfiguration = SelectionConfiguration
   { _selectionSelectWords  :: [String]
   , _selectionThroughWords :: [String]
 --  , selection ::
   }
 
-{-|
-
--}
-defaultSelectionGrammar :: SelectionGrammar
-defaultSelectionGrammar = SelectionGrammar{..}
+defaultSelectionConfiguration :: SelectionConfiguration
+defaultSelectionConfiguration = SelectionConfiguration{..}
  where
- _selectionProperties = defaultGrammarProperties
  _selectionSelectWords = ["select","correct","insert before","insert after","capitalize"] -- TODO Reproduce all NaturallySpeaking's Selection commands
  _selectionThroughWords = ["through","until"] -- TODO non-words, so they dont conflict with the buffer itself
-
-newtype SelectionGrammarId = SelectionGrammarId Int
-unsafeSelectionGrammarId = SelectionGrammarId
 
 data SelectionSettingStatus = SelectionSettingSuccess
 
@@ -325,7 +350,7 @@ data SelectionSettingStatus = SelectionSettingSuccess
 see @ResultsObject.getSelectInfo()@
 
 -}
-data SelectionResultsObject = SelectionResultsObject
+data SelectionResults = SelectionResults
  { _sroRecognition :: Recognition -- ^ A subsequence of the selection buffer
  , _sroOffset      :: Natural     -- ^ Bounded by the length of the selection buffer -- TODO Necessary?
  }
@@ -356,7 +381,7 @@ class MonadNatlink m where
  deleteWord :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L421)
  addWord :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
 
- setSelection :: SelectionGrammarId -> DNSBuffer -> m SelectionSettingStatus
+ setSelection :: SelectionGrammarObject -> DNSBuffer -> m SelectionSettingStatus
 
 {-|
 -}
@@ -385,24 +410,3 @@ data NatlinkF k
  | CorrectResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
 
 --------------------------------------------------------------------------------
-
-makePrisms ''Recognition
-makePrisms ''DNSBuffer
-makeLenses ''DNSToken
-makeLenses ''DNSWord
-
-makePrisms ''DNSMode
-makePrisms ''MicrophoneState
-
-makeLenses ''GrammarProperties
-makeLenses ''ControlGrammar
-makeLenses ''SelectionGrammar
-makeLenses ''ControlConfiguration
-makeLenses ''SelectionConfiguration
-
-makeLenses ''ControlResults
-makeLenses ''SelectionResults
-
-makePrisms ''Utterance
-makePrisms ''DragonScriptExpression
-makePrisms ''PythonExpression

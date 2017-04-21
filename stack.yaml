@@ -1,11 +1,5 @@
-resolver: lts-7.14
-compiler: ghc-8.0
-
-nix:
-  enable: true
-  pure: true
-  packages: [zlib]
-  # shell-file: shell.nix
+resolver: nightly-2017-04-19 #lts-8.11
+compiler: ghc-8.0.2
 
 packages:
 - .
@@ -24,5 +18,4 @@ extra-deps:
 - reified-bindings-0.0.0
 
 - language-python-0.5.4
-- recursion-schemes-5.0.1 # why? it's transitive.
-
+- recursion-schemes-5

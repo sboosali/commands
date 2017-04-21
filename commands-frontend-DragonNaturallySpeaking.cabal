@@ -60,6 +60,7 @@ library
                  Commands.Frontends.Dragon13.Optimize
                  Commands.Frontends.Dragon13.Shim
                  Commands.Frontends.Dragon13.Shim.Types
+                 Commands.Frontends.Dragon13.Shim.Selection
                  Commands.Frontends.Dragon13.Serialize
 
                  Commands.Frontends.Natlink.Types

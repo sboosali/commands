@@ -10,7 +10,7 @@ TODO websockets + setTimerCallback ?
 -}
 module Commands.Frontends.Natlink.Types where
 import Commands.Frontends.Dragon13.Extra
-import Commands.Frontends.Dragon13.Types (DNSGrammar(..))
+import Commands.Frontends.Dragon13.Types (DNSGrammar(..), DNSInfo)
 import Commands.Frontends.Dragon13.Text
 
 import Control.Lens(makeLenses,makePrisms)
@@ -134,25 +134,6 @@ newtype DragonScriptExpression = DragonScriptExpression { getDragonScriptExpress
 
 {-|
 
-Training can fail of the transcription is not close enough to the utterance.
-
--}
-data CorrectionStatus = CorrectionSuccess | CorrectionHeterophonic | CorrectionInvalidWord
- deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
-instance NFData   MicrophoneState
-instance Hashable MicrophoneState
-instance ToJSON   MicrophoneState
-instance FromJSON MicrophoneState
-
--- | True is "good", False is "bad"
-booleanCorrectionStatus :: CorrectionStatus -> Bool
-booleanCorrectionStatus = \case
-  CorrectionSuccess      -> True
-  CorrectionHeterophonic -> False
-  CorrectionInvalidWord  -> False
-
-{-|
-
 Audio data in wave format.
 
 11.025 * 4000 = 441000
@@ -162,6 +143,25 @@ Audio data in wave format.
 data Utterance = Utterance
   { _utteranceData :: () --TODO
   }
+
+{-|
+
+Training can fail of the transcription is not close enough to the utterance.
+
+-}
+data CorrectionStatus = CorrectionSuccess | CorrectionHeterophonic | CorrectionInvalidWord
+ deriving (Show,Read,Eq,Ord,Enum,Bounded,Data,Generic)
+instance NFData   CorrectionStatus
+instance Hashable CorrectionStatus
+instance ToJSON   CorrectionStatus
+instance FromJSON CorrectionStatus
+
+-- | True is "good", False is "bad"
+booleanCorrectionStatus :: CorrectionStatus -> Bool
+booleanCorrectionStatus = \case
+  CorrectionSuccess      -> True
+  CorrectionHeterophonic -> False
+  CorrectionInvalidWord  -> False
 
 {-|
 
@@ -189,7 +189,7 @@ data GrammarProperties = GrammarProperties
   , _grammarShouldEavesdrop   :: ShouldEavesdrop
   , _grammarShouldHypothesize :: ShouldHypothesize
 --  , grammar ::
-  }
+  }  deriving (Show,Read,Eq,Ord)
 
 {-|
 
@@ -348,7 +348,7 @@ class MonadNatlink m where
  setExclusiveGrammar :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L619)
 
 -- getResultsObject :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
- getResultsObjectAudio :: (ResultsObject) -> m (RecognitionAudio)  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
+ getResultsObjectAudio :: (ResultsObject) -> m (Utterance)  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
  correctResultsObject :: (ResultsObject) -> Recognition -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
 
  setWordInfo :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
@@ -403,6 +403,6 @@ makeLenses ''SelectionConfiguration
 makeLenses ''ControlResults
 makeLenses ''SelectionResults
 
-makePrisms ''RecognitionAudio
+makePrisms ''Utterance
 makePrisms ''DragonScriptExpression
 makePrisms ''PythonExpression

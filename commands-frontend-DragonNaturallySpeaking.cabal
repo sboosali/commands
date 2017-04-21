@@ -122,7 +122,16 @@ library
 
               -- not on Stackage
               , language-python
---
+
+executable example-commands-frontend-DragonNaturallySpeaking
+ hs-source-dirs:      executables
+ main-is:             Main.hs
+
+ default-language:    Haskell2010
+ ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+
+ build-depends: base, commands-frontend-DragonNaturallySpeaking
+
 -- -- $ stack test doctest
 -- test-suite doctest
 --  hs-source-dirs:      tests

@@ -5,7 +5,7 @@ import           Commands.Munging
 import Commands.Mixins.DNS13OSX9.Types
 import Commands.Frontends.Dragon13
 import Commands.RHS
-import Commands.Parsers.Earley
++import Commands.Parsers.Earley
 import Data.GUI
 
 import Control.Lens hiding (snoc)

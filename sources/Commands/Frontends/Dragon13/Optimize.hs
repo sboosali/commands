@@ -17,7 +17,6 @@ import           Data.Either                       (partitionEithers)
 import qualified Data.List                         as List
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
-import           Numeric.Natural
 
 
 -- | a grammar can be normalized/optimized with its @i@ and @n@ type parameters.

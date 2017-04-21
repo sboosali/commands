@@ -5,7 +5,6 @@ import Commands.Extra
 import Data.Hashable
 
 import Data.List                  (intercalate)
-import Data.Monoid                ((<>))
 import Language.Haskell.TH.Syntax (Name)
 import Data.Typeable (Typeable)
  

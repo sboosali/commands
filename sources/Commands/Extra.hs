@@ -5,15 +5,15 @@
 -- | assorted functionality, imported by most modules in this package.
 module Commands.Extra
  ( module Commands.Extra
+ , module Prelude.Spiros
+
  , module Data.Possibly
  , module Data.Address
  , module Data.GUI
- , module Commands.Instances
  , module Data.Data
  , module Data.HTypes
- , module GHC.Generics
- , (>>>)
- , traverse_
+ , module Commands.Instances
+
  ) where
 import           Commands.Instances
 import Data.Possibly
@@ -30,27 +30,21 @@ import           Numeric
 
 -- TODO import Data.Functor.Classes
 import           Control.Applicative
-import           Control.Arrow                ((>>>))
 import           Control.Exception            (Exception (..), Handler,
                                                SomeException (..), catches, evaluate)
 import           Data.Graph
 import qualified Data.Set as Set
 import           Data.List                    (nub)
 import           Data.Maybe
-import           Data.Monoid                  ((<>))
 import           Data.Ord
-import           Data.Typeable                (Typeable)
+import           Data.Data
 import qualified Debug.Trace
-import           GHC.Generics                 (Generic)
 import           GHC.Exts                          (IsString (..))
-import Data.Data (Data)
-import           Data.Foldable                   (traverse_)
 import Control.Concurrent.STM(swapTVar,TVar,STM)
 import System.Mem.StableName
-import Control.Monad.IO.Class (MonadIO(..))
 
-__BUG__ :: SomeException -> a
-__BUG__ = error . show
+import Prelude.Spiros
+import Prelude()
 
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".
 (-->) :: (a -> Bool) -> (a -> Bool) -> (a -> Bool)
@@ -132,15 +126,8 @@ sccs2cycles = mapMaybe $ \case
  AcyclicSCC _ -> Nothing
  CyclicSCC ns -> Just ns
 
-snoc :: [a] -> a -> [a]
-snoc xs x = xs <> [x]
-
 -- | a natural transformation
 type (:~>:) f g = forall x. f x -> g x
-
--- | @($>) = flip ('<$')@
-($>) :: (Functor f) => f a -> b -> f b
-($>) = flip (<$)
 
 {- | left-biased maximum.
 
@@ -171,22 +158,6 @@ argmax f = maximumByL (comparing f)
 -}
 interleaving :: (Alternative f) => f a -> f x -> f (NonEmpty a)
 interleaving f g = (:|) <$> f <*> many (g *> f)
-
-{- | @(-:) = (,)@
-
-fake dictionary literal syntax:
-
-@
- [ "a"-: 1
- , "b"-: 2
- , "c"-: 1+2
- ]
-@
-
--}
-(-:) :: a -> b -> (a,b)
-(-:) = (,)
-infix 1 -:
 
 {- | for convenience when writing string dicts, let's you make a value equal to its key.
 
@@ -261,9 +232,6 @@ cross = sequence
 -}
 takeTVar :: TVar (Maybe a) -> STM (Maybe a)
 takeTVar var = swapTVar var Nothing
-
-maybe2bool :: Maybe a -> Bool
-maybe2bool = maybe False (const True)
 
 -- |
 forceStableName

@@ -8,12 +8,12 @@ module Commands.Servers.Simple.Types where
 import qualified Workflow.Core as W
 
 import Servant
-import           Data.Text.Lazy                        (Text)
-import           Control.Monad.Trans.Except            (ExceptT)
+-- import           Data.Text.Lazy                        (Text)
+-- import           Control.Monad.Trans.Except            (ExceptT)
 
 import GHC.TypeLits (Symbol)
 import Data.Char(toLower)
-import Control.Monad (unless)
+-- import Control.Monad (unless)
 import qualified Data.Map as Map
 
 import Prelude.Spiros
@@ -75,6 +75,7 @@ defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
  handle = defaultHandler
+ cmdln = defaultCmdln
  port  = 8888
 
 defaultHandler :: Recognition -> W.WorkflowT IO ()
@@ -84,9 +85,9 @@ defaultHandler ws = do
  liftIO$ print a
  
  case a of
-   Ignored_ -> nothing
    Shortcut_ kbd -> W.press kbd
-   Dictated_ vs -> W.sendText vs
+   Dictated_ vs  -> W.sendText vs
+   Ignored_      -> nothing
    
  where
  a = defaultParseAction ws
@@ -96,20 +97,24 @@ defaultParseAction = go
  where
  go ws
   | isNoise ws = Ignored_
-  | otherwise = maybe (Dictated_ vs) Shortcut_ $ isShortcut vs
-  where
-  vs = munge ws
+  | otherwise  = isShortcut vs & maybe (Dictated_ (vs  ++ " ")) Shortcut_ 
+   where
+   vs = munge ws
  isNoise = munge > (`elem` noise)
- munge = unwords > fmap toLower > (++ " ")
+ munge = unwords > fmap toLower
  noise = ["the","will","if","him","that","a","she","and"]
- cmdln s = putStrLn (munge (words s)) -- echoes
- port  = 8888
- -- isShortcut = (Map.lookup&flip) shortcuts
- -- shortcuts = Map.fromList
- --  [ "copy"-: "C-c"
- --  , "paste"-: "C-v"
- --  , "undo"-: "C-z"
- --  ]
+ isShortcut = (Map.lookup&flip) shortcuts
+ shortcuts = Map.fromList
+  [ "copy"-: "C-c"
+  , "paste"-: "C-v"
+  , "undo"-: "C-z"
+  ]
+
+defaultCmdln :: String -> IO ()
+defaultCmdln s = do
+  putStrLn (munge s) -- echoes
+  where
+  munge = fmap toLower
 
 recognitionAPI :: Proxy RecognitionAPI
 recognitionAPI = Proxy

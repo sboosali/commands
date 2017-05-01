@@ -1,4 +1,4 @@
-resolver: lts-8.12
+resolver: nightly-2017-04-19 # lts-8.12
 compiler: ghc-8.0.2
 
 nix:

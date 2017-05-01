@@ -24,7 +24,7 @@ type RecognitionHandler = Recognition -> Response ()
 {-| The server's response.
 
 -}
-type Response = ExceptT ServantErr IO
+type Response = Handler -- ExceptT ServantErr IO
 
 {-| signature for a simple foreign function, via JSON and HTTP.
 
@@ -63,10 +63,13 @@ type Recognition = [String]
 
 -}
 data Settings = Settings
- { handle               :: Recognition -> W.WorkflowT IO ()
+ { handle               :: Recognition -> W.WorkflowT IO () -- tokenized
  , exec                 :: W.ExecuteWorkflow
+ , cmdln                :: String -> IO () -- not tokenized
  , port                 :: Int
  }
+
+data Action_ = Ignored_ | Shortcut_ String | Dictated_ String deriving (Show)
 
 defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
@@ -99,14 +102,14 @@ defaultParseAction = go
  isNoise = munge > (`elem` noise)
  munge = unwords > fmap toLower > (++ " ")
  noise = ["the","will","if","him","that","a","she","and"]
- isShortcut = (Map.lookup&flip) shortcuts
- shortcuts = Map.fromList
-  [ "copy"-: "C-c"
-  , "paste"-: "C-v"
-  , "undo"-: "C-z"
-  ]
-
-data Action_ = Ignored_ | Shortcut_ String | Dictated_ String deriving (Show)
+ cmdln s = putStrLn (munge (words s)) -- echoes
+ port  = 8888
+ -- isShortcut = (Map.lookup&flip) shortcuts
+ -- shortcuts = Map.fromList
+ --  [ "copy"-: "C-c"
+ --  , "paste"-: "C-v"
+ --  , "undo"-: "C-z"
+ --  ]
 
 recognitionAPI :: Proxy RecognitionAPI
 recognitionAPI = Proxy

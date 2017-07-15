@@ -1,6 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, RecordWildCards, TemplateHaskell #-}
 module Commands.Frontends.Dragon13.Shim.Types where
 import           Commands.Extra
+import Commands.Frontends.Natlink.Types
 
 import           Data.Text.Lazy                  (Text)
 import qualified Data.Text.Lazy                  as T
@@ -9,6 +10,9 @@ import           Language.Python.Common.ParseError (ParseError)
 import Control.Lens
 
 import Control.Exception (Exception)
+
+import Prelude() 
+import Prelude.Spiros
 
 
 -- | "keyword arguments" for 'getShim'.
@@ -19,10 +23,11 @@ data ShimR t = ShimR
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
  , __serverHost__  :: t  -- ^ a Python String
  , __serverPort__  :: t  -- ^ a Python Int
- , __logFile__     :: t  -- ^ a Python String
- , __contextFile__ :: t  -- ^ a Python String
+ -- , __logFile__     :: t  -- ^ a Python String
+ -- , __contextFile__ :: t  -- ^ a Python String
  -- , :: t   -- ^ a Python
- } deriving (Show,Eq,Ord,Functor,Data,Generic)
+ , __properties__ :: t
+ } deriving (Show,Read , Eq,Ord,Data,Generic)
 
 -- | "keyword arguments" for 'getShim'.
 data SelectionShimR t = SelectionShimR
@@ -33,7 +38,7 @@ data SelectionShimR t = SelectionShimR
  , __SelectionShimR_logFile__     :: t  -- ^ a Python String
  , __SelectionShimR_contextFile__ :: t  -- ^ a Python String
  -- , :: t   -- ^ a Python
- } deriving (Show,Eq,Ord,Functor,Data,Generic)
+ } deriving (Show,Read, Eq,Ord,Functor,Data,Generic)
 
 -- | syntactically correct Python files (when constructed with 'newPythonFile').
 newtype PythonFile = PythonFile {getPythonFile :: Text}  deriving (Show,Eq,Ord,Data,Generic)
@@ -45,10 +50,22 @@ instance Exception PythonSyntaxError
 
 data NatLinkConfig = NatLinkConfig
  { nlAddress     :: Address
- , nlLogFile     :: FilePath
- , nlContextFile :: FilePath
- }
+ -- , nlLogFile     :: FilePath
+ -- , nlContextFile :: FilePath
+ , nlGrammarProperties :: GrammarProperties
+ }  deriving (Show,Read,Eq,Ord,Data,Generic)
 
+defaultNatLinkConfig :: NatLinkConfig
+defaultNatLinkConfig = NatLinkConfig defaultNatlinkAddress defaultGrammarProperties
+
+defaultNatlinkAddress :: Address
+defaultNatlinkAddress = Address defaultNatlinkHost defaultNatlinkPort -- TODO why?
+
+defaultNatlinkHost :: Host
+defaultNatlinkHost = Host "127.0.0.1" -- TODO why?
+
+defaultNatlinkPort :: Port
+defaultNatlinkPort = Port 8888 -- TODO why?
 
 -- ================================================================ --
 

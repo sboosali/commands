@@ -9,6 +9,13 @@ import           GHC.Exts                        (IsString)
 
 {-|
 
+@
+A select XYZ grammar is a special grammar which
+recognizes an utterance of the form "<select> <text> [ <through> <text> ]"
+where <select> and <through> can both be lists of keywords
+and <text> is an arbitrary sequence of words in a specified text buffer.
+@
+
 -}
 getSelectionShim :: (IsString t, Monoid t) => SelectionShimR t -> t
 getSelectionShim SelectionShimR{..} = [qc|

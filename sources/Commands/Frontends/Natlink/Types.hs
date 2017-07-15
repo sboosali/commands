@@ -212,13 +212,21 @@ data GrammarProperties = GrammarProperties
   , _grammarShouldEavesdrop   :: ShouldEavesdrop
   , _grammarShouldHypothesize :: ShouldHypothesize
 --  , grammar ::
-  }  deriving (Show,Read,Eq,Ord)
+  }  deriving (Show,Read,Eq,Ord,Data,Generic)
 
 {-|
 
 -}
 defaultGrammarProperties :: GrammarProperties
-defaultGrammarProperties = fastGrammarProperties
+defaultGrammarProperties = primaryGrammarProperties
+
+primaryGrammarProperties :: GrammarProperties
+primaryGrammarProperties = GrammarProperties{..}
+ where
+ _grammarStatus = Enabled
+ _grammarExclusivity = Inclusive
+ _grammarShouldEavesdrop = YesEavesdrop
+ _grammarShouldHypothesize = YesHypothesize
 
 {-|
 
@@ -268,7 +276,7 @@ data ShouldHypothesize = YesHypothesize | NoHypothesize
 data ControlGrammar = ControlGrammar
   { _controlProperties    :: GrammarProperties
   , _controlConfiguration :: DNSGrammar DNSInfo DNSText DNSName
-  } deriving (Show,Eq,Ord)
+  } deriving (Show,Eq,Ord,Generic)
 
 -- data ControlConfiguration = ControlConfiguration
 --   { _control ::
@@ -280,7 +288,8 @@ data ControlGrammar = ControlGrammar
 data ControlResults = ControlResults
   { _controlRecognition :: Recognition
 --  , _control ::
-  }
+  } deriving (Show,Read,Eq,Ord,Data,Generic)
+
 
 --------------------------------------------------------------------------------
 
@@ -317,7 +326,7 @@ data SelectionGrammar = SelectionGrammar
   { _selectionProperties    :: GrammarProperties
   , _selectionConfiguration :: SelectionConfiguration
 --  , selection ::
-  }
+  } deriving (Show,Read,Eq,Ord,Data,Generic)
 
 {-|
 
@@ -335,7 +344,7 @@ data SelectionConfiguration = SelectionConfiguration
   { _selectionSelectWords  :: [String]
   , _selectionThroughWords :: [String]
 --  , selection ::
-  }
+  } deriving (Show,Read,Eq,Ord,Data,Generic)
 
 defaultSelectionConfiguration :: SelectionConfiguration
 defaultSelectionConfiguration = SelectionConfiguration{..}
@@ -353,7 +362,8 @@ see @ResultsObject.getSelectInfo()@
 data SelectionResults = SelectionResults
  { _sroRecognition :: Recognition -- ^ A subsequence of the selection buffer
  , _sroOffset      :: Natural     -- ^ Bounded by the length of the selection buffer -- TODO Necessary?
- }
+ } deriving (Show,Read,Eq,Ord,Data,Generic)
+
 
 --------------------------------------------------------------------------------
 

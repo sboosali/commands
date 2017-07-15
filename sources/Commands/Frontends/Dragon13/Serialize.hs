@@ -1,5 +1,7 @@
 {-# LANGUAGE AutoDeriveTypeable, DeriveDataTypeable, DataKinds, GADTs, NamedFieldPuns, OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, RankNTypes, ViewPatterns, RecordWildCards          #-}
+-- {-# LANGUAGE TemplateHaskell #-}
+
 -- | Uses pretty printer combinators for readability of serialization.
 --
 --
@@ -9,16 +11,18 @@ import           Commands.Frontends.Dragon13.Extra hiding ((<>))
 import           Commands.Frontends.Dragon13.Types
 import           Commands.Frontends.Dragon13.Text
 import           Commands.Frontends.Dragon13.Lens
+import           Commands.Frontends.Dragon13.Shim
 import           Commands.Frontends.Dragon13.Shim.Types
 import Data.Address
 
 import           Control.Monad.Catch               (SomeException (..))
 import           Data.Bitraversable
 import           Data.Either.Validation            (validationToEither)
-import           Data.Foldable                     (toList)
+import           Data.Foldable                     (toList, fold)
 import           Data.Monoid                       ((<>))
 import qualified Data.Text.Lazy                    as T
-import           Text.PrettyPrint.Leijen.Text      hiding ((<>))
+import           Text.PrettyPrint.Leijen.Text      hiding ((<>),group)
+import qualified Text.PrettyPrint.Leijen.Text as P
 import Data.List.NonEmpty (NonEmpty(..))
 import           Data.Maybe                        (mapMaybe)
 import Control.Lens
@@ -107,9 +111,12 @@ as you can see, horizontally delimited 'Doc'uments are vertically aligned iff th
 
 -}
 serializeGrammar :: DNSGrammar i DNSText DNSName -> SerializedGrammar
-serializeGrammar grammar = SerializedGrammar{..}
+serializeGrammar = serializeGrammarWith defaultSerializationOptions
+
+serializeGrammarWith :: SerializationOptions -> DNSGrammar i DNSText DNSName -> SerializedGrammar
+serializeGrammarWith o grammar = SerializedGrammar{..}
  where
- serializedLists  = serializeVocabularies (grammar^.dnsVocabularies)
+ serializedLists  = serializeVocabularies o (grammar^.dnsVocabularies)
  serializedExport = serializeName name
  serializedRules  = vsep . punctuate "\n" $
   [ "'''"
@@ -147,10 +154,10 @@ not (as the 'DNSRule's are) defined as a @gramSpec@ String.
 
 -}
 serializeVocabularies
- :: [DNSVocabulary i DNSText DNSName] -> Doc
-serializeVocabularies
- = enclosePythonic "{" "}" ","
- . mapMaybe serializeVocabulary
+ :: SerializationOptions -> [DNSVocabulary i DNSText DNSName] -> Doc
+serializeVocabularies o
+ = enclosePythonic o "{" "}" ","
+ . mapMaybe (serializeVocabulary o)
 
 {- |
 
@@ -158,9 +165,9 @@ serializeVocabularies
 "list": ["one","two"]
 
 -}
-serializeVocabulary :: DNSVocabulary i DNSText DNSName -> Possibly Doc
-serializeVocabulary (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
- (dquotes (text n)) <> ":" <+> enclosePythonic "[" "]" "," (fmap serializeToken ts)
+serializeVocabulary :: SerializationOptions -> DNSVocabulary i DNSText DNSName -> Possibly Doc
+serializeVocabulary o (DNSVocabulary _ (DNSList (DNSName n)) ts) = return $
+ (dquotes (text n)) <> ":" <+> enclosePythonic o "[" "]" "," (fmap serializeToken ts)
 
 -- | serializes 'DNSProduction's into a Python @String@.
 --
@@ -274,11 +281,19 @@ against Haskell-layout, via 'encloseSep':
 which doesn't parse as Python.
 
 -}
-enclosePythonic :: Doc -> Doc -> Doc -> [Doc] -> Doc
-enclosePythonic left right seperator ds
+enclosePythonic :: SerializationOptions -> Doc -> Doc -> Doc -> [Doc] -> Doc
+enclosePythonic o left right seperator ds
   = left
- <> (align . cat $ punctuate seperator ds)
+ <> (_separateItems o $ punctuate seperator ds)
  <> right
+
+_separateItems :: SerializationOptions -> ([Doc] -> Doc)
+_separateItems SerializationOptions{..} = case _serializationForceWordWrap of
+  True  -> align . h -- TODO
+  False -> align . cat
+  where
+  h :: [Doc] -> Doc
+  h = P.group . foldr (<+>) mempty -- (<++>)
 
 -- | validates the grammar (@:: 'DNSGrammar' name token@) :
 --
@@ -332,8 +347,10 @@ from_SerializedGrammar_to_ShimR NatLinkConfig{..} SerializedGrammar{..} = ShimR{
 
  __serverHost__  = str2doc h
  __serverPort__  = str2doc (show p)
- __logFile__     = str2doc nlLogFile
- __contextFile__ = str2doc nlContextFile
+ -- __logFile__     = str2doc nlLogFile
+ -- __contextFile__ = str2doc nlContextFile
+
+ __properties__ = renderGrammarProperties nlGrammarProperties
 
  Address (Host h) (Port p) = nlAddress -- TODO lol
  str2doc = T.pack >>> text >>> squotes
@@ -343,3 +360,9 @@ displaySerializedGrammar :: SerializedGrammar -> String
 displaySerializedGrammar SerializedGrammar{..} = T.unpack $ displayDoc $
  (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]
 
+-- -- | (for debugging)
+-- displaySerializedGrammarCompactly :: SerializedGrammar -> String
+-- displaySerializedGrammarCompactly SerializedGrammar{..} = pp doc
+--  where
+--  pp = T.unpack . displayT . renderCompact -- renderPretty 1.0 80
+--  doc = (vsep . punctuate "\n") [serializedExport,serializedRules,serializedLists]

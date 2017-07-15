@@ -171,6 +171,7 @@ instance Bitraversable DNSRHS where -- valid Bitraversable?
  bitraverse f g (DNSOptional r)      = DNSOptional     <$> bitraverse f g r
  bitraverse f g (DNSMultiple r)      = DNSMultiple     <$> bitraverse f g r
 
+--TODO Derive automatically with Recursion scheme?
 instance Plated (DNSRHS t n) where
  plate f (DNSOptional r)      = DNSOptional     <$> f r
  plate f (DNSMultiple r)      = DNSMultiple     <$> f r
@@ -498,11 +499,22 @@ defaultDNSInfo = DNSInfo 0 False
 
 data DnsOptimizationSettings = DnsOptimizationSettings
  { _dnsOptimizeInlineSmall :: Bool
+ , _dnsOptimizeSerialization :: SerializationOptions
  -- , dnsOptimize ::
- }
- deriving (Show,Read,Eq,Ord,Data,Generic)
+ } deriving (Show,Read,Eq,Ord,Data,Generic)
 
 defaultDnsOptimizationSettings :: DnsOptimizationSettings
 defaultDnsOptimizationSettings = DnsOptimizationSettings {..}
  where
  _dnsOptimizeInlineSmall = False
+ _dnsOptimizeSerialization = defaultSerializationOptions
+
+-- |
+data SerializationOptions = SerializationOptions
+ { _serializationForceWordWrap :: Bool -- ^ Separate alternatives by spaces (true), or always by newlines (false)
+ }  deriving (Show,Read,Eq,Ord,Data,Generic)
+
+defaultSerializationOptions :: SerializationOptions
+defaultSerializationOptions = SerializationOptions{..}
+  where
+  _serializationForceWordWrap = False

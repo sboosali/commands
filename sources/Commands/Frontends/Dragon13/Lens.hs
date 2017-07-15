@@ -1,4 +1,5 @@
-{-# LANGUAGE DataKinds, GADTs, LambdaCase, TemplateHaskell #-}
+{-# LANGUAGE DataKinds, GADTs, LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Commands.Frontends.Dragon13.Lens where
 import Commands.Extra
 import Commands.Frontends.Dragon13.Types
@@ -16,6 +17,7 @@ makePrisms ''DNSRHS
 
 makeLenses ''DNSInfo
 makeLenses ''DnsOptimizationSettings
+makeLenses ''SerializationOptions
 
 -- | equality projected 'on' the left-hand sides of productions.
 equalDNSProduction :: (Eq n) => DNSProduction i t n -> DNSProduction i t n -> Bool

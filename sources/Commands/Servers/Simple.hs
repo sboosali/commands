@@ -31,6 +31,7 @@ runSimpleServer $ defaultSettings runWorkflowT
 -}
 main = do
   print "Commands.Servers.Simple"
+  -- runSimpleServer (defaultSettings ?) 
 
 {- | launches the server.
 

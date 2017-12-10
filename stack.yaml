@@ -1,10 +1,14 @@
-resolver: nightly-2017-04-19 #lts-8.11
+resolver: nightly-2017-04-19 # lts-8.12
 compiler: ghc-8.0.2
+
+nix:
+#  enable: true
+  pure: true
+  packages: [zlib]
 
 packages:
 - .
 - ../spiros
-
 #- ../workflow-types
 
 extra-deps:

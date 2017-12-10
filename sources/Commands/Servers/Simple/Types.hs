@@ -8,12 +8,13 @@ module Commands.Servers.Simple.Types where
 import qualified Workflow.Core as W
 
 import Servant
-import           Data.Text.Lazy                        (Text)
-import           Control.Monad.Trans.Except            (ExceptT)
+-- import           Data.Text.Lazy                        (Text)
+-- import           Control.Monad.Trans.Except            (ExceptT)
 
 import GHC.TypeLits (Symbol)
 import Data.Char(toLower)
-import Control.Monad (unless)
+-- import Control.Monad (unless)
+import qualified Data.Map as Map
 
 import Prelude.Spiros
 import Prelude()
@@ -84,21 +85,58 @@ type Recognition = [String]
 
 -}
 data Settings = Settings
- { handle               :: [String] -> W.WorkflowT IO () -- tokenized
+ { handle               :: Recognition -> W.WorkflowT IO () -- tokenized
  , exec                 :: W.ExecuteWorkflow
  , cmdln                :: Maybe (String -> IO ()) -- not tokenized
  , port                 :: Int
  }
 
+data Action_ = Ignored_ | Shortcut_ String | Dictated_ String deriving (Show)
+
 defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
- handle ws = unless (ignore ws) $ W.sendText (munge ws)
- munge = unwords > fmap toLower > (++ " ")
- ignore = unwords > (`elem` noise)
- noise = ["the","will","if","him","that","a","she","and"]
- cmdln = Just $ \s -> putStrLn (munge (words s)) -- echoes
+ handle = defaultHandler
+ cmdln = defaultCmdln
  port  = 8888
+
+defaultHandler :: Recognition -> W.WorkflowT IO ()
+defaultHandler ws = do
+ liftIO$ putStrLn ""
+ liftIO$ print ws
+ liftIO$ print a
+ 
+ case a of
+   Shortcut_ kbd -> W.press kbd
+   Dictated_ vs  -> W.sendText vs
+   Ignored_      -> nothing
+   
+ where
+ a = defaultParseAction ws
+
+defaultParseAction :: Recognition -> Action_
+defaultParseAction = go
+ where
+ go ws
+  | isNoise ws = Ignored_
+  | otherwise  = isShortcut vs & maybe (Dictated_ (vs  ++ " ")) Shortcut_ 
+   where
+   vs = munge ws
+ isNoise = munge > (`elem` noise)
+ munge = unwords > fmap toLower
+ noise = ["the","will","if","him","that","a","she","and"]
+ isShortcut = (Map.lookup&flip) shortcuts
+ shortcuts = Map.fromList
+  [ "copy"-: "C-c"
+  , "paste"-: "C-v"
+  , "undo"-: "C-z"
+  ]
+
+defaultCmdln :: String -> IO ()
+defaultCmdln s = do
+  putStrLn (munge s) -- echoes
+  where
+  munge = fmap toLower
 
 recognitionAPI :: Proxy RecognitionAPI
 recognitionAPI = Proxy

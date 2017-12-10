@@ -1,0 +1,211 @@
+name: commands-core
+version: 0.0.0
+cabal-version: >=1.10
+build-type: Simple
+license: GPL-3
+license-file: LICENSE
+copyright: Copyright (C) 2015 Spiros M. Boosalis
+maintainer: samboosalis@gmail.com
+stability: experimental
+homepage: https://github.com/sboosali/commands-core#readme
+bug-reports: https://github.com/sboosali/commands-core/issues
+synopsis: control your computer by voice, with "grammar combinators"
+description:
+    Define @Grammar@s declaratively/modularly with combinators, which simultaneously induce @Parser@s and (for serialization) @Recognizer@s.
+    .
+    @parse@ natural language commands with a @Grammar@, @compile@ the @data@ into @Action@s, and @execute@ those @Action@s on your computer.
+    .
+category: Accessibility, Natural Language Processing, Parsing, Speech Recognition, Voice Control
+author: Spiros Boosalis
+tested-with: GHC ==7.10.1
+extra-source-files:
+    README.md
+
+source-repository head
+    type: git
+    location: https://github.com/sboosali/commands-core
+
+library
+
+  hs-source-dirs: sources
+  default-language: Haskell2010
+  default-extensions: AutoDeriveTypeable DeriveDataTypeable
+                      DeriveGeneric DeriveFunctor DeriveFoldable DeriveTraversable
+  Other-Extensions: TemplateHaskell
+  ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors
+
+  exposed-modules:
+                  Commands.Core
+
+                  Commands.RHS
+                  Commands.RHS.Types
+                  Commands.RHS.Derived
+    -- TODO                 Commands.RHS.Finite
+                  Commands.RHS.Open
+    -- TODO                  Commands.RHS.ObserveSharing
+
+                  Commands.Command.Types
+
+                  Commands.Frontends.Types
+                  Commands.Frontends.Dictation
+
+                  Commands.Backends.Types
+
+    -- TODO rm
+                  Commands.Parsers.Earley
+
+                  Commands.Extra
+                  Commands.Instances
+                  Commands.LHS
+                  Commands.Munging
+                  Commands.Main
+
+                  Data.Possibly
+                  Data.Address
+                  Data.GUI
+                  Data.Some
+
+    -- TODO rm
+                  Data.TPrelude
+                  Data.HTypes
+                  Data.HPrelude
+                  Data.HFunctor
+                  Data.HFoldable
+                  Data.HTraversable
+                  Data.HFunctor.Recursion
+                  Data.HFunctor.ObserveSharing
+
+    -- TODO rm
+                  Data.RefCache
+                  Data.RefCache.Internal
+                  Data.HRefCache
+                  Data.HRefCache.Internal
+                  Data.RefCache.Extra
+
+    -- TODO rm
+                  -- CabalLenses.PackageDescription
+                  -- CabalLenses.PackageDescription.TH
+
+  other-modules:
+                Commands.Playground
+                Commands.RHS.Finite
+                Commands.RHS.ObserveSharing
+                
+  build-depends:
+                base >=4.8 && <5.0
+
+              , spiros
+              , reified-bindings
+
+     -- packages:
+     -- , workflow-types
+     -- , workflow-pure
+     -- , workflow-extra
+     -- , workflow-osx
+
+     -- ekmett
+              , profunctors
+              , free
+              , tagged
+              , kan-extensions
+              , reducers
+              , exceptions
+              , lens
+              , either
+              , semigroups
+
+     -- servant
+              , servant-client
+              -- , servant-server
+              -- , servant
+
+     -- on stackage
+              , Earley
+              , split
+              , ListLike
+              , text
+
+-- formatting ~> text-format ~> double-conversion
+-- double-conversion is C++, crashes on Windows during TH
+--              , formatting
+
+              , interpolatedstring-perl6
+              , http-types
+              , vector
+              , async
+              , parallel
+              , hashable
+              , MemoTrie
+              , unordered-containers
+              , pipes
+
+     -- standard library
+              , time
+              , bytestring
+              , stm
+              , template-haskell
+              , containers
+              , mtl
+              , transformers
+              , ghc-prim
+              , Cabal >=1.22.4
+              , filepath
+
+              -- not on Stackage
+              , recursion-schemes
+
+executable example-commands-core
+  main-is: Example.hs
+  hs-source-dirs: executables
+  default-language: Haskell2010
+  ghc-options: -Wall -fno-warn-name-shadowing -threaded -with-rtsopts=-N
+  build-depends:
+      base
+    , commands-core
+
+
+-- stack test commands-core
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Tests.hs
+  hs-source-dirs: tests
+  default-language: Haskell2010
+  ghc-options: -Wall -fno-warn-name-shadowing -threaded
+  other-modules:
+    Commands.Test.Extra
+    Commands.Test.Types
+    Commands.Test.Arbitrary
+    Commands.Test.Properties
+    Test.DocTest.Discover
+
+  build-depends:
+      base
+    , commands-core
+
+    , template-haskell
+    , Cabal
+    , text
+    , semigroups
+    , lens
+
+    -- testing
+    , QuickCheck
+    , doctest
+    , tasty
+    , tasty-quickcheck
+
+
+-- stack bench commands-core
+benchmark benchmarks
+  type: exitcode-stdio-1.0
+  main-is: Bench.hs
+  hs-source-dirs: bench
+  default-language: Haskell2010
+  ghc-options: -Wall -fno-warn-name-shadowing -threaded
+  build-depends:
+      base
+    , commands-core
+    , lens
+    , deepseq
+    , criterion
+    , semigroups

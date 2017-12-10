@@ -1,8 +1,7 @@
-resolver: nightly-2017-04-19 # lts-8.12
-compiler: ghc-8.0.2
+resolver: nightly-2017-12-09
 
 nix:
-#  enable: true
+  enable: false 
   pure: true
   packages: [zlib]
 

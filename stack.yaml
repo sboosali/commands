@@ -1,0 +1,24 @@
+resolver: nightly-2017-04-19 #lts-8.11
+compiler: ghc-8.0.2
+
+packages:
+- .
+
+- ../spiros
+
+- ../workflow-types
+
+- ../commands-core
+- ../commands-frontend-DragonNaturallySpeaking
+
+- ../reified-bindings
+
+extra-deps:
+- spiros-0.0.0
+
+- workflow-types-0.0.1
+
+- commands-core-0.0.0
+- commands-frontend-DragonNaturallySpeaking-0.0.0
+
+- language-python-0.5.4

@@ -1,0 +1,15 @@
+resolver: nightly-2017-12-09
+
+nix:
+  enable: false 
+  pure: true
+  packages: [zlib]
+
+packages:
+- .
+- ../spiros
+#- ../workflow-types
+
+extra-deps:
+- spiros-0.0.0
+- workflow-types-0.0.1

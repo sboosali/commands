@@ -14,6 +14,7 @@ import qualified Network.Wai.Handler.Warp       as Wai
 import Servant
 
 import Control.Monad
+import Control.Concurrent (forkIO)
 
 import Prelude.Spiros
 import Prelude()
@@ -38,16 +39,22 @@ Simultaneously, reads from standard input, for debugging.
 -}
 runSimpleServer :: Settings -> IO ()
 runSimpleServer settings@Settings{..} = do
-	forkever_ $do
-		getLine >>= cmdln
-	Wai.run port (serve recognitionAPI (handlers settings))
+  _read cmdln
+  _serve
+  where
+  _read = \case
+    Nothing     -> nothing
+    Just cmdln' -> forkever_ $ getLine >>= cmdln'
+  _serve = Wai.run port (serve recognitionAPI (handlers settings))
 
 handlers :: Settings -> Server RecognitionAPI
-handlers = handleRecognition
+handlers settings = handleRecognition settings :<|> handleTest
 -- type family ServerT (layout :: k) (m :: * -> *) :: *
 
 handleRecognition :: Settings -> RecognitionHandler
 handleRecognition Settings{handle, exec= W.ExecuteWorkflow exec} ws
- = Handler $ liftIO $ exec $ handle ws
-
+ = Handler (handle ws & exec & forkIO & void & liftIO) -- TODO fork necessary?  Probably not, server spins off new thread per req
 -- _500 :: String -> ServantErr _500 s = err500{ errBody = BS.pack e }
+
+handleTest :: Response String
+handleTest = return "success"

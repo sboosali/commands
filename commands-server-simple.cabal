@@ -59,8 +59,8 @@ library
                base >=4.7 && <5
              , transformers
 
-             , spiros ==0.0.0
-             , workflow-types ==0.0.0
+             , spiros
+             , workflow-types
 
              , servant
              , servant-server

@@ -1,0 +1,22 @@
+resolver: nightly-2017-12-09
+# compiler: ghc-8.2.2
+
+packages:
+- .
+
+# - ../spiros
+
+- ../commands-core
+
+- ../reified-bindings
+
+extra-deps:
+- spiros-0.0.0
+
+- commands-core-0.0.0
+
+- reified-bindings-0.0.0
+
+- language-python-0.5.4
+- recursion-schemes-5
+- prettyprinter-1.1.1

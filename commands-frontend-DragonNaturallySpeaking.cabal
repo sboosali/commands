@@ -1,0 +1,207 @@
+name:                commands-frontend-DragonNaturallySpeaking
+version:             0.0.0
+synopsis:            TODO
+description:         TODO
+homepage:            http://github.com/sboosali/commands-frontend-DragonNaturallySpeaking#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Spiros Boosalis
+maintainer:          samboosalis@gmail.com
+copyright:           2017 Spiros Boosalis
+category:            TODO
+build-type:          Simple
+cabal-version:       >=1.10
+
+-- PVP
+-- https://wiki.haskell.org/Package_versioning_policy
+-- "A.B is known as the major version number, and C the minor version number."
+
+extra-source-files:
+  README.md
+  .gitignore
+  .travis.yml
+  HLint.hs
+  stack.yaml
+
+-- data-files:
+
+--  data/
+
+source-repository head
+  type:     git
+  location: https://github.com/sboosali/commands-frontend-DragonNaturallySpeaking
+
+
+library
+ hs-source-dirs:      sources
+ default-language:    Haskell2010
+ ghc-options:
+  -Wall
+  -fwarn-incomplete-uni-patterns
+  -fwarn-incomplete-record-updates
+  -fwarn-identities
+  -fno-warn-unticked-promoted-constructors
+  -fwarn-missing-fields
+ default-extensions: AutoDeriveTypeable DeriveDataTypeable DeriveGeneric
+                     DeriveFunctor DeriveFoldable DeriveTraversable
+                     LambdaCase EmptyCase TypeOperators PostfixOperators
+                     ViewPatterns BangPatterns KindSignatures
+                     NamedFieldPuns RecordWildCards TupleSections
+                     MultiWayIf DoAndIfThenElse EmptyDataDecls
+                     MultiParamTypeClasses FlexibleContexts FlexibleInstances
+                     TypeFamilies FunctionalDependencies
+                     ScopedTypeVariables StandaloneDeriving
+
+ exposed-modules:
+
+                 Commands.Frontends.Dragon13
+                 Commands.Frontends.Dragon13.Types
+                 Commands.Frontends.Dragon13.Lens
+                 Commands.Frontends.Dragon13.Text
+                 Commands.Frontends.Dragon13.Optimize
+                 Commands.Frontends.Dragon13.Shim
+                 Commands.Frontends.Dragon13.Shim.Types
+                 Commands.Frontends.Dragon13.Shim.Commands
+                 Commands.Frontends.Dragon13.Shim.Selection
+                 Commands.Frontends.Dragon13.Serialize
+
+                 Commands.Frontends.Natlink
+                 Commands.Frontends.Natlink.Types
+                 Commands.Frontends.Natlink.Lens
+
+                 Commands.Mixins.DNS13OSX9
+                 Commands.Mixins.DNS13OSX9.Types
+                 Commands.Mixins.DNS13OSX9.Derived
+                 Commands.Mixins.DNS13OSX9.Parser
+                 Commands.Mixins.DNS13OSX9.Frontend
+                 Commands.Mixins.DNS13OSX9.ObservedSharing
+
+-- other-modules:
+                Commands.Frontends.Dragon13.Example
+                Commands.Frontends.Dragon13.Extra
+                Commands.Frontends.Dragon13.Instances
+
+ build-depends:
+                base >=4.7 && <5
+
+              , commands-core ==0.0.0
+              , spiros
+
+              , transformers
+              , mtl
+              , containers
+--              , bytestring
+--              , stm
+              , template-haskell
+
+              , deepseq
+              , hashable
+              , semigroups
+
+              , lens
+              , Earley
+              , split
+              , ListLike
+              , text
+              , bifunctors
+              , profunctors
+              , free
+              , exceptions
+              , reducers
+              , either
+
+              , wl-pprint-text
+              , prettyprinter 
+--              , pipes
+--              , formatting
+--              , servant
+--              , Earley
+--              , split
+              , interpolatedstring-perl6
+--              , wl-pprint-text
+--              , text
+              , aeson
+--              , hashable
+--              , unordered-containers
+--              , async
+--              , parallel
+
+              -- not on Stackage
+              , language-python
+
+-- 144 == length "C:\\Users\\Spiros\\haskell\\commands-frontend-DragonNaturallySpeaking\\.stack-work\\install\\b45ea292\\bin\\commands-frontend-DragonNaturallySpeaking.exe"
+-- MAX_PATH is 260
+-- so it should be short enough
+-- 
+-- executable example-commands-frontend-DragonNaturallySpeaking
+--  hs-source-dirs:      executables
+--  main-is:             Main.hs
+--
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  build-depends: base, commands-frontend-DragonNaturallySpeaking
+          -- wtf?
+          --      Preprocessing executable 'example-commands-frontend-DragonNaturallySpeaking'
+          --      for commands-frontend-DragonNaturallySpeaking-0.0.0...
+          --      [1 of 1] Compiling Main             ( executables\Main.hs, .stack-work\dist\ca59d0ab\build\example-commands-frontend-DragonNaturallySpeaking\example-commands-frontend-DragonNaturallySpeaking-tmp\Main.o )
+          --      Linking .stack-work\dist\ca59d0ab\build\example-commands-frontend-DragonNaturallySpeaking\example-commands-frontend-DragonNaturallySpeaking.exe ...
+          --      Installing library in
+          --      C:\Users\Spiros\haskell\commands-frontend-DragonNaturallySpeaking\.stack-work\install\b45ea292\lib\x86_64-windows-ghc-8.0.2\commands-frontend-DragonNaturallySpeaking-0.0.0-FQaZxapzQX9ECyG7SaNsJZ
+          --      Installing executable(s) in
+          --      C:\Users\Spiros\haskell\commands-frontend-DragonNaturallySpeaking\.stack-work\install\b45ea292\bin
+          --      copyFile: does not exist (The system cannot find the path specified.)
+          --
+          --  One possible cause of this issue is:
+          --  * No module named "Main". The 'main-is' source file should usually have a header indicating that it's a 'Main' module.
+
+-- -- $ stack test doctest
+-- test-suite doctest
+--  hs-source-dirs:      tests
+--  main-is:             DocTest.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , doctest
+--
+--
+-- -- $ stack test unittest
+-- test-suite unittest
+--  hs-source-dirs:      tests
+--  main-is:             UnitTest.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  other-modules:
+--   DragonNaturallySpeaking.Test
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , hspec ==2.2.*
+--   , QuickCheck ==2.8.*
+--   -- , tasty
+--   -- , tasty-quickcheck
+--
+--
+-- -- $ stack bench
+-- benchmark command
+--  hs-source-dirs:      benchmarks
+--  main-is:             Bench.hs
+--  type:                exitcode-stdio-1.0
+--
+--  default-language: Haskell2010
+--  ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
+--
+--  build-depends:
+--     base >=4.7 && <5
+--   , commands-frontend-DragonNaturallySpeaking
+--   , criterion
+--   , deepseq

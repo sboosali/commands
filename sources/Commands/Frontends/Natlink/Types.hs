@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving, PatternSynonyms, OverloadedStrings #-}
+{-# LANGUAGE GADTs, GeneralizedNewtypeDeriving, StandaloneDeriving, PatternSynonyms, OverloadedStrings #-}
 
 {-| the speech engine API, as exposed by
 <https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L106 Natlink>
@@ -6,6 +6,21 @@
 NOTE natlink is single-threaded, and so it can only act as a client, not a server
 
 TODO websockets + setTimerCallback ?
+
+
+'''gotBeginCallback() is called at start of every recognition. Recognizer will block until you return.
+During callback, do bookkeeping:
+Make sure text is synchronized with application
+Get the location of the insertion point from the app.
+Activate or deactivate grammars
+Update select grammar from text
+Update dictation context
+Update “Resume With” word list'''
+
+ADVANCED FORMATTING 
+NatSpeak’s VDct uses a chart parser to format dates, time, numbers, currency, etc.
+"one hundred dollars and two cents" -> $100.02
+
 
 -}
 module Commands.Frontends.Natlink.Types where
@@ -16,7 +31,7 @@ import Commands.Frontends.Dragon13.Text
 import           Data.Aeson (ToJSON,FromJSON) --TODO rm
 import Data.Maybe (isJust)
 import           Data.Text.Lazy (Text)
---import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy as T
 
 import Prelude()
 
@@ -53,8 +68,8 @@ DNSToken
 -}
 data DNSToken = DNSToken
  { _dnsPronounced :: Text
- , _dnsWritten    :: Text
- , _dnsCategory   :: Text
+ , _dnsCategory   :: Maybe DnsCategory 
+ , _dnsWritten    :: Maybe Text
  }
  deriving (Show,Read,Eq,Ord,Data,Generic)
 instance NFData   DNSToken
@@ -63,11 +78,13 @@ instance ToJSON   DNSToken
 instance FromJSON DNSToken
 
 toDNSToken :: Text -> Maybe DNSToken --TODO
-toDNSToken s = if s & (validDNSToken > isJust) then Just DNSToken{..} else Nothing
+toDNSToken s = case ts of 
+ [p] -> Just$ DNSToken p Nothing Nothing -- NOTE the default and most frequent 
+ [p,c] -> Just$ DNSToken p (Just c) Nothing 
+ [p,c, w] -> Just$ DNSToken p (Just c) (Just w)  
+ _  ->  Nothing 
  where
- _dnsPronounced = s
- _dnsWritten = ""
- _dnsCategory = ""
+ ts = T.splitOn "\\" s 
 
 validDNSToken :: Text -> Maybe Text --TODO
 validDNSToken s = Just s
@@ -83,6 +100,9 @@ data DNSWord = DNSWord Text
 
 validateDNSWord :: Text -> Maybe DNSWord
 validateDNSWord s = s & (DNSWord > Just) --TODO
+
+-- data DnsCategory = DnsCategory Text -- TODO 
+type  DnsCategory =Text -- TODO 
 
 --------------------------------------------------------------------------------
 
@@ -125,10 +145,11 @@ newtype DragonScriptExpression = DragonScriptExpression { getDragonScriptExpress
 
 {-|
 
-Audio data in wave format.
+Audio data in wave format. 
 
-11.025 * 4000 = 441000
+11.025Khz, 16 bit, mono (11.025 * 4000 = 441000). 
 
+from natlink's @resObj.getWave()@. 
 
 -}
 data Utterance = Utterance
@@ -367,6 +388,8 @@ data SelectionResults = SelectionResults
 
 --------------------------------------------------------------------------------
 
+data ChangeCallBack = MicrophoneCallBack PythonExpression | UserCallBack PythonExpression 
+ 
 class MonadNatlink m where
 
  executeScript :: DragonScriptExpression -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
@@ -376,6 +399,7 @@ class MonadNatlink m where
  getMicrophoneState :: m (MicrophoneState)  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
 
  setTimerCallback :: DragonScriptExpression -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
+ setChangeCallback :: PythonExpression -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/9545436181f23652224041afa2035f12fa60d949/NatlinkSource/natlink.txt#L520) 
 
  loadGrammarObject :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L574)
  activateGrammarRule :: () -> m ()  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L601)
@@ -393,8 +417,7 @@ class MonadNatlink m where
 
  setSelection :: SelectionGrammarObject -> DNSBuffer -> m SelectionSettingStatus
 
-{-|
--}
+{-| 
 data NatlinkF k
  = RecognitionMimic  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L209)
  | ExecuteScript  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
@@ -404,6 +427,7 @@ data NatlinkF k
  | GetMicrophoneState  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
 
  | SetTimerCallback  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
+ | SetChangeCallback -- ^ [documentation](https://github.com/sboosali/NatLink/blob/9545436181f23652224041afa2035f12fa60d949/NatlinkSource/natlink.txt#L520) 
 
  | SetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
  | GetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L373)
@@ -418,5 +442,48 @@ data NatlinkF k
  | GetResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
  | GetResultsObjectAudio  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
  | CorrectResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
+
+-} 
+ 
+
+{-| 
+equivalent to @'NatlinkFunction' ()@.   
+
+[JSON-RPC](http://ku-fpg.github.io/2016/02/09/remote-json/) 
+[remote-json package](http://hackage.haskell.org/package/remote-json) 
+
+-}
+data NatlinkCommand
+ = RecognitionMimic  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L209)
+ | ExecuteScript  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L190)
+ | InputFromFile  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L249)
+
+ | SetMicrophoneState  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L178)
+
+ | SetTimerCallback  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L279)
+ | SetChangeCallback -- ^ [documentation](https://github.com/sboosali/NatLink/blob/9545436181f23652224041afa2035f12fa60d949/NatlinkSource/natlink.txt#L520) 
+
+ | SetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L466)
+ | GetWordInfo  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L373)
+ | DeleteWord  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L421)
+ | AddWord  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L428)
+
+ | LoadGrammarObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L574)
+ | ActivateGrammarRule  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L601)
+ | DectivateGrammarRule  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L614)
+ | SetExclusiveGrammar  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L619)
+
+ | GetResultsObject  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L759)
+ | GetResultsObjectAudio  -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L753)
+
+{-|
+
+[JSON-RPC](http://ku-fpg.github.io/2016/02/09/remote-json/) 
+[remote-json package](http://hackage.haskell.org/package/remote-json) 
+
+-}
+data NatlinkFunction a where
+ GetMicrophoneState    :: NatlinkFunction MicrophoneState -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L182)
+ CorrectResultsObject  :: NatlinkFunction CorrectionStatus -- ^ [documentation](https://github.com/sboosali/NatLink/blob/master/NatlinkSource/natlink.txt#L740)
 
 --------------------------------------------------------------------------------

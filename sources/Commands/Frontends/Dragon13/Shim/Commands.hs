@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes, RecordWildCards #-}
 -- | (you should read the source for documentation: just think of this module as a config file)
-module Commands.Frontends.Dragon13.Shim where
+module Commands.Frontends.Dragon13.Shim.Commands where
 import Commands.Frontends.Dragon13.Shim.Types
 import  Commands.Frontends.Natlink.Types
 
@@ -69,21 +69,74 @@ getShim ShimR{..} = [qc|
 from natlinkmain import (setCheckForGrammarChanges)
 from natlinkutils import (GrammarBase)
 import natlink  # a DLL
-# import natlinkmain
-# import natlinkutils
 
-# standard library
+# python standard library
 import time
 import json
 import urllib2
 import traceback
 from collections import (namedtuple)
 
-# Types
+################################################################################
+# TYPES
 
 Properties = namedtuple('Properties', ['status', 'exclusivity', 'shouldEavesdrop', 'shouldHypothesize'])
 
-# interpolated from "H"askell
+################################################################################
+# UTILITIES
+
+# current time in milliseconds
+def now():
+    return int(time.clock() * 1000)
+
+# http://stackoverflow.com/questions/1685221/accurately-measure-time-python-function-takes
+def timeit(message, callback, *args, **kwargs):
+    before = time.clock()
+    result = callback(*args,**kwargs)
+    after = time.clock()
+    print message, ': ', (after - before) * 1000, 'ms'
+    return result
+
+'''
+json.dumps("cafe'") (i.e. with acute accent) causes
+```UnicodeDecodeError: 'utf8' codec can't decode byte 0xe9 in position 3: unexpected end of data```
+
+>>> 'caf\xe9'.decode('cp1252').encode('utf-8')
+u'caf\xe9'
+
+'''
+def isUnicode(data): # TODO
+    try:
+        for word in data:
+            word.decode('cp1252').encode('utf8')
+        return True
+    except UnicodeDecodeError as e:
+        print e
+        print traceback.format_exc()
+        return False
+
+def toUnicode(data): # TODO
+    try:
+        return [word.decode('cp1252').encode('utf8') for word in data]
+    except UnicodeDecodeError as e:
+        print e
+        print traceback.format_exc()
+        return False
+
+def first_result(resultsObject):
+    return next(get_results(resultsObject), None)
+
+# "exceptions aren't exceptional" lmfao
+def get_results(resultsObject):
+    '''iterators are more idiomatic'''
+    try:
+        for number in xrange(10):
+            yield resultsObject.getWords(number)
+    except:
+        return
+
+################################################################################
+# INTERPOLATIONS from "H"askell
 
 H_RULES  = {__rules__}
 H_LISTS  = {__lists__}
@@ -98,7 +151,7 @@ H_PROPERTIES = {__properties__}
 # H_EXPORT = 'test'
 # H_SERVER_HOST = "192.168.56.1"
 # H_SERVER_PORT = '8666'
-# H_PROPERTIES = \{'status': , 'exclusivity': , 'shouldEavesdrop': , 'shouldHypothesize': }
+# H_PROPERTIES = \{'status': True , 'exclusivity': 0, 'shouldEavesdrop': 1, 'shouldHypothesize': 1}
 
 server_address = "http://%s:%s" % (H_SERVER_HOST, H_SERVER_PORT)
 # HTTP versus HTTPS
@@ -106,9 +159,8 @@ server_address = "http://%s:%s" % (H_SERVER_HOST, H_SERVER_PORT)
 microphone_rule = '''<microphone> exported = mike on | mike off | mike dead ;'''
 microphone_export = "microphone"
 
-
-
-# the grammar
+################################################################################
+# THE GRAMMAR
 
 class NarcissisticGrammar(GrammarBase):
     ''' 'Narcissistic' because:
@@ -171,18 +223,22 @@ class NarcissisticGrammar(GrammarBase):
         print "recognitionType =", recognitionType
         if not recognitionType: return
         words = next(get_results(resultsObject), [])
-        data  = words                                   # munge_recognition(words)
+        data  = toUnicode(words)                                   # munge_recognition(words)
         url   = "%s/recognition/" % (server_address,)        # TODO parameterize "recognition" API
 
         # print 'resultsObject =',resultsObject
         print 'words =', words
         print 'url   =', url
+        
+        # # NOTE this correctly inserts characters into the virtual machine playString
+        # natlink.playString (' '.join(words)) 
 
         try:
             if should_request(self,data):
                 print 'data  =', json.dumps(data)
                 request  = urllib2.Request(url, json.dumps(data), \{"Content-Type": "application/json"})
                 response = urllib2.urlopen(request)
+                handleResponse(self, response) 
             pass
         except Exception as e:
             print
@@ -211,6 +267,7 @@ class NarcissisticGrammar(GrammarBase):
         print "---------- gotResultsObject ----------"
         print "fullResults =", fullResults
 
+################################################################################
 # API
 
 # TODO             handleDGNUpdate(grammar, response)
@@ -218,7 +275,7 @@ def handleDGNUpdate(grammar, response):
     pass
 
 def should_request(grammar,data):
-    b = data and not handle_microphone(grammar,data) and isUnicode(data) and not isNoise(data)
+    b = data and not handle_microphone(grammar,data) and isUnicode(data)
     print "should_request=", b
     return b
 
@@ -242,59 +299,23 @@ def handle_microphone(grammar,data):
     else:
         return False
 
-def isUnicode(data):
-    try:
-        for word in data:
-            word.decode('utf8')
-        return True
-    except UnicodeDecodeError as e:
-        print e
-        print traceback.format_exc()
-        return False
+'''
+''' 
+def handleResponse(grammar, response) : 
+    pass 
+            
+################################################################################
+# BOILERPLATE
 
-def isNoise(data):
-    return False
-    # return data in [["the"],["if"],["him"],["A"],["that"],["up"]] #TODO hack, noise tends to be recognized as these short single words
-
-
-
-# helpers
-
-# current time in milliseconds
-def now():
-    return int(time.clock() * 1000)
-
-def first_result(resultsObject):
-    return next(get_results(resultsObject), None)
-
-def get_results(resultsObject):
-    '''iterators are more idiomatic'''
-    try:
-        for number in xrange(10):
-            yield resultsObject.getWords(number)
-    except:
-        return
-
-# http://stackoverflow.com/questions/1685221/accurately-measure-time-python-function-takes
-def timeit(message, callback, *args, **kwargs):
-    before = time.clock()
-    result = callback(*args,**kwargs)
-    after = time.clock()
-    print message, ': ', (after - before) * 1000, 'ms'
-    return result
-
-
-
-# boilerplate
-
-GRAMMAR = None # mutable global
+# mutable global
+GRAMMAR = None
 
 def load():
     global GRAMMAR
-    setCheckForGrammarChanges(1) # automatically reload on file change (not only when microphone toggles on)
+    # automatically reload on file change (not only when microphone toggles on)
+    setCheckForGrammarChanges(1)
     GRAMMAR = NarcissisticGrammar()
     GRAMMAR.initialize()
-# H_PROPERTIESallResults=True , hypothesis=True , doOnlyGotResultsObject=True):
 
 def unload():
     global GRAMMAR
@@ -303,4 +324,5 @@ def unload():
     GRAMMAR = None
 
 load()
-#  |] -- TODO necessary? trailing comment is hack
+################################################################################
+|]

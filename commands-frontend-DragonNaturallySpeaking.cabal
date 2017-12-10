@@ -7,7 +7,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Spiros Boosalis
 maintainer:          samboosalis@gmail.com
-copyright:           2016 Spiros Boosalis
+copyright:           2017 Spiros Boosalis
 category:            TODO
 build-type:          Simple
 cabal-version:       >=1.10
@@ -103,7 +103,6 @@ library
               , split
               , ListLike
               , text
-              , wl-pprint-text
               , bifunctors
               , profunctors
               , free
@@ -111,6 +110,8 @@ library
               , reducers
               , either
 
+              , wl-pprint-text
+              , prettyprinter 
 --              , pipes
 --              , formatting
 --              , servant
@@ -128,6 +129,10 @@ library
               -- not on Stackage
               , language-python
 
+-- 144 == length "C:\\Users\\Spiros\\haskell\\commands-frontend-DragonNaturallySpeaking\\.stack-work\\install\\b45ea292\\bin\\commands-frontend-DragonNaturallySpeaking.exe"
+-- MAX_PATH is 260
+-- so it should be short enough
+-- 
 -- executable example-commands-frontend-DragonNaturallySpeaking
 --  hs-source-dirs:      executables
 --  main-is:             Main.hs

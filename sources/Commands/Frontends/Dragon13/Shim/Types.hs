@@ -32,11 +32,15 @@ data ShimR t = ShimR
 -- | "keyword arguments" for 'getShim'.
 data SelectionShimR t = SelectionShimR
  { __SelectionShimR_name__        :: t  -- ^ a Python String
+ , __SelectionShimR_selectWords__   :: t 
+ , __SelectionShimR_throughWords__  :: t 
  -- TODO  this stuff below should probably be a separate interpolation, like servant-python
  , __SelectionShimR_serverHost__  :: t  -- ^ a Python String
  , __SelectionShimR_serverPort__  :: t  -- ^ a Python Int
  , __SelectionShimR_logFile__     :: t  -- ^ a Python String
  , __SelectionShimR_contextFile__ :: t  -- ^ a Python String
+ , __SelectionShimR_properties__ :: t
+
  -- , :: t   -- ^ a Python
  } deriving (Show,Read, Eq,Ord,Functor,Data,Generic)
 

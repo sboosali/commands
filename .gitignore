@@ -1,0 +1,37 @@
+# my
+ignore/
+notes
+sources
+vocab.txt
+data.txt
+docs.md
+cbits/main
+TODO
+notes.txt
+binaries/
+
+# Haskell
+.stack-work
+dist
+cabal-dev
+*.o
+*.hi
+*.chi
+*.chs.h
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+cabal.config
+report.html
+.ghci
+
+# Emacs
+\#*
+*~
+.#*
+\#*\#
+*.log
+TAGS
+
+# OS X
+.DS_Store

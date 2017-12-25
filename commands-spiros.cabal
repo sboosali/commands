@@ -1,0 +1,246 @@
+name: commands-spiros
+version: 0.0.0
+cabal-version: >=1.10
+build-type: Simple
+license: GPL-3
+license-file: LICENSE
+copyright: Copyright (C) 2015 Spiros M. Boosalis
+maintainer: samboosalis@gmail.com
+stability: experimental
+homepage: https://github.com/sboosali/commands-spiros#readme
+bug-reports: https://github.com/sboosali/commands-spiros/issues
+synopsis: my configuration for commands
+description:
+    my configuration for commands: OS X backend; Dragon NaturallySpeaking frontend.
+category: Voice Control
+author: Spiros Boosalis
+tested-with: GHC ==7.10.*
+extra-source-files:
+    README.md
+    emacs-interactive-commands.txt
+
+source-repository head
+    type: git
+    location: https://github.com/sboosali/commands-spiros
+
+
+library
+    -- https://www.haskell.org/cabal/users-guide/developing-packages.html#meaning-of-field-values-when-using-conditionals
+    -- booleans are and'd
+    -- lists are appended
+
+    -- http://stackoverflow.com/questions/9341611/what-are-possible-values-for-the-system-info-os-function-in-haskell
+
+    hs-source-dirs: config
+
+    -- if os(darwin)
+    --     hs-source-dirs: config-osx
+    --     exposed-modules:
+    --                     Commands.Backends.Workflow
+    --     build-depends:
+    --                     workflow-osx
+    --
+    if os(windows)
+         hs-source-dirs: config-windows
+         exposed-modules:
+                         Commands.Backends.Workflow
+         build-depends:
+                         workflow-windows
+
+
+--     ghc.exe: C:\Users\Maria\speech\commands-spiros\.stack-work\install\12018b8a\lib\x86_64-windows-ghc-7.10.3\workflow-windows-0.0.0-IbuwRuKOjSPBHW440nyHEh\HSworkflow-windows-0.0.0-IbuwRuKOjSPBHW440nyHEh.o: unknown symbol `__imp_LookupPrivilegeValueW'
+        --
+        -- includes:         native/CommandsSpiros.h
+        -- install-includes: native/CommandsSpiros.h
+        -- include-dirs:     native
+        --
+        -- ghc-options: -D_UNICODE -DUNICODE
+        -- cc-options: -D_UNICODE -DUNICODE
+        -- cpp-options: -D_UNICODE -DUNICODE
+
+    exposed-modules:
+                    Commands.Spiros.Server
+                    Commands.Spiros.Templates
+
+                    Commands.Plugins.Spiros
+
+                    Commands.Plugins.Spiros.Extra
+                    Commands.Plugins.Spiros.Extra.Types
+
+                    Commands.Plugins.Spiros.Types
+                    Commands.Plugins.Spiros.TypeLevel
+
+                    Commands.Plugins.Spiros.Config
+                    Commands.Plugins.Spiros.Main
+
+                    Commands.Plugins.Spiros.Apply
+
+                    Commands.Plugins.Spiros.Digit.Grammar
+
+                    Commands.Plugins.Spiros.Correct.Grammar
+
+                    Commands.Plugins.Spiros.Template
+                    Commands.Plugins.Spiros.Template.Types
+                    Commands.Plugins.Spiros.Template.QQ
+
+                              -- grammars
+
+                    Commands.Plugins.Spiros.Root
+                    Commands.Plugins.Spiros.Root.Types
+                    Commands.Plugins.Spiros.Root.Run
+
+                      --TODO
+                    Commands.Plugins.Spiros.Finite
+                    -- Commands.Plugins.Spiros.Finite.Types
+                    -- Commands.Plugins.Spiros.Finite.Grammar
+                    -- Commands.Plugins.Spiros.Finite.Execute
+                    -- Commands.Plugins.Spiros.Finite.Example
+
+                    Commands.Plugins.Spiros.Act
+                    Commands.Plugins.Spiros.Act.Types
+                    Commands.Plugins.Spiros.Act.Grammar
+                    Commands.Plugins.Spiros.Act.Execute
+
+                    Commands.Plugins.Spiros.Macros
+                    Commands.Plugins.Spiros.Macros.Types
+
+                    Commands.Plugins.Spiros.Shortcut
+                    Commands.Plugins.Spiros.Shortcut.Types
+
+                    Commands.Plugins.Spiros.Shell
+
+                    Commands.Plugins.Spiros.Keys
+
+                    Commands.Plugins.Spiros.Number
+
+                    Commands.Plugins.Spiros.Phrase
+                    Commands.Plugins.Spiros.Phrase.Types
+                    Commands.Plugins.Spiros.Phrase.Run
+                    Commands.Plugins.Spiros.Phrase.Munging
+                    Commands.Plugins.Spiros.Phrase.Spacing
+
+                    Commands.Plugins.Spiros.Edit
+                    Commands.Plugins.Spiros.Edit.Types
+                    Commands.Plugins.Spiros.Edit.Run
+
+                    Commands.Plugins.Spiros.Emacs
+                    Commands.Plugins.Spiros.Emacs.Config
+                    Commands.Plugins.Spiros.Emacs.InteractiveCommands
+
+                    Commands.Plugins.Spiros.Chrome
+                    Commands.Plugins.Spiros.Chrome.Gmail
+
+                    Commands.Plugins.Spiros.IntelliJ
+                    Commands.Plugins.Spiros.IntelliJ.Grammar
+                    Commands.Plugins.Spiros.IntelliJ.Run
+
+                              -- etc
+
+                    Commands.Plugins.Spiros.Apply.Types
+                    Commands.Plugins.Spiros.Emacs.Grammar
+                    Commands.Plugins.Spiros.Emacs.Run
+                    Commands.Plugins.Spiros.Emacs.Types
+
+                    Commands.Plugins.Spiros.Macros.Extra
+
+                    Commands.Plugins.Spiros.Module
+
+                    Commands.Plugins.Spiros.Password
+
+                    Commands.Plugins.Spiros.Rank
+
+                    Commands.Plugins.Spiros.Shell.Grammar
+                    Commands.Plugins.Spiros.Shell.Run
+                    Commands.Plugins.Spiros.Shell.Types
+
+                    Commands.Plugins.Spiros.Sustain
+
+                    Commands.Plugins.Spiros.Language.Haskell
+
+--                    Commands.Plugins.Spiros.History 
+
+                    --TODO
+                    Commands.Backends.Workflow_
+
+    build-depends:
+
+        -- my packages:
+                  spiros,
+
+                  commands-core,
+                  commands-frontend-DragonNaturallySpeaking,
+                  commands-server-types,
+                  commands-server-simple,
+
+                  workflow-types,
+                  workflow-pure,
+                  workflow-extra,
+                  monoid-extras,
+
+                  s-expression,
+                  enumerate,
+
+        -- extra-deps:
+                  language-python >=0.5,
+
+        -- on stack
+                  haskell-src-meta >=0.6,
+                  process >= 1.2.3.0,
+                  containers,
+                  mtl,
+                  wl-pprint-text,
+                  Earley,
+                  text,
+                  semigroups,
+                  lens,
+                  exceptions,
+                  parallel,
+                  async,
+                  either,
+                  bytestring,
+                  transformers,
+                  filepath,
+                  interpolatedstring-perl6 >=1,
+                  split,
+                  clock,
+                  template-haskell >=2.10,
+                  time,
+                  deepseq >=1.4,
+                  ghc-prim >=0.4,
+                  data-default,
+
+        -- newer
+                  wai,
+                  warp,
+                  vinyl,
+
+                  aeson,
+
+        -- ekmett
+                  free,
+
+                  clock,
+                  time, 
+
+--         vty,
+                  base >=4.8 && <5.0
+
+    default-language: Haskell2010
+    default-extensions: AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveLift
+    ghc-options:
+      -Wall
+      -Wcompat
+      -Wmissing-monadfail-instances
+      -Wsemigroup
+      -Wnoncanonical-monad-instances
+      -Wnoncanonical-monadfail-instances
+
+executable commands-spiros-server
+    main-is:        Main.hs
+    hs-source-dirs: executables
+    build-depends:  base >=4.8 && <5.0, commands-spiros
+
+    default-language: Haskell2010
+    ghc-options:
+     -threaded
+     -Wall

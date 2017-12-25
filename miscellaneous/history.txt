@@ -1,0 +1,32 @@
+this repository was created by "merging" several existing separate repositories.
+
+see https://saintgimp.org/2013/01/22/merging-two-git-repositories-into-one-repository-without-losing-file-history/
+
+function Merge-Repository { 
+ $NAME   = $args[0]
+ $URL    = $args[1]
+ $PREFIX = $args[2]
+ git remote add -f $NAME $URL
+ git merge --allow-unrelated-histories $NAME/master
+ mkdir $NAME
+ dir –exclude $PREFIX*\ | %{git mv $_.Name $NAME}
+ git commit -m “move workflow-types into subdirectory”
+} 
+
+e.g.
+
+Merge-Repository commands-core https://github.com/sboosali/commands-core 
+
+----------------------------------------
+ 
+function Merge-Existing-Repository { 
+ $NAME   = $args[0]
+ $URL    = $args[1]
+ $PREFIX = $args[2]
+# git remote add -f $NAME $URL
+ cd $NAME 
+ git merge $NAME/master
+ git commit 
+} 
+
+Merge-Existing-Repository commands-spiros https://github.com/sboosali/commands-spiros 

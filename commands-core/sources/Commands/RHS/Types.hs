@@ -40,6 +40,7 @@ data RHS n t f a where
  Terminals    :: (t -> a)               -> RHS n t f a -- a placeholder for a set of terminals (e.g. set of all terminal symbols in the grammar. see 'getTerminals')
 
 -- | @pattern Empty = Alter []@
+pattern Empty :: forall (n :: * -> (* -> *) -> * -> *) t (f :: * -> *) a. RHS n t f a
 pattern Empty = Alter []
 
 -- | @ConstraintKinds@

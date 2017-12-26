@@ -2,7 +2,7 @@
 module Commands.LHS where
 import Commands.Extra
 
-import Data.Hashable
+-- import Data.Hashable
 
 import Data.List                  (intercalate)
 import Language.Haskell.TH.Syntax (Name)

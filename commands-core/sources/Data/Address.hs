@@ -10,7 +10,7 @@ import           Control.Lens                 (makeLenses,makePrisms)
 
 import           GHC.Generics                 (Generic)
 import Data.Data (Data)
-import Data.Function ((&))
+-- import Data.Function ((&))
 import Data.Monoid
 import GHC.Exts (IsString(..))
 

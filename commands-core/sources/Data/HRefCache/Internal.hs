@@ -13,7 +13,7 @@ import           Data.IntMap           (IntMap)
 import qualified Data.IntMap           as IntMap
 import           Data.IORef
 import qualified Data.List             as List
-import           GHC.Prim              (Any)
+import           GHC.Types               (Any)
 import           Prelude               hiding (lookup)
 import           System.Mem.StableName
 import           Unsafe.Coerce

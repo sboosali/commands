@@ -95,7 +95,7 @@ library
                 base >=4.8 && <5.0
 
               , spiros
-              , reified-bindings
+--              , reified-bindings
 
      -- packages:
      -- , workflow-types

@@ -97,7 +97,7 @@ defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
  handle = defaultHandler
- cmdln = defaultCmdln
+ cmdln = Just defaultCmdln
  port  = 8888
 
 defaultHandler :: Recognition -> W.WorkflowT IO ()

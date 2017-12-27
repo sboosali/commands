@@ -8,7 +8,7 @@ import           Commands.Plugins.Spiros.Extra
 
 import           Commands.Mixins.DNS13OSX9 
 import Prelude()
-import Prelude.Spiros
+import Prelude.Spiros()
 
 
 shell = 'shell <=> foldMap go shellCommands

@@ -80,12 +80,15 @@ Just ["hello","world"]
 
 -}
 type Recognition = [String]
+-- newtype Recognition = Recognition [String]
 
 {-| Platform-independent settings for the server.
 
 -}
 data Settings = Settings
- { handle               :: Recognition -> W.WorkflowT IO () -- tokenized
+-- { handle               :: Recognition -> IO ()
+ { handle :: W.ExecuteWorkflow -> Recognition -> IO ()
+ -- W.WorkflowT IO () -- tokenized
  , exec                 :: W.ExecuteWorkflow
  , cmdln                :: Maybe (String -> IO ()) -- not tokenized
  , port                 :: Int
@@ -96,12 +99,16 @@ data Action_ = Ignored_ | Shortcut_ String | Dictated_ String deriving (Show)
 defaultSettings :: W.ExecuteWorkflow -> Settings
 defaultSettings exec = Settings{..}
  where
- handle = defaultHandler
+ -- handle = (exec&W.getExecuteWorkflow) defaultHandler
+ -- handle = defaultHandler exec
+ handle = defaultHandler   
  cmdln = Just defaultCmdln
  port  = 8888
 
-defaultHandler :: Recognition -> W.WorkflowT IO ()
-defaultHandler ws = do
+-- defaultHandler :: Recognition -> IO ()
+-- defaultHandler ws = do
+defaultHandler :: W.ExecuteWorkflow -> Recognition -> IO ()
+defaultHandler (W.ExecuteWorkflow _execute) ws = _execute $ do
  liftIO$ putStrLn ""
  liftIO$ print ws
  liftIO$ print a

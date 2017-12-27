@@ -16,6 +16,7 @@ packages:
 - commands-frontend-DragonNaturallySpeaking/
 - commands-server-simple/
 # - commands-server-types/
+- commands-spiros/
 
 - location:
     git:    https://github.com/sboosali/spiros
@@ -62,6 +63,8 @@ packages:
 extra-deps:
 
 - enumerate-0.2.2
+- s-expression-0.0.0
+- derive-monoid-0.0.1
 
 - template-haskell-2.11.1.0
 

@@ -24,7 +24,6 @@ import           Commands.Parsers.Earley as CP
 
 import qualified Data.Text.Lazy                   as T
 
-import           Control.Applicative
 import           Data.Char
 
 

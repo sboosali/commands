@@ -53,9 +53,11 @@ handlers settings = handleRecognition settings :<|> handleTest
 -- type family ServerT (layout :: k) (m :: * -> *) :: *
 
 handleRecognition :: Settings -> RecognitionHandler
-handleRecognition Settings{handle, exec= W.ExecuteWorkflow exec} ws
- = Handler (handle ws & exec & forkIO & void & liftIO) -- TODO fork necessary?  Probably not, server spins off new thread per req
+handleRecognition Settings{handle,exec} ws
+ = Handler (go ws & forkIO & void & liftIO) -- TODO fork necessary?  Probably not, server spins off new thread per req
 -- _500 :: String -> ServantErr _500 s = err500{ errBody = BS.pack e }
+ where
+ go = handle exec
 
 handleTest :: Response String
-handleTest = return "success"
+handleTest = return "success (commands-server-simple)"

@@ -49,7 +49,7 @@ newtype Hypotheses = Hypotheses [Hypothesis]
 {-|
 -}
 type Hypothesis = [Text]
-
+ 
 --------------------------------------------------------------------------------
 
 makeLenses ''CorrectionSettings

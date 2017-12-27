@@ -33,13 +33,15 @@ library
 
     hs-source-dirs: config
 
-    -- if os(darwin)
-    --     hs-source-dirs: config-osx
-    --     exposed-modules:
-    --                     Commands.Backends.Workflow
-    --     build-depends:
-    --                     workflow-osx
-    --
+-- TODO use backpack? 
+
+    -- if os(linux)
+    --      hs-source-dirs: config-linux
+    --      exposed-modules:
+    --                      Commands.Backends.Workflow
+    --      build-depends:
+    --                      workflow-x11-shell
+
     if os(windows)
          hs-source-dirs: config-windows
          exposed-modules:
@@ -47,6 +49,13 @@ library
          build-depends:
                          workflow-windows
 
+    -- if os(darwin)
+    --     hs-source-dirs: config-osx
+    --     exposed-modules:
+    --                     Commands.Backends.Workflow
+    --     build-depends:
+    --                     workflow-osx
+    --
 
 --     ghc.exe: C:\Users\Maria\speech\commands-spiros\.stack-work\install\12018b8a\lib\x86_64-windows-ghc-7.10.3\workflow-windows-0.0.0-IbuwRuKOjSPBHW440nyHEh\HSworkflow-windows-0.0.0-IbuwRuKOjSPBHW440nyHEh.o: unknown symbol `__imp_LookupPrivilegeValueW'
         --
@@ -169,7 +178,7 @@ library
 
                   commands-core,
                   commands-frontend-DragonNaturallySpeaking,
-                  commands-server-types,
+--                  commands-server-types,
                   commands-server-simple,
 
                   workflow-types,
@@ -227,6 +236,8 @@ library
 
     default-language: Haskell2010
     default-extensions: AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveLift
+    other-extensions:   TemplateHaskell
+                        -- for clarity about portability across compilers  
     ghc-options:
       -Wall
       -Wcompat
@@ -234,6 +245,7 @@ library
       -Wsemigroup
       -Wnoncanonical-monad-instances
       -Wnoncanonical-monadfail-instances
+
 
 executable commands-spiros-server
     main-is:        Main.hs

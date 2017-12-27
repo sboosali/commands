@@ -33,7 +33,8 @@ import Control.Monad (replicateM_)
 import Data.Char (chr)
 
 import Prelude()
-import Prelude.Spiros hiding(insert)
+-- import Prelude.Spiros hiding(insert)
+import Prelude.Spiros() 
 
 
 -- default (Workflow ())            -- ExtendedDefaultRules. TODO doesn't help with inference
@@ -199,13 +200,14 @@ goto_line n = do
  slot (show n)
 
 atomic_goto_line ds = do
- let n = fromDecimal ds
+ let n = fromDecimal ds :: Integer 
  press "H-g"
  slot (show n)
 
 atomic_goto_location lineNumbers columnNumbers = do
-  let l= fromDecimal lineNumbers
-  let c= {- fromMaybe 0 -} columnNumbers & fromDecimal -- TODO as a pattern, should simple defaulting be in the grammar declaration (e.g.with -?-) or the handler function (e.g.like here)
+  let l = fromDecimal lineNumbers :: Integer
+  let c = {- fromMaybe 0 -} columnNumbers & fromDecimal -- :: Int
+          -- TODO as a pattern, should simple defaulting be in the grammar declaration (e.g.with -?-) or the handler function (e.g.like here)
   press "H-g"
   slot (show l)
   replicateM_ c $ moveRight -- atom's goto-line command moves to the start of the life
@@ -476,7 +478,7 @@ transferTextWith howToInsert howToReturn = do
   -- openApplication "Notes"
   press "M-<tab>"
   delay 500                    -- must wait for clipboard
-  howToInsert
+  _ <- howToInsert
   replicateM_ 1 $ press "<ret>"
   delay 500                    -- must wait for clipboard
   howToReturn 

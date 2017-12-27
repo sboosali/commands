@@ -14,14 +14,11 @@ and you can perform actions on regions (e.g. jump to the start of it, copy it, e
 module Commands.Plugins.Spiros.Language.Haskell  where
 import Commands.Plugins.Spiros.Extra
 
-import Commands.Mixins.DNS13OSX9
-
-import Control.Applicative
-
-import Prelude.Spiros
+-- import Commands.Mixins.DNS13OSX9
+import Prelude.Spiros()
 
 derivingStatement = "deriving" -: derivingStrategy
 
 derivingStrategy = ["stock", "newtype", "anyclass"]
 
-haskellDeclaration = ["data", "newtype", "type", "class", "instance"]
+haskellDeclaration = ["data", "newtype", "type", "class", "instance"] -- TODO 

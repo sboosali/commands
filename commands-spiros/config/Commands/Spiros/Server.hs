@@ -1,3 +1,4 @@
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE RankNTypes, FlexibleContexts, NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings, ViewPatterns, NamedFieldPuns, RecordWildCards, PartialTypeSignatures, DoAndIfThenElse #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-partial-type-signatures -fno-warn-type-defaults #-}
@@ -27,7 +28,7 @@ which makes it easy to click on visual incorrect characters
 module Commands.Spiros.Server where
 import Commands.Plugins.Spiros hiding (mainWith)
 
-import Commands.Servers.Simple
+import "commands-server-simple" Commands.Servers.Simple hiding (Recognition)
 -- import Workflow.<platform>
 import qualified Commands.Backends.Workflow as Windows
 import qualified Workflow.Windows.Bindings as Windows2
@@ -37,21 +38,26 @@ import Commands.Frontends.Natlink.Types
 --import qualified Commands.Frontends.Dragon13 as DNS
 import           Commands.Parsers.Earley (EarleyParser(..), bestParse) -- , eachParse)
 import           Commands.Mixins.DNS13OSX9 -- (unsafeDNSGrammar, unsafeEarleyProd)
--- import qualified Workflow.Core         as W
+import qualified Workflow.Core         as W
 
 import           Control.Lens
 import           Data.Text.Lazy                        (Text)
 import qualified Data.Text.Lazy                as T
 import qualified Data.Text.Lazy.IO             as T
+import "clock" System.Clock 
+import "time" Data.Time.Clock 
+import "deepseq" Control.DeepSeq (NFData, force) 
+
 import Data.Char
 import qualified Data.List as List
 import           Control.Monad
 import System.IO
 import System.Mem
-import System.Clock 
-
--- import Prelude.Spiros
 import Prelude()
+import "base" Control.Concurrent (forkIO) 
+import "base" Control.Exception  (evaluate)
+
+import "spiros" Prelude.Spiros (delayMilliseconds) 
 
 {-|
 
@@ -196,7 +202,7 @@ mainWith environment@VEnvironment{..} = do
   runSimpleServer _settings
 
   where
-  _settings = (defaultSettings Windows.defaultWindowsExecuteWorkflow) -- TODO This is  platform specific
+  _settings = (defaultSettings Windows.defaultWindowsExecuteWorkflow) -- TODO This is  platform specific / and currently ignored
     { handle = myHandle ePlugin
     , cmdln = Nothing -- Just $ myCmdln ePlugin
     }
@@ -210,14 +216,18 @@ myCmdln ePlugin (words -> fmap T.pack -> ws) = do
   hFlush stdout
 
 -- myHandle = defaultHandle
-myHandle :: _
-myHandle ePlugin (fmap T.pack -> recognition) = do
+-- myHandle :: _ -> W.ExecuteWorkflow -> Recognition -> IO ()
+myHandle :: _ -> W.ExecuteWorkflow -> [String] -> IO ()
+myHandle ePlugin (W.ExecuteWorkflow _execute) (fmap T.pack -> recognition) =
+-- execute_ $ printingDurationInMilliseconds "request" $ do
+ printingDurationInMilliseconds "request" $ do
+  -- TODO lol re- factor command-server-simple 
   let ws = recognition & cleanRecognition
   liftIO$ do
+      putStrLn ""    
       putStrLn "----------------------------------------------------------------------------------"
       putStrLn$ "RECOGNITION:"
       print $ recognition
-      putStrLn ""
 
   -- context' <- Windows.currentApplication
   -- liftIO$ do
@@ -243,15 +253,20 @@ myHandle ePlugin (fmap T.pack -> recognition) = do
     Right () -> do
       go context ws
 
-  performGarbageCollection 
+  _ <- performGarbageCollection 
+  putStrLn "\n(returned)"
+  hFlush stdout
 
  where
  go context ws = do
-  case bestParse (ePlugin&vParser) ws of
+  x' <- printingDurationInMilliseconds "parse" $ do
+            return $ bestParse (ePlugin&vParser) ws 
+  case x' of
     Right x -> do
       -- if (isNoise (ws & fmap T.unpack)) -- TODO a "results type" for the parsing stage , either failure, success, or noise (and later maybe  other cases)
         _display ws context x
-        exec context x
+        printingDurationInMilliseconds "execute" $ do
+            exec context x
 
     Left e -> do
       liftIO$ do
@@ -263,6 +278,7 @@ myHandle ePlugin (fmap T.pack -> recognition) = do
            hFlush stdout -- TODO why flush ?
 
  _display ws context value = liftIO$ do
+      putStrLn ""
       putStrLn$ "VALUE:"
       print value
       putStrLn ""
@@ -271,16 +287,18 @@ myHandle ePlugin (fmap T.pack -> recognition) = do
       putStrLn ""
       putStrLn$ "WORDS:"
       putStrLn$ showWords ws
-      putStrLn ""
+      -- putStrLn ""
 
  exec context value = liftIO$ do
     runSpirosMonad $ (ePlugin&vDesugar) context value
+    -- runSpirosMonad $ (ePlugin&vDesugar) context value -- TODO
 
  printingDurationInMilliseconds s m = do 
    (x,t) <- measuringDuration m
    putStrLn "" 
    putStrLn $ "[action]:   " <> s 
-   putStrLn $ "[duration]: " <> show t <> "ms" 
+   putStrLn $ "[duration]: " <> show t <> "ms"
+   return x
 
  -- NOTE http://chrisdone.com/posts/measuring-duration-in-haskell
  -- 
@@ -294,28 +312,45 @@ myHandle ePlugin (fmap T.pack -> recognition) = do
  -- https://ocharles.org.uk/blog/posts/2013-12-15-24-days-of-hackage-time.html
  -- 
  measuringDuration m = do 
-   tBefore <- getCurrentTime 
-   x <- m -- calculates the computation, doesn't necessarily evaluate the output 
-   _ <- evaluate x -- evaluate the output too
-   tAfter <- getCurrentTime -- TODO getTime Realtime  
-   let tDuration = diffUTCTime tAfter tBefore 
-   let t = millisecondsFromNominalDiffTime tDuration -- in milliseconds 
-   return !(!x, !t) -- pretty sure some of these are redundant or trivial, but I just want to make sure I'm actually measuring the computation 
 
- -- the unit of NominalDiffTime seems to be seconds 
- -- https://hackage.haskell.org/package/time-1.8.0.3/docs/Data-Time-Clock.html
- -- 
- millisecondsFromNominalDiffTime :: NominalDiffTime -> Natural -- TODO 
- millisecondsFromNominalDiffTime = (*1000) > ceiling 
+   tBefore <- getNow 
+   x <- m >>= evaluate -- forceEvaluation needs NFData
+   tAfter <- getNow 
+   let tDuration = diffTimeSpec tAfter tBefore 
+   let t = millisecondsFromTimeSpec tDuration -- in milliseconds 
+   return (x, t) -- pretty sure some of these are redundant or trivial, but I just want to make sure I'm actually measuring the computation 
+
+   -- tBefore <- getCurrentTime 
+   -- x <- m -- calculates the computation, doesn't necessarily evaluate the output 
+   -- _ <- evaluate x -- evaluate the output too
+   -- tAfter <- getCurrentTime -- TODO getTime Realtime  
+   -- let tDuration = diffUTCTime tAfter tBefore 
+   -- let t = millisecondsFromNominalDiffTime tDuration -- in milliseconds 
+   -- return (x, t) -- pretty sure some of these are redundant or trivial, but I just want to make sure I'm actually measuring the computation 
+
+ getNow :: IO TimeSpec
+ getNow = getTime Realtime
+
+ forceEvaluation :: (NFData a) => a -> IO a
+ forceEvaluation x = evaluate (force x) 
+
+ -- -- the unit of NominalDiffTime seems to be seconds 
+ -- -- https://hackage.haskell.org/package/time-1.8.0.3/docs/Data-Time-Clock.html
+ -- -- 
+ -- millisecondsFromNominalDiffTime :: NominalDiffTime -> Natural -- TODO 
+ -- millisecondsFromNominalDiffTime = (*1000) > ceiling 
 
  millisecondsFromTimeSpec :: TimeSpec -> Natural 
- millisecondsFromTimeSpec = sec > (*1000) 
+ millisecondsFromTimeSpec = toNanoSecs > (`div` 1000000) > fromIntegral
  
  performGarbageCollection = do 
     _ <- forkIO$ liftIO$ do
-    -- TODO verify that the child thread is actually asynchronous and independent from the parent request thread 
-        printingDurationInMilliseconds "collected garbage" $ do 
-            performMajorGC -- lol 
+             delayMilliseconds 100 -- pause for a hundred milliseconds 
+             -- TODO verify that the child thread is actually asynchronous and independent from the parent request thread 
+             printingDurationInMilliseconds "collected garbage" $ do 
+                 performMajorGC -- lol
+    nothing
+    -- TODO the garbage collection is stop-the-world, that includes other threads right? so we should wait a little, enough for the request to return 
 
 --------------------------------------------------------------------------------
 

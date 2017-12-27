@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude, TypeSynonymInstances, FlexibleInstances, TemplateHaskellQuotes, OverloadedStrings, PostfixOperators #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-orphans #-} -- Rankable
 {-# OPTIONS_GHC -O0 -fno-cse -fno-full-laziness #-}  -- preserve "lexical" sharing for observed sharing
 module Commands.Plugins.Spiros.Number where
 import           Commands.Plugins.Spiros.Extra
@@ -9,7 +9,7 @@ import           Commands.Mixins.DNS13OSX9
 import GHC.Stack
 
 import Digit
-import Prelude.Spiros
+import Prelude.Spiros()
 
 instance Rankable Digit  -- omg this stupid typeclass must die
 instance Rankable Decimal

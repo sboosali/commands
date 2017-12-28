@@ -68,8 +68,10 @@ library
         -- cpp-options: -D_UNICODE -DUNICODE
 
     exposed-modules:
-                    Commands.Spiros.Server
-                    Commands.Spiros.Templates
+                    Commands.Spiros.Server.Main 
+                    Commands.Spiros.Server.Types                     
+                    Commands.Spiros.Server.Invoke 
+                    Commands.Spiros.Server.Templates
 
                     Commands.Plugins.Spiros
 
@@ -195,6 +197,7 @@ library
         -- on stack
                   haskell-src-meta >=0.6,
                   process >= 1.2.3.0,
+                  typed-process,
                   containers,
                   mtl,
                   wl-pprint-text,
@@ -231,11 +234,25 @@ library
                   clock,
                   time, 
 
+                  MemoTrie,
+                  uglymemo,
+--                  stable-memo, 
+
 --         vty,
                   base >=4.8 && <5.0
 
     default-language: Haskell2010
-    default-extensions: AutoDeriveTypeable, DeriveDataTypeable, DeriveGeneric, DeriveFunctor, DeriveFoldable, DeriveTraversable, DeriveLift
+    default-extensions: 
+                     PackageImports AutoDeriveTypeable DeriveDataTypeable DeriveGeneric
+                     DeriveFunctor DeriveFoldable DeriveTraversable
+                     LambdaCase EmptyCase TypeOperators PostfixOperators
+                     ViewPatterns BangPatterns KindSignatures
+                     NamedFieldPuns RecordWildCards TupleSections
+                     MultiWayIf DoAndIfThenElse EmptyDataDecls
+                     MultiParamTypeClasses FlexibleContexts FlexibleInstances
+                     TypeFamilies FunctionalDependencies
+                     ScopedTypeVariables StandaloneDeriving
+
     other-extensions:   TemplateHaskell
                         -- for clarity about portability across compilers  
     ghc-options:

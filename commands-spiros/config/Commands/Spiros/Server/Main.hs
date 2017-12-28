@@ -25,7 +25,10 @@ TODO on my correction interface, use monospaced and large font ,
 which makes it easy to click on visual incorrect characters
 
 -}
-module Commands.Spiros.Server where
+module Commands.Spiros.Server.Main where
+import Commands.Spiros.Server.Types
+import Commands.Spiros.Server.Invoke 
+-- import Commands.Spiros.Server.Templates 
 import Commands.Plugins.Spiros hiding (mainWith)
 
 import "commands-server-simple" Commands.Servers.Simple hiding (Recognition)
@@ -40,13 +43,19 @@ import           Commands.Parsers.Earley (EarleyParser(..), bestParse) -- , each
 import           Commands.Mixins.DNS13OSX9 -- (unsafeDNSGrammar, unsafeEarleyProd)
 import qualified Workflow.Core         as W
 
-import           Control.Lens
+import          "lens" Control.Lens
+import qualified "typed-process" System.Process.Typed as P 
+
 import           Data.Text.Lazy                        (Text)
 import qualified Data.Text.Lazy                as T
 import qualified Data.Text.Lazy.IO             as T
 import "clock" System.Clock 
 import "time" Data.Time.Clock 
-import "deepseq" Control.DeepSeq (NFData, force) 
+import "deepseq" Control.DeepSeq (NFData, force)
+
+import qualified "uglymemo" Data.MemoUgly as Ugly
+import qualified "MemoTrie" Data.MemoTrie as Trie
+-- import qualified "stable-memo" Data.StableMemo as Stable 
 
 import Data.Char
 import qualified Data.List as List
@@ -119,6 +128,8 @@ or concurrency(the server is being run with `-threaded`).
 -}
 main = do
   --
+  P.runProcess_ $ P.shell "title commands-spiros-server"
+  
   hSetBuffering stdin LineBuffering -- TODO NoBuffering ? 
   hSetBuffering stdout NoBuffering
 
@@ -152,34 +163,9 @@ defaultNatlinkSettings = NatLinkSettings{..} -- "" -- Todo remove context  field
   nlAddress = Address (Host "127.0.0.1") (Port 8888) -- Todo Write-once The simple-server's settings&Port
   nlLocation = "C:/NatLink/NatLink/MacroSystem/_commands.py"
 
-{-| the \"diff\" of an 'Invocation'.
-
--}
-data Invoker m a = Invoker
-  { iParse   :: [Text] -> Maybe a
-  , iCompile :: a -> m ()
-  }
-
-data Invocation m a = Invocation
- { iRecognized :: [Text]
- , iParsed     :: Maybe a
- , iCompiled   :: m ()
--- , executed   :: Bool
- }
-
-{-| the fields in the output are constructed lazily,
-with intermediary computations shared.
-
--}
--- handleRequest :: CommandsHandlers a b -> CommandsRequest -> CommandsResponse a b
-invoke :: (Applicative m) => Invoker m a -> [Text] -> Invocation m a
-invoke Invoker{..} ws = Invocation{..}
- where
- iRecognized = ws
- iParsed     = iRecognized & iParse
- iCompiled   = iParsed & maybe (pure()) iCompile
 
 {- |
+
 
 @
 
@@ -393,15 +379,19 @@ cleanRecognition
 ----------------------------------------------------------------------------------
 
 spirosUpdate
- :: DnsOptimizationSettings
+ :: (Ord c) => DnsOptimizationSettings
  -- -> RULED ((Server.VSettings m c a)) r a
  -> (CMD c (m()) a)
  -> (VPlugin m c a)
-spirosUpdate dnsSettings command = VPlugin g p d
- where
- g = (unsafeDNSGrammar dnsSettings (command&_cRHS))
- p = (EarleyParser (unsafeEarleyProd (command&_cRHS)) (command&_cBest))
- d = (command&_cDesugar)
+spirosUpdate dnsSettings command = VPlugin
+ (unsafeDNSGrammar dnsSettings (command&_cRHS))
+
+ -- ((EarleyParser (unsafeEarleyProd (command&_cRHS)) (command&_cBest)) & id) 
+ -- ((command&_cDesugar) & id) 
+
+ -- TODO make sure that the Ord constraint that Ugly.memo requires is okay 
+ (EarleyParser (unsafeEarleyProd (command&_cRHS)) (command&_cBest))  -- TODO Ugly.memo 
+ ((command&_cDesugar) & Ugly.memo)
 {-# NOINLINE spirosUpdate #-}
 
 type CMD c = DNSEarleyCommand c --TODO
@@ -413,7 +403,7 @@ type CMD c = DNSEarleyCommand c --TODO
 -}
 data VPlugin m c v = VPlugin
  { vGrammar :: DNS.SerializedGrammar
- , vParser  :: (forall s r. EarleyParser s r String Text v)
+ , vParser  :: (forall s r. EarleyParser s r String Text v) -- can't be memorized, because of the rank to type, which re-creates everything on each input sentence
  , vDesugar :: c -> v -> m ()
  }
 

@@ -29,7 +29,7 @@ import Language.Python.Common.SrcLocation
 import Language.Python.Common.ParseError
 import qualified Data.Text.Lazy                as T
 import Data.Text.Lazy (Text)
-import           Control.Lens(imap)
+-- import           Control.Lens(imap)
 import Data.Semigroup ((<>))
 import Data.Default as X
 
@@ -216,7 +216,7 @@ padNumber :: Integral a => Int -> a -> String
 padNumber padding n = printf ("%0." ++ show padding ++ "d") (toInteger n)
 
 leftAppendLineNumbers :: Text -> (Int,Int,Text)
-leftAppendLineNumbers code = (marginWidth, countWidth, (T.unlines . imap go) allLines)
+leftAppendLineNumbers code = (marginWidth, countWidth, (T.unlines . _imap go) allLines)
  where
  go ((+1) -> lineNumber) oneLine = getLeftMargin lineNumber <> oneLine
  marginWidth = (fromInteger . toInteger . T.length) (getLeftMargin (0::Integer))  -- assumes the length is constant
@@ -224,6 +224,8 @@ leftAppendLineNumbers code = (marginWidth, countWidth, (T.unlines . imap go) all
  countWidth = length (show lineCount)
  lineCount = length allLines
  allLines = T.lines code
+ _imap :: (Integer -> a -> b) -> [a] -> [b] 
+ _imap f xs = zipWith f [1..] xs
 
 getPythonErrorSpan :: ParseError -> (Int,Int)
 getPythonErrorSpan = maybe (1,1) id . go -- TODO default error span

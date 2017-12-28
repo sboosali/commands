@@ -1,9 +1,11 @@
 # my
+private/
+executables/
 ignore/
 .projectile
-enumerate/sources/Data/Canonical.hs
 result/
 result
+commands-spiros-server.exe
 
 # Haskell
 cabal.project.local

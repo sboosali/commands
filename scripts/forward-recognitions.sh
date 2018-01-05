@@ -9,23 +9,48 @@ SHARED_FOLDER="/home/sboo/guest_IE11_Win7"
 #########################################
 # watch a file
 
-TRANSCRIPTION_FILENAME=transcription.txt
-TRANSCRIPTION_FILEPATH="$SHARED_FOLDER/$TRANSCRIPTION_FILENAME"
+# doesn't work, doesn't see 
 
-inotifywait --monitor --quiet --event 'modify' "$TRANSCRIPTION_FILEPATH" | while read -r filename event; do
-  cat "${filename}" 
-done
+TRANSCRIPTION_FILENAME=transcription
+WATCHED_FILE="$SHARED_FOLDER/$TRANSCRIPTION_FILENAME"
+
+# inotifywait --monitor --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
+#   cat "${filename}" 
+# done
+
+# inotifywait --monitor --quiet --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
+#   cat "${filename}" 
+# done
 
 # inotifywait "$SHARED_FOLDER/$TRANSCRIPTION_FILE" --monitor --event 'modify'
 
 #########################################
 # watch a directory
 
+# triggers by any file in that directory being written to 
+# (a newly created file that's nonempty triggers both `create` and `modify`)
+
 TRANSCRIPTIONS_DIRECTORY=transcriptions
+WATCHED_DIRECTORY="$SHARED_FOLDER/$TRANSCRIPTIONS_DIRECTORY/"
 
-# inotifywait "$SHARED_FOLDER/$TRANSCRIPTIONS_DIRECTORY/" --monitor --event 'modify,create'
+# excludes dotfiles, files that start with a dot
+# in particular, ephemeral emacs files like: /home/sboo/guest_IE11_Win7/transcriptions/.#-emacsa05488
 
-# inotifywait "$SHARED_FOLDER/$TRANSCRIPTIONS_DIRECTORY/" --monitor --event 'modify,create' 
+# TODO  --exclude '\..+' matches a dot anywhere in string, and '\`' doesn't work
+
+# also see https://stackoverflow.com/questions/7943528/inotifywait-exclude-regex-pattern-formatting
+
+echo Watching "$WATCHED_DIRECTORY"
+echo
+
+inotifywait --monitor --exclude '\..+' --event 'modify' $WATCHED_DIRECTORY | grep "${WATCHED_DIRECTORY}.*${TRANSCRIPTION_FILENAME}" --line-buffered | while read -r directory event filename; do
+  echo "----------------------------------------"
+  echo "${event}"
+  cat "${directory}${filename}" 
+  echo
+done
+
+# in emacs, transcribe into subdir for inotifywait
 
 #########################################
 
@@ -75,6 +100,11 @@ TRANSCRIPTIONS_DIRECTORY=transcriptions
 #               tened  for are listed in the EVENTS section.  This option can be
 #               specified more than once.  If omitted, all events  are  listened
 #               for.
+
+# --exclude <pattern>
+#        Do not process any events whose  filename  matches
+#        the  specified  POSIX extended regular expression,
+#        case sensitive.
 
 # EVENTS
 #        The following events are valid for use with the -e option:

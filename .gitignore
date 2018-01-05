@@ -6,6 +6,7 @@ ignore/
 result/
 result
 commands-spiros-server.exe
+scripts/test-auto-save.txt
 
 # Haskell
 cabal.project.local

@@ -3,35 +3,21 @@
 # $ ./scripts/forward-recognitions.sh
 
 #########################################
+# constants
 
 SHARED_FOLDER="/home/sboo/guest_IE11_Win7"
 
-#########################################
-# watch a file
-
-# doesn't work, doesn't see 
+TRANSCRIPTIONS_DIRECTORY=transcriptions
+WATCHED_DIRECTORY="$SHARED_FOLDER/$TRANSCRIPTIONS_DIRECTORY/"
 
 TRANSCRIPTION_FILENAME=transcription
-WATCHED_FILE="$SHARED_FOLDER/$TRANSCRIPTION_FILENAME"
-
-# inotifywait --monitor --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
-#   cat "${filename}" 
-# done
-
-# inotifywait --monitor --quiet --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
-#   cat "${filename}" 
-# done
-
-# inotifywait "$SHARED_FOLDER/$TRANSCRIPTION_FILE" --monitor --event 'modify'
+WATCHED_FILE="$WATCHED_DIRECTORY/$TRANSCRIPTION_FILENAME"
 
 #########################################
 # watch a directory
 
 # triggers by any file in that directory being written to 
 # (a newly created file that's nonempty triggers both `create` and `modify`)
-
-TRANSCRIPTIONS_DIRECTORY=transcriptions
-WATCHED_DIRECTORY="$SHARED_FOLDER/$TRANSCRIPTIONS_DIRECTORY/"
 
 # excludes dotfiles, files that start with a dot
 # in particular, ephemeral emacs files like: /home/sboo/guest_IE11_Win7/transcriptions/.#-emacsa05488
@@ -44,15 +30,37 @@ echo Watching "$WATCHED_DIRECTORY"
 echo
 
 inotifywait --monitor --exclude '\..+' --event 'modify' $WATCHED_DIRECTORY | grep "${WATCHED_DIRECTORY}.*${TRANSCRIPTION_FILENAME}" --line-buffered | while read -r directory event filename; do
-  echo "----------------------------------------"
-  echo "${event}"
-  cat "${directory}${filename}" 
-  echo
+  filepath="${directory}${filename}"
+  xdotool type "$(cat ${filepath})" # TODO encoding
 done
 
 # in emacs, transcribe into subdir for inotifywait
 
 #########################################
+# (older versions)
+# watching a single file doesn't seem to work, doesn't see edits from the guest 
+
+# inotifywait --monitor --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
+#   cat "${filename}" 
+# done
+
+# inotifywait --monitor --quiet --event 'modify' "$WATCHED_FILE" | while read -r filename event; do
+#   cat "${filename}" 
+# done
+
+# inotifywait "$SHARED_FOLDER/$TRANSCRIPTION_FILE" --monitor --event 'modify'
+
+
+# inotifywait --monitor --exclude '\..+' --event 'modify' $WATCHED_DIRECTORY | grep "${WATCHED_DIRECTORY}.*${TRANSCRIPTION_FILENAME}" --line-buffered | while read -r directory event filename; do
+#   echo "----------------------------------------"
+#   echo "${event}"
+#   cat "${directory}${filename}" 
+#   echo
+# done
+
+
+#########################################
+# docs
 
 # NAME
 #        inotifywait - wait for changes to files using inotify

@@ -1,0 +1,22 @@
+========================================
+
+;; auto-save-hook
+;;
+;; which checks both: 
+;; an idle timer; 
+;; and a keystroke counter;
+;; whichever's sooner. 
+;;
+;; called before performing the auto-save
+(defun run-whenever-idle (f)  
+  (add-hook 'auto-save-hook f))
+
+;; there is no after-auto-save-hook
+;; 
+;; there are:
+;; post-self-insert-hook
+;; before-revert-hook
+;; before-save-hook
+
+========================================
+

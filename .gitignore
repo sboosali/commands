@@ -9,6 +9,7 @@ commands-spiros-server.exe
 scripts/test-auto-save.txt
 
 # Haskell
+.styx/
 cabal.project.local
 dist-newstyle/
 dist

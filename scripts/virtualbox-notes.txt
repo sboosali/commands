@@ -1,0 +1,10 @@
+========================================
+VirtualBox.xml 
+
+~/.config/VirtualBox/VirtualBox.xml 
+
+<ExtraDataItem name="GUI/Statusbar" value="true"/>
+<ExtraDataItem name="GUI/Toolbar" value="true"/>
+
+
+========================================

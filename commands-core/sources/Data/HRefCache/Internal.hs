@@ -18,6 +18,7 @@ import           Prelude               hiding (lookup)
 import           System.Mem.StableName
 import           Unsafe.Coerce
 
+import Prelude
 
 {- | a @H@eterogeneous store that @Cache@s by @Ref@erence.
 

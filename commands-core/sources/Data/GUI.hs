@@ -16,6 +16,7 @@ import           Language.Haskell.TH.Syntax   (ModName (ModName), Name (..),
                                                OccName (OccName),
                                                PkgName (PkgName))
 
+import Prelude
 
 -- | could have fourth field: @Version@.
 data GUI = GUI

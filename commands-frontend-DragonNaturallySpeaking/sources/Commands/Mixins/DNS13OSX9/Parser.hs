@@ -23,6 +23,7 @@ import Unsafe.Coerce
 import           Control.Monad.ST.Unsafe
 import           System.IO.Unsafe
 
+import Prelude
 
 {-|
 

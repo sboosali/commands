@@ -19,6 +19,7 @@ import Control.Applicative
 import Control.Arrow ((>>>))
 import           Data.Function                   ((&) )
 
+import Prelude
 
 type EarleyEither e t = Either (E.Report e [t])
 

@@ -6,6 +6,7 @@ module Data.Possibly
 
 import           Control.Monad.Catch          (MonadThrow(..))
 
+import Prelude
 
 {-| generalized 'Maybe':
 

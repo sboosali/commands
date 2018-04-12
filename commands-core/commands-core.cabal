@@ -17,7 +17,11 @@ description:
     .
 category: Accessibility, Natural Language Processing, Parsing, Speech Recognition, Voice Control
 author: Spiros Boosalis
-tested-with: GHC ==7.10.1
+
+
+tested-with:
+ GHC ==8.2.2
+
 extra-source-files:
     README.md
 
@@ -29,9 +33,34 @@ library
 
   hs-source-dirs: sources
   default-language: Haskell2010
-  default-extensions: AutoDeriveTypeable DeriveDataTypeable
-                      DeriveGeneric DeriveFunctor DeriveFoldable DeriveTraversable
-  Other-Extensions: TemplateHaskell
+
+  -- NOTE -XNoImplicitPrelude 
+  default-extensions:
+    NoImplicitPrelude
+    -- deriving
+    AutoDeriveTypeable DeriveDataTypeable DeriveGeneric DeriveFunctor DeriveFoldable DeriveTraversable DeriveLift StandaloneDeriving
+    -- syntax
+    PackageImports LambdaCase EmptyCase TypeOperators PostfixOperators BangPatterns KindSignatures NamedFieldPuns RecordWildCards TupleSections MultiWayIf DoAndIfThenElse EmptyDataDecls InstanceSigs
+    -- typeclasses
+    MultiParamTypeClasses FlexibleContexts FlexibleInstances TypeFamilies FunctionalDependencies
+    -- patterns
+    ViewPatterns PatternSynonyms
+    -- (miscellaneous)
+    ScopedTypeVariables
+ 
+  other-extensions:
+   -- macros
+   TemplateHaskell
+   -- QuasiQuotes
+   -- syntax (of literals)
+   OverloadedStrings OverloadedLists
+   -- RebindableSyntax
+   -- kinds
+   -- DataKinds ConstraintKinds
+   -- harmful to inference
+   -- GADTs RankNTypes
+   -- (miscellaneous)
+ 
   ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-unticked-promoted-constructors
 
   exposed-modules:
@@ -116,6 +145,7 @@ library
 
      -- servant
               , servant-client
+              , servant-client-core
               -- , servant-server
               -- , servant
 

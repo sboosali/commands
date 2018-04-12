@@ -16,6 +16,7 @@ import           Data.Monoid
 import           GHC.Exts            (IsList (..), IsString (..))
 -- import Text.Printf
 
+import Prelude
 
 newtype ConstNonTerminal n t (f :: (* -> *)) a = ConstNonTerminal n
 

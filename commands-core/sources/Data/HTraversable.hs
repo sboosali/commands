@@ -4,6 +4,7 @@ import Data.HTypes
 import Data.HFunctor 
 -- import Data.HFoldable 
 
+import Prelude
 
 {-| higher-order Traversable. 
 

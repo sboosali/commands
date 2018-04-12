@@ -16,7 +16,10 @@ import           Text.PrettyPrint.Leijen.Text (Doc, displayT, renderPretty)
 import qualified Data.Set as Set
 import           GHC.Exts                          (IsString (..))
 
-import Prelude.Spiros
+import Prelude.Spiros hiding
+ (constructors
+ ,Possibly,throwM
+ )
 import Prelude(toEnum)
 
 -- | The constructors of a (zero-based) Enum.

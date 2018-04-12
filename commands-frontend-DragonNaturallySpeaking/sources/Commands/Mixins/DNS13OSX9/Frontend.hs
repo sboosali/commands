@@ -8,7 +8,7 @@ module Commands.Mixins.DNS13OSX9.Frontend where
 
 import Commands.RHS
 import Commands.Frontends.Dragon13
-import           Commands.Extra
+import           Commands.Extra hiding (gets, modify)
 import Commands.Mixins.DNS13OSX9.Types
 import Commands.Mixins.DNS13OSX9.Derived
 import Commands.Mixins.DNS13OSX9.ObservedSharing

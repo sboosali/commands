@@ -7,8 +7,8 @@ module Commands.Server.Platform.Types where
 import Data.Default.Class
 
 import qualified System.Info
-import Prelude.Spiros
 
+import Prelude.Spiros hiding (KnownOperatingSystem(..))
 import Prelude(error)
 
 {-|

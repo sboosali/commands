@@ -7,6 +7,8 @@ import           Text.InterpolatedString.Perl6
 
 import           GHC.Exts                        (IsString)
 
+import Prelude
+
 {-|
 
 @

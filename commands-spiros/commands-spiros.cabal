@@ -33,7 +33,35 @@ library
 
     hs-source-dirs: config
 
--- TODO use backpack? 
+
+    -- NOTE -XNoImplicitPrelude 
+    default-extensions:
+       NoImplicitPrelude
+       -- deriving
+       AutoDeriveTypeable DeriveDataTypeable DeriveGeneric DeriveFunctor DeriveFoldable DeriveTraversable DeriveLift StandaloneDeriving
+       -- syntax
+       PackageImports LambdaCase EmptyCase TypeOperators PostfixOperators BangPatterns KindSignatures NamedFieldPuns RecordWildCards TupleSections MultiWayIf DoAndIfThenElse EmptyDataDecls InstanceSigs
+       -- typeclasses
+       MultiParamTypeClasses FlexibleContexts FlexibleInstances TypeFamilies FunctionalDependencies
+       -- patterns
+       ViewPatterns PatternSynonyms
+       -- (miscellaneous)
+       ScopedTypeVariables
+    
+    other-extensions:
+      -- macros
+      TemplateHaskell
+      -- QuasiQuotes
+      -- syntax (of literals)
+      OverloadedStrings OverloadedLists
+      -- RebindableSyntax
+      -- kinds
+      -- DataKinds ConstraintKinds
+      -- harmful to inference
+      -- GADTs RankNTypes
+      -- (miscellaneous)
+
+   -- TODO use backpack? 
 
     -- if os(linux)
     --      hs-source-dirs: config-linux
@@ -241,20 +269,9 @@ library
 --         vty,
                   base >=4.8 && <5.0
 
-    default-language: Haskell2010
-    default-extensions: 
-                     PackageImports AutoDeriveTypeable DeriveDataTypeable DeriveGeneric
-                     DeriveFunctor DeriveFoldable DeriveTraversable
-                     LambdaCase EmptyCase TypeOperators PostfixOperators
-                     ViewPatterns BangPatterns KindSignatures
-                     NamedFieldPuns RecordWildCards TupleSections
-                     MultiWayIf DoAndIfThenElse EmptyDataDecls
-                     MultiParamTypeClasses FlexibleContexts FlexibleInstances
-                     TypeFamilies FunctionalDependencies
-                     ScopedTypeVariables StandaloneDeriving
 
-    other-extensions:   TemplateHaskell
-                        -- for clarity about portability across compilers  
+    default-language: Haskell2010
+
     ghc-options:
       -Wall
       -Wcompat

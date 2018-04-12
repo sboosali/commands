@@ -7,6 +7,7 @@ import           Control.Monad.Catch               (Exception)
 import           Data.Typeable                     (Typeable)
 import qualified Text.Earley                       as E
 
+import Prelude
 
 -- | the superclass constraints on 'Exception'. uses @ConstraintKinds@.
 --

@@ -4,7 +4,9 @@ module Commands.Main where
 -- import Commands.Playground
 
 import           System.Environment             (getArgs)
+import Control.Monad
 
+import Prelude
 
 main = mainWith =<< getArgs
 

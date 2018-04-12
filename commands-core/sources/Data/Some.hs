@@ -6,6 +6,8 @@ module Data.Some where
 import Data.Type.Equality
 -- import Data.Ord
 
+import Prelude
+
 
 data Some f where 
  Some :: f x -> Some f 

@@ -8,7 +8,7 @@ import Commands.Server.Platform.Types
 
 -- import Commands.Frontends.Natlink.Types
 import Commands.Frontends.Dictation
-import Digit
+import "spiros" Data.Digit
 import Workflow.Core (MonadWorkflow)
 import qualified Workflow.Core as W
 
@@ -18,7 +18,7 @@ import qualified Data.Text.Lazy                as T
 
 import Data.Monoid              (First(..))
 
-import Prelude.Spiros
+import Prelude.Spiros hiding (KnownOperatingSystem(..))
 import Prelude(error)
 
 --------------------------------------------------------------------------------

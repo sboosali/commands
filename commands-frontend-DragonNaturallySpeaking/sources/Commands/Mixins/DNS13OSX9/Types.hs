@@ -27,6 +27,7 @@ import Data.Void
 import Control.Exception (Exception, SomeException)
 import           Control.Monad.ST (ST)
 
+import Prelude
 
 -- ================================================================ --
 

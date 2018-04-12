@@ -12,6 +12,7 @@ import Data.HPrelude
 import Control.Category ((>>>), (<<<)) 
 import Control.Monad((<=<), (>=>))
 
+import Prelude
 
 -- ================================================================ --
 

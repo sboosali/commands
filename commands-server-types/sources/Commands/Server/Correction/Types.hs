@@ -6,7 +6,7 @@ module Commands.Server.Correction.Types where
 
 -- import Commands.Frontends.Natlink.Types
 import Commands.Frontends.Dictation
-import Digit
+import "spiros" Data.Digit
 
 import Control.Lens (makeLenses)
 

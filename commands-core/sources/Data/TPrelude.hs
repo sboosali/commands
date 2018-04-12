@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies #-}
 module Data.TPrelude where 
 
+--import Prelude
 
 {-| n-ary type-level composition. 
 

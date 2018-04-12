@@ -43,7 +43,11 @@ import           GHC.Exts                          (IsString (..))
 import Control.Concurrent.STM(swapTVar,TVar,STM)
 import System.Mem.StableName
 
-import Prelude.Spiros
+import Prelude.Spiros hiding
+ (Handler,catches,Possibly,throwM
+ ,GUI(..),fromGlobalName
+ )
+
 import Prelude()
 
 -- | logical implication as Boolean propositions. makes reading validators easier. read @p --> q@ it as "p implies q".

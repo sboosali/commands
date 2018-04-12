@@ -8,6 +8,7 @@ import           Text.InterpolatedString.Perl6
 
 import           GHC.Exts                        (IsString)
 
+import Prelude
 
 renderGrammarProperties :: (IsString t, Monoid t) => GrammarProperties -> t
 renderGrammarProperties GrammarProperties{..} = [qc|Properties(status={_status}, exclusivity={_exclusivity}, shouldEavesdrop={_shouldEavesdrop}, shouldHypothesize={_shouldHypothesize})|]

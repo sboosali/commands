@@ -31,6 +31,8 @@ import Data.Text.Lazy (Text)
 import Data.Function ((&))
 import Control.Monad.Trans.Reader (ReaderT(..))
 
+import Prelude
+
 -- | see 'unsafeInterpretCommand'
 data Command' m a = Command'
  { cGrammar :: SerializedGrammar

@@ -1,8 +1,12 @@
-module Data.RefCache.Extra where
+module Data.RefCache.Extra
+  ( module Data.RefCache.Extra
+  -- , module Prelude
+  ) where
 
 import Control.Exception     (evaluate)
 import System.Mem.StableName
 
+import Prelude
 
 forceStableName
  :: a -- ^ strict

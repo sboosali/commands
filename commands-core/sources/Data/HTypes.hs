@@ -6,6 +6,7 @@ import Data.Functor.Product
 import Data.Functor.Compose 
 -- import Control.Applicative (Alternative(..)) 
 
+import Prelude
 
 {-| a higher-order identity-functor. 
 

@@ -17,6 +17,8 @@ import           Data.Foldable       (asum)
 -- import Control.Monad.State
 -- import Data.Functor.Classes
 
+import Prelude
+
 
 
 -- -- {-| splits RHS into DAGs (by NonTerminal). outputs the FiniteGrammar at each root. 

@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Address where
 
-import Servant.Common.BaseUrl (BaseUrl(..), Scheme(..))
+import "servant-client-core" Servant.Client.Core (BaseUrl(..), Scheme(..))
 --TODO import           Formatting                   (format, shown, string, (%))
 import           Data.Text.Lazy               (Text)
 import           Data.Text.Lazy as T
@@ -14,6 +14,7 @@ import Data.Data (Data)
 import Data.Monoid
 import GHC.Exts (IsString(..))
 
+import Prelude
 
 data Address = Address
  { _host :: Host

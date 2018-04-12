@@ -16,8 +16,7 @@ import Data.Char(toLower)
 -- import Control.Monad (unless)
 import qualified Data.Map as Map
 
-import Prelude.Spiros
-import Prelude()
+import Prelude.Spiros hiding (Handler)
 
 type RecognitionHandler = Recognition -> Response ()
 

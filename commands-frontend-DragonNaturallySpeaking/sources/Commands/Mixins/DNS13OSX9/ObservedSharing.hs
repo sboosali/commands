@@ -15,6 +15,7 @@ import           Control.Monad.ST
 import           Control.Monad.ST.Unsafe
 import           Data.IORef
 
+--import Prelude
 
 renameDNSEarleyFunc
  :: forall m n1 n2 t f1 f2 a. ((f1 ~ DNSEarleyFunc n1 t), (f2 ~ DNSEarleyFunc n2 t))

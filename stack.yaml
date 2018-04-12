@@ -1,38 +1,73 @@
-resolver: lts-10.0 
-# resolver: nightly-2017-11-24   # the last ghc-8.2.1 nightly 
+########################################
 
+resolver: lts-11.0
+
+# LTS Haskell 11.0 (ghc-8.2.2)
+# Published on 2018-03-12
 
 allow-newer: true 
 
+########################################
+
 nix:
-  enable: false
+  enable: true
   pure: true
+
   packages:
   - zlib
 
+########################################
 
 packages:
 - commands-core/
 - commands-frontend-DragonNaturallySpeaking/
 - commands-server-simple/
-# - commands-server-types/
+- commands-server-types/
 - commands-spiros/
 
 - location:
-    git:    https://github.com/sboosali/spiros
-    commit: 0c5f3584e73ae3e4c00b0a142d2024c241ac3032
+    ../spiros
   extra-dep: true
   subdirs: [.]
 
 - location:
-    git:    https://github.com/sboosali/workflow
-    commit: bbdeb206b5fb17be5a333738fac3cdd5acb512e0
+    ../workflow
   extra-dep: true
   subdirs:
   - workflow-types 
   - workflow-pure
   - workflow-extra 
-  - workflow-windows 
+  - workflow-x11-shell
+#TODO  - workflow-osx
+#TODO  - workflow-windows 
+
+- location:			
+    ../enumerate
+  extra-dep: true
+  subdirs: 
+  - enumerate 
+  - enumerate-function 
+
+- location:
+    ../Haskell-Memoize
+  extra-dep: true
+  subdirs: [.]
+
+# - location:
+#     git:    https://github.com/sboosali/spiros
+#     commit: 0c5f3584e73ae3e4c00b0a142d2024c241ac3032
+#   extra-dep: true
+#   subdirs: [.]
+
+# - location:
+#     git:    https://github.com/sboosali/workflow
+#     commit: bbdeb206b5fb17be5a333738fac3cdd5acb512e0
+#   extra-dep: true
+#   subdirs:
+#   - workflow-types 
+#   - workflow-pure
+#   - workflow-extra 
+#   - workflow-windows 
 
 # - location:			
 #     git:    https://github.com/sboosali/enumerate 
@@ -59,27 +94,28 @@ packages:
 # - ../derive-monoid
 # - ../s-expression
 
+########################################
 
 extra-deps:
 
-- enumerate-0.2.2
+# - spiros-0.2
+
+# - enumerate-0.2.2
 - s-expression-0.0.0
 - derive-monoid-0.0.1
 
-- template-haskell-2.11.1.0
+# - template-haskell-2.11.1.0
 
-- Earley-0.12.0.1
-# - language-python-0.5.4
+# - Earley-0.12.0.1
+# # - language-python-0.5.4
 
-- c-storable-deriving-0.1.3
-- string-conv-0.1.1
-- optparse-generic-1.1.3
-# - recursion-schemes-5.0.1 
+# - c-storable-deriving-0.1.3
+# - string-conv-0.1.1
+# - optparse-generic-1.1.3
+# # - recursion-schemes-5.0.1 
 
-- uglymemo-0.1.0.1 
-# - stable-memo-0.3.1 
-
-# - spiros-0.0.0
+# - uglymemo-0.1.0.1 
+# # - stable-memo-0.3.1 
 
 # - commands-core-0.0.0
 # - commands-frontend-DragonNaturallySpeaking-0.0.0
@@ -91,5 +127,8 @@ extra-deps:
 # - workflow-windows-0.0.0
 
 # - enumerate-0.2.1
+# - enumerate-function-0.2.1
 # - derive-monoid-0.0.0
 # - s-expression-0.0.0
+
+########################################

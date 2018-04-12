@@ -17,7 +17,7 @@ import Data.Monoid
  -- TODO intersperse not intercalate?
 -- TODO handle acronyms (i.e. adjacent uppercase ) correctly 
 
-
+import Prelude
 
 -- ================================================================ --
 

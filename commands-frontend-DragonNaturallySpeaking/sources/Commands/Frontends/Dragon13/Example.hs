@@ -4,6 +4,8 @@
 module Commands.Frontends.Dragon13.Example where
 import Commands.Frontends.Dragon13
 
+import Prelude
+
 main = do
 
   let

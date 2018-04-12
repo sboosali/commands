@@ -16,7 +16,7 @@ import Servant
 import Control.Monad
 import Control.Concurrent (forkIO)
 
-import Prelude.Spiros
+import Prelude.Spiros hiding (Handler)
 import Prelude()
 
 {-|

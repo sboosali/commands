@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, RankNTypes, ScopedTypeVariables, LambdaCase #-}
 module Commands.Mixins.DNS13OSX9.Derived where
-import           Commands.Frontends.Dragon13.Extra
+import           Commands.Frontends.Dragon13.Extra hiding (fromGlobalName)
 import           Commands.Munging
 import Commands.Mixins.DNS13OSX9.Types
 import Commands.Frontends.Dragon13

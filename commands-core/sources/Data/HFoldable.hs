@@ -2,6 +2,7 @@
 module Data.HFoldable where 
 import Data.HTypes
 
+import Prelude
 
 {-| higher-order Foldable. 
 
